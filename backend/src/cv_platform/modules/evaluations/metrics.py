@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
+
+from cv_algorithm_sdk import AlgorithmResult
+
+
+def evaluate_result(result: AlgorithmResult, ground_truth: dict[str, Any]) -> dict[str, float]:
+    if result.type == "object_detection":
+        return _detection_metrics(result.data.detections, ground_truth.get("detections", []))
+    if result.type == "classification":
+        expected = str(ground_truth.get("label", ""))
+        labels = [item.label for item in result.data.predictions]
+        return {"top1_accuracy": float(bool(labels) and labels[0] == expected), "top5_accuracy": float(expected in labels[:5])}
+    if result.type == "segmentation":
+        predicted = {item.label for item in result.data.segments}
+        expected = {str(item) for item in ground_truth.get("labels", [])}
+        return _set_metrics(predicted, expected)
+    if result.type == "ocr":
+        predicted = "".join(item.text for item in result.data.texts)
+        expected = str(ground_truth.get("text", ""))
+        distance = _edit_distance(predicted, expected)
+        denominator = max(1, len(expected))
+        return {"character_accuracy": max(0.0, 1 - distance / denominator), "edit_distance": float(distance)}
+    if result.type == "pose_estimation":
+        expected = ground_truth.get("keypoints", [])
+        predicted = result.data.instances[0].keypoints if result.data.instances else []
+        threshold = float(ground_truth.get("threshold", 0.05)) * max(result.input.width, result.input.height)
+        expected_by_name = {str(item["name"]): item for item in expected}
+        correct = 0
+        compared = 0
+        for keypoint in predicted:
+            target = expected_by_name.get(keypoint.name)
+            if target is None:
+                continue
+            compared += 1
+            distance = ((keypoint.x - float(target["x"])) ** 2 + (keypoint.y - float(target["y"])) ** 2) ** 0.5
+            correct += distance <= threshold
+        return {"pck": correct / compared if compared else 0.0, "keypoints_compared": float(compared)}
+    raise ValueError(f"unsupported result type: {result.type}")
+
+
+def aggregate_metrics(samples: Sequence[dict[str, float]]) -> dict[str, float]:
+    keys = sorted({key for sample in samples for key in sample})
+    return {
+        key: round(sum(sample[key] for sample in samples if key in sample) / sum(key in sample for sample in samples), 6)
+        for key in keys
+    }
+
+
+def _detection_metrics(predictions, expected: list[dict[str, Any]]) -> dict[str, float]:
+    unmatched = set(range(len(expected)))
+    true_positive = 0
+    for prediction in sorted(predictions, key=lambda item: item.score, reverse=True):
+        candidates = [
+            (index, _iou(prediction.bbox, expected[index]["bbox"]))
+            for index in unmatched
+            if prediction.label == expected[index].get("label")
+        ]
+        if not candidates:
+            continue
+        index, overlap = max(candidates, key=lambda item: item[1])
+        if overlap >= 0.5:
+            unmatched.remove(index)
+            true_positive += 1
+    false_positive = len(predictions) - true_positive
+    false_negative = len(expected) - true_positive
+    precision = true_positive / max(1, true_positive + false_positive)
+    recall = true_positive / max(1, true_positive + false_negative)
+    return {
+        "precision_iou50": precision,
+        "recall_iou50": recall,
+        "f1_iou50": 2 * precision * recall / max(1e-12, precision + recall),
+        "true_positive": float(true_positive),
+        "false_positive": float(false_positive),
+        "false_negative": float(false_negative),
+    }
+
+
+def _iou(left, right) -> float:
+    lx1, ly1, lx2, ly2 = map(float, getattr(left, "root", left))
+    rx1, ry1, rx2, ry2 = map(float, getattr(right, "root", right))
+    intersection = max(0.0, min(lx2, rx2) - max(lx1, rx1)) * max(0.0, min(ly2, ry2) - max(ly1, ry1))
+    union = max(0.0, lx2 - lx1) * max(0.0, ly2 - ly1) + max(0.0, rx2 - rx1) * max(0.0, ry2 - ry1) - intersection
+    return intersection / union if union else 0.0
+
+
+def _set_metrics(predicted: set[str], expected: set[str]) -> dict[str, float]:
+    matched = len(predicted & expected)
+    precision = matched / max(1, len(predicted))
+    recall = matched / max(1, len(expected))
+    return {"label_precision": precision, "label_recall": recall, "label_f1": 2 * precision * recall / max(1e-12, precision + recall)}
+
+
+def _edit_distance(left: str, right: str) -> int:
+    previous = list(range(len(right) + 1))
+    for left_index, left_character in enumerate(left, 1):
+        current = [left_index]
+        for right_index, right_character in enumerate(right, 1):
+            current.append(min(current[-1] + 1, previous[right_index] + 1, previous[right_index - 1] + (left_character != right_character)))
+        previous = current
+    return previous[-1]
