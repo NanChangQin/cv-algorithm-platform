@@ -8,6 +8,7 @@ import AlgorithmCard from '@/components/algorithms/AlgorithmCard.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
 import type { Algorithm, BuildJob } from '@/types/algorithm'
 import { sessionRole } from '@/api/auth'
+import { buildProgress, buildStatusLabel } from '@/utils/status'
 
 const { algorithms, loading, error, refresh } = useAlgorithms()
 const actionError = ref('')
@@ -233,7 +234,11 @@ weights/</pre>
       <button v-if="isAdmin" class="secondary-button danger-button" @click="deleteVersion">删除版本</button>
     </div>
     <div v-if="buildJob" class="build-log">
-      <header><strong>构建日志</strong><span>{{ buildJob.status }}</span></header>
+      <header><strong>构建日志</strong><span>{{ buildStatusLabel[buildJob.status] }}</span></header>
+      <div class="build-progress">
+        <progress :value="buildProgress[buildJob.status]" max="100" />
+        <span>{{ buildProgress[buildJob.status] }}%</span>
+      </div>
       <pre>{{ buildJob.logs.join('\n') || '等待构建 Worker…' }}</pre>
     </div>
   </section>

@@ -236,6 +236,8 @@ h1 em { color: var(--white); font-style: normal; }
 .task-row-actions label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 11px; cursor: pointer; }
 .task-row-actions input { accent-color: var(--green); }
 .task-row-actions .secondary-button { min-height: 30px; padding: 4px 8px; font-size: 12px; }
+.pagination { margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-size: 13px; }
+.pagination .secondary-button { min-width: 76px; }
 .task-head, .instance-head, .audit-head { min-height: 40px; color: var(--muted); background: #f8fafc; font-size: 12px; font-weight: 600; }
 .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .empty-state { padding: 28px; border: 1px dashed var(--line-strong); border-radius: var(--radius); color: var(--muted); background: #fafbfc; text-align: center; font-size: 13px; }
@@ -384,6 +386,8 @@ h1 em { color: var(--white); font-style: normal; }
 .build-log { margin-top: 14px; overflow: hidden; border: 1px solid #344054; border-radius: 6px; background: #101828; }
 .build-log header { padding: 8px 11px; display: flex; justify-content: space-between; border-bottom: 1px solid #344054; color: #eaecf0; font-size: 11px; }
 .build-log header span { color: #84adff; }
+.build-progress { padding: 8px 11px; display: flex; align-items: center; gap: 10px; color: #d0d5dd; font-size: 12px; }
+.build-progress progress { width: 100%; accent-color: #528bff; }
 .build-log pre { max-height: 300px; margin: 0; padding: 12px; overflow: auto; color: #d0d5dd; font: 11px/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
 
 .login-page { min-height: 100vh; padding: 24px; display: grid; place-items: center; background: #f5f7fa; }

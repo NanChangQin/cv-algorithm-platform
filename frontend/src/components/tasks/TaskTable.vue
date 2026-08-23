@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Algorithm } from '@/types/algorithm'
 import type { InferenceTask } from '@/types/task'
+import { taskStatusLabel } from '@/utils/status'
 
 const props = withDefaults(defineProps<{
   tasks: InferenceTask[]
@@ -36,7 +37,7 @@ function formatTime(value: string) {
     <div v-for="task in tasks" :key="task.id" class="task-row">
       <RouterLink :to="`/tasks/${task.id}`" class="mono">{{ task.id.slice(0, 8) }}</RouterLink>
       <RouterLink :to="`/tasks/${task.id}`">{{ algorithmName(task.algorithm_version_id) }}</RouterLink>
-      <RouterLink :to="`/tasks/${task.id}`" :class="`task-status task-${task.status}`"><i class="status-dot" /> {{ task.status }}</RouterLink>
+      <RouterLink :to="`/tasks/${task.id}`" :class="`task-status task-${task.status}`"><i class="status-dot" /> {{ taskStatusLabel[task.status] }}</RouterLink>
       <RouterLink :to="`/tasks/${task.id}`">{{ formatTime(task.created_at) }}</RouterLink>
       <span v-if="manageable" class="task-row-actions">
         <label v-if="task.status === 'completed'" title="加入结果归档">
