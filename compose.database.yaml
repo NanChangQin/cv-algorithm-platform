@@ -42,6 +42,7 @@ services:
   backend:
     environment:
       CV_PLATFORM_PERSISTENCE_BACKEND: postgres
+      CV_PLATFORM_QUEUE_BACKEND: postgres
       CV_PLATFORM_POSTGRES_HOST: postgres
       CV_PLATFORM_POSTGRES_PORT: "5432"
       CV_PLATFORM_POSTGRES_DB: ${CV_PLATFORM_POSTGRES_DB:-cv_platform}
@@ -50,6 +51,39 @@ services:
     depends_on:
       database-migrator:
         condition: service_completed_successfully
+
+  worker:
+    image: cv-platform/backend:dev
+    restart: unless-stopped
+    command: ["python", "-m", "cv_platform.worker"]
+    healthcheck:
+      disable: true
+    environment:
+      CV_PLATFORM_PERSISTENCE_BACKEND: postgres
+      CV_PLATFORM_QUEUE_BACKEND: postgres
+      CV_PLATFORM_POSTGRES_HOST: postgres
+      CV_PLATFORM_POSTGRES_PORT: "5432"
+      CV_PLATFORM_POSTGRES_DB: ${CV_PLATFORM_POSTGRES_DB:-cv_platform}
+      CV_PLATFORM_POSTGRES_USER: ${CV_PLATFORM_POSTGRES_USER:-cv_platform}
+      CV_PLATFORM_POSTGRES_PASSWORD: ${CV_PLATFORM_POSTGRES_PASSWORD}
+      CV_PLATFORM_ALGORITHM_MANAGER_URL: http://algorithm-manager:8010/api/v1
+      CV_PLATFORM_MEDIA_WORKER_URL: http://media-worker:8020
+      CV_PLATFORM_STORAGE_ROOT: /storage
+      CV_PLATFORM_PACKAGE_ROOT: /packages
+      CV_PLATFORM_TASK_WORKER_COUNT: ${CV_PLATFORM_TASK_WORKER_COUNT:-2}
+    volumes:
+      - ${CV_PLATFORM_DATA_ROOT:-/srv/cv-platform/data}:/storage
+      - ${CV_PLATFORM_PACKAGE_ROOT:-/srv/cv-platform/packages}:/packages
+    depends_on:
+      database-migrator:
+        condition: service_completed_successfully
+      algorithm-manager:
+        condition: service_healthy
+      media-worker:
+        condition: service_healthy
+    networks:
+      - default
+      - algorithm-runtime
 
 volumes:
   cv-platform-postgres:

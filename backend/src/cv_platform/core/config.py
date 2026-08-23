@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     max_video_upload_bytes: int = 2 * 1024 * 1024 * 1024
     prediction_timeout_seconds: float = 120
     task_worker_count: int = 2
+    queue_backend: Literal["local", "postgres"] = "local"
+    worker_poll_seconds: float = Field(default=0.5, ge=0.1, le=10)
     max_package_bytes: int = 2 * 1024 * 1024 * 1024
     max_package_extracted_bytes: int = 4 * 1024 * 1024 * 1024
     max_package_files: int = 10_000

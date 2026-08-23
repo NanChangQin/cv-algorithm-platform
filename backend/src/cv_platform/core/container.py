@@ -10,6 +10,8 @@ from ..modules.algorithms.infrastructure.postgres_repository import (
 from ..modules.algorithms.infrastructure.package_storage import AlgorithmPackageStorage
 from ..modules.algorithms.infrastructure.manager_build_gateway import ManagerBuildGateway
 from ..modules.algorithms.infrastructure.local_build_queue import LocalBuildQueue
+from ..modules.algorithms.infrastructure.persistent_queue import PostgresBuildQueue
+from ..modules.algorithms.application.service import BuildQueue
 from ..modules.assets.infrastructure.local_storage import LocalAssetStorage
 from ..modules.assets.infrastructure.memory_repository import InMemoryAssetRepository
 from ..modules.assets.domain.repositories import AssetRepository
@@ -22,6 +24,8 @@ from ..modules.tasks.infrastructure.http_prediction_gateway import (
     HttpAlgorithmPredictionGateway,
 )
 from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
+from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
+from ..modules.tasks.domain.execution import TaskQueue
 from ..modules.instances.application.service import RuntimeInstanceService
 from ..modules.comparisons.infrastructure.memory_repository import (
     InMemoryComparisonRepository,
@@ -54,12 +58,14 @@ class ApplicationContainer:
     build_jobs: BuildJobRepository
     package_storage: AlgorithmPackageStorage
     build_gateway: ManagerBuildGateway
-    build_queue: LocalBuildQueue
+    build_queue: BuildQueue
+    build_executor: LocalBuildQueue
     assets: AssetRepository
     asset_storage: LocalAssetStorage
     tasks: TaskRepository
     algorithm_manager: ClusterAlgorithmManagerGateway
-    task_queue: LocalTaskQueue
+    task_queue: TaskQueue
+    task_executor: LocalTaskQueue
     comparisons: InMemoryComparisonRepository | PostgresComparisonRepository
     auth: LocalAuthService | PostgresAuthService
     audit_log: InMemoryAuditLog | PostgresAuditLog
@@ -112,9 +118,9 @@ def build_container() -> ApplicationContainer:
     media_worker = MediaWorkerGateway(settings.media_worker_url)
     manager = ClusterAlgorithmManagerGateway(settings.algorithm_manager_url, database)
     build_gateway = ManagerBuildGateway(settings.algorithm_manager_url)
-    build_queue = LocalBuildQueue(algorithms, build_jobs, build_gateway)
+    build_executor = LocalBuildQueue(algorithms, build_jobs, build_gateway)
     instances = RuntimeInstanceService(algorithms, manager)
-    task_queue = LocalTaskQueue(
+    task_executor = LocalTaskQueue(
         tasks,
         algorithms,
         assets,
@@ -122,6 +128,14 @@ def build_container() -> ApplicationContainer:
         HttpAlgorithmPredictionGateway(settings.prediction_timeout_seconds),
         settings.task_worker_count,
     )
+    if settings.queue_backend == "postgres":
+        if database is None:
+            raise RuntimeError("PostgreSQL queue requires PostgreSQL persistence")
+        build_queue: BuildQueue = PostgresBuildQueue(database)
+        task_queue: TaskQueue = PostgresTaskQueue(database)
+    else:
+        build_queue = build_executor
+        task_queue = task_executor
     return ApplicationContainer(
         algorithms=algorithms,
         build_jobs=build_jobs,
@@ -133,6 +147,7 @@ def build_container() -> ApplicationContainer:
         ),
         build_gateway=build_gateway,
         build_queue=build_queue,
+        build_executor=build_executor,
         assets=assets,
         asset_storage=LocalAssetStorage(
             settings.storage_root,
@@ -143,6 +158,7 @@ def build_container() -> ApplicationContainer:
         tasks=tasks,
         algorithm_manager=manager,
         task_queue=task_queue,
+        task_executor=task_executor,
         comparisons=comparisons,
         auth=auth,
         audit_log=audit_log,

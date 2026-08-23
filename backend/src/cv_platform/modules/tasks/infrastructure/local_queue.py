@@ -55,6 +55,10 @@ class LocalTaskQueue:
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
+    def execute_now(self, task_id: UUID) -> None:
+        """Execute a task claimed by the durable worker."""
+        self._execute(task_id)
+
     def _execute(self, task_id: UUID) -> None:
         try:
             task = self._required_task(task_id)
@@ -110,11 +114,13 @@ class LocalTaskQueue:
                 self._cancel_events.pop(task_id, None)
 
     def _cancelled(self, task_id: UUID) -> bool:
+        task = self._required_task(task_id)
+        if task.status is TaskStatus.CANCELLED:
+            return True
         with self._lock:
             event = self._cancel_events.get(task_id)
         if event is None or not event.is_set():
             return False
-        task = self._required_task(task_id)
         if task.status not in {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}:
             self._tasks.save(
                 task.transition(TaskStatus.CANCELLED, cancelled_by="system")

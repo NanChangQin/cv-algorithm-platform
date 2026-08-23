@@ -1,4 +1,4 @@
-from typing import BinaryIO
+from typing import BinaryIO, Protocol
 from uuid import UUID
 
 from cv_algorithm_sdk import AlgorithmStatus
@@ -7,11 +7,16 @@ from ....core.errors import ApplicationError
 from ...tasks.domain.repositories import TaskRepository
 from ..domain.entities import AlgorithmVersion, BuildJob
 from ..domain.repositories import AlgorithmRepository, BuildJobRepository
-from ..infrastructure.local_build_queue import LocalBuildQueue
 from ..infrastructure.manager_build_gateway import ManagerBuildGateway
 from ...instances.domain.gateway import AlgorithmManagerGateway
 from ....core.project_context import DEFAULT_PROJECT_ID
 from ..infrastructure.package_storage import AlgorithmPackageStorage
+
+
+class BuildQueue(Protocol):
+    def submit(self, job_id: UUID) -> None: ...
+
+    def shutdown(self) -> None: ...
 
 
 class AlgorithmService:
@@ -20,7 +25,7 @@ class AlgorithmService:
         repository: AlgorithmRepository,
         jobs: BuildJobRepository | None = None,
         packages: AlgorithmPackageStorage | None = None,
-        build_queue: LocalBuildQueue | None = None,
+        build_queue: BuildQueue | None = None,
         tasks: TaskRepository | None = None,
         build_gateway: ManagerBuildGateway | None = None,
         instance_gateway: AlgorithmManagerGateway | None = None,

@@ -31,6 +31,10 @@ class LocalBuildQueue:
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
+    def execute_now(self, job_id: UUID) -> None:
+        """Execute a build claimed by the durable worker."""
+        self._execute(job_id)
+
     def _execute(self, job_id: UUID) -> None:
         job = self._jobs.get(job_id)
         if job is None:

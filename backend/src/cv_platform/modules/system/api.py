@@ -34,7 +34,7 @@ def system_health(request: Request, container=Depends(get_container)) -> dict[st
             "platform_api": "ok",
             "algorithm_manager": manager,
             "database": database,
-            "task_queue": "in_process",
+            "task_queue": "postgres_worker" if container.database is not None else "in_process",
             "file_storage": "local",
         },
         "counts": {

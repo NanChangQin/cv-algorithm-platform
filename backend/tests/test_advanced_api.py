@@ -17,7 +17,7 @@ def test_workflow_rejects_cycle(client: TestClient) -> None:
                 },
                 {
                     "id": "b",
-                    "algorithm_version_id": algorithms[1]["id"],
+                    "algorithm_version_id": algorithms[0]["id"],
                     "parameters": {},
                     "depends_on": ["a"],
                 },

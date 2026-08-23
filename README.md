@@ -72,7 +72,7 @@ cv-algorithm-platform/
 Copy-Item .env.example .env
 ```
 
-一条命令构建并启动 PostgreSQL、数据库迁移器、Algorithm Manager、Media Worker、Backend 与 Frontend：
+一条命令构建并启动 PostgreSQL、数据库迁移器、Algorithm Manager、持久任务 Worker、Media Worker、Backend 与 Frontend：
 
 ```powershell
 .\scripts\docker-local.ps1 up
@@ -118,6 +118,8 @@ CV_PLATFORM_AUTH_ENABLED=true
 
 数据库容器会自动完成 Alembic 迁移。用户和会话、项目和成员、算法和构建日志、素材元数据、推理任务和结果、算法对比、媒体源和运行、工作流和运行、运行节点、扩缩容策略及审计均写入 PostgreSQL。图片、视频、模型与算法包本体仍使用受控文件目录；Algorithm Manager 重启后会通过 Docker 标签恢复其管理的容器索引。
 
-任务执行器目前仍是 Backend 进程内线程池。平台重启时，未结束的推理、媒体或工作流任务会被持久化标记为中断失败，可在界面中重试，不会伪装为仍在运行。
+数据库组合会启用 PostgreSQL 持久队列和独立 Worker。Backend 重启不会丢失已排队的构建或推理任务，Worker 重启会重新领取中断任务。媒体运行和工作流协调器当前仍在 Backend 进程内，重启后会明确标记为中断，可在界面重试。
+
+完整备份恢复见 [服务器备份与恢复](docs/BACKUP-RESTORE.md)，Prometheus/Grafana 组合见 [运行监控](docs/MONITORING.md)。
 
 数据库版本管理详见 [数据库迁移说明](database/README.md)，支持版本查询、升级、回滚和离线 SQL 导出。

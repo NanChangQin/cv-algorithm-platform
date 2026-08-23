@@ -19,7 +19,7 @@ def test_project_creation_and_isolation(client: TestClient) -> None:
         headers={"X-Project-ID": project_b["id"]},
     )
 
-    assert len(default_algorithms.json()) == 2
+    assert len(default_algorithms.json()) == 1
     assert project_b_algorithms.json() == []
 
 

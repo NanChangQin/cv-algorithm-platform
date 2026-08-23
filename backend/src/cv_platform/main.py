@@ -1,16 +1,18 @@
 import asyncio
+import time
 from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from cv_algorithm_sdk import TaskStatus
 
 from .api.router import api_router
 from .core.config import get_settings
 from .core.errors import install_exception_handlers
+from .core.metrics import METRICS
 from .core.seed import seed_demo_data
 from .dependencies import get_container
 
@@ -21,20 +23,21 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         container = get_container()
-        for task in container.tasks.list():
-            if task.status in {
-                TaskStatus.QUEUED,
-                TaskStatus.PREPARING,
-                TaskStatus.STARTING,
-                TaskStatus.RUNNING,
-            }:
-                container.tasks.save(
-                    task.transition(
-                        TaskStatus.FAILED,
-                        error_code="TASK_INTERRUPTED",
-                        error_message="平台重启导致任务中断",
+        if settings.queue_backend == "local":
+            for task in container.tasks.list():
+                if task.status in {
+                    TaskStatus.QUEUED,
+                    TaskStatus.PREPARING,
+                    TaskStatus.STARTING,
+                    TaskStatus.RUNNING,
+                }:
+                    container.tasks.save(
+                        task.transition(
+                            TaskStatus.FAILED,
+                            error_code="TASK_INTERRUPTED",
+                            error_message="平台重启导致任务中断",
+                        )
                     )
-                )
         container.media_runs.recover_incomplete()
         container.workflows.recover_incomplete()
         seed_demo_data(container)
@@ -52,6 +55,10 @@ def create_app() -> FastAPI:
                 await scaling_task
             container.task_queue.shutdown()
             container.build_queue.shutdown()
+            if container.task_executor is not container.task_queue:
+                container.task_executor.shutdown()
+            if container.build_executor is not container.build_queue:
+                container.build_executor.shutdown()
             container.workflows.shutdown()
             container.media_runs.shutdown()
 
@@ -93,6 +100,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):
+        request_started = time.perf_counter()
         request_id = request.headers.get("X-Request-ID", str(uuid4()))
         request.state.request_id = request_id
         authorization = request.headers.get("Authorization", "")
@@ -208,6 +216,11 @@ def create_app() -> FastAPI:
                     },
                 )
         response = await call_next(request)
+        METRICS.observe_http(
+            request.method,
+            response.status_code,
+            time.perf_counter() - request_started,
+        )
         response.headers["X-Request-ID"] = request_id
         if is_api and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
             from .modules.security.service import AuditEvent
@@ -229,6 +242,20 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics() -> Response:
+        container = get_container()
+        snapshot = container.operations.metrics()
+        depths = None
+        if container.database is not None:
+            from .modules.tasks.infrastructure.persistent_queue import PostgresWorkClaimer
+
+            depths = PostgresWorkClaimer(container.database).queue_depths()
+        return Response(
+            METRICS.render(snapshot, depths),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     return app
 

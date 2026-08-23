@@ -151,9 +151,9 @@ docker compose -f compose.yaml -f compose.database.yaml --profile database run -
 - `/srv/cv-platform/data`、`packages`、`models`；
 - 算法包和 manifest 是重建镜像的主来源。
 
-业务元数据和登录会话保存在 PostgreSQL，API 重启不会丢失。重启时尚未结束的进程内任务会标记为 `TASK_INTERRUPTED` 或对应的中断失败状态，之后可重试。Manager 可通过 Docker 标签恢复算法实例索引。
+业务元数据、登录会话和构建/推理排队状态保存在 PostgreSQL。API 重启不会影响任务，独立 Worker 重启后会重新领取中断的构建与推理。媒体和工作流协调运行中断后仍会明确标记并允许重试。Manager 可通过 Docker 标签恢复算法实例索引。
 
-建议定期使用 `pg_dump` 备份 PostgreSQL，同时备份 `/srv/cv-platform/data`、`packages` 和 `models`。数据库记录与文件目录应作为同一恢复点管理。后续若需要多 Backend 副本或可靠任务续跑，再将进程内线程池替换为 Redis/Celery 等持久队列。
+使用 `scripts/backup-server.sh` 同时备份 PostgreSQL、`data`、`packages` 和 `models`，并用 `scripts/restore-server.sh` 校验和恢复同一恢复点。详细步骤见 `docs/BACKUP-RESTORE.md`。
 
 ## 12. BentoML 与 KServe
 
