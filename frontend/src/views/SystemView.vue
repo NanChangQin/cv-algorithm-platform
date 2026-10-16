@@ -40,13 +40,13 @@ onMounted(refresh)
     <p>查看 GPU、受管容器、容器日志与高风险操作审计记录。</p>
   </header>
   <p v-if="error" class="alert">{{ error }}</p>
-  <div class="toolbar"><span>本地单机运行状态</span><button class="secondary-button" @click="refresh">刷新</button></div>
+  <div class="toolbar"><span>运行节点与 GPU 状态</span><button class="secondary-button" @click="refresh">刷新</button></div>
   <section class="system-grid">
     <article class="system-panel">
       <h2>GPU</h2>
       <div v-if="gpus.length === 0" class="empty-state">未发现可用 NVIDIA GPU</div>
-      <div v-for="gpu in gpus" :key="gpu.index" class="gpu-card">
-        <strong>{{ gpu.name }}</strong><span>GPU {{ gpu.index }}</span>
+      <div v-for="gpu in gpus" :key="`${gpu.node_id}-${gpu.index}`" class="gpu-card">
+        <strong>{{ gpu.name }}</strong><span>{{ gpu.node_name }} · GPU {{ gpu.index }}</span>
         <progress :value="gpu.memory_used_mb" :max="gpu.memory_total_mb" />
         <small>{{ gpu.memory_used_mb }} / {{ gpu.memory_total_mb }} MB · {{ gpu.utilization_percent }}%</small>
       </div>

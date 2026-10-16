@@ -1,9 +1,15 @@
 from datetime import datetime
+import json
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 
-from fastapi import APIRouter, Depends, Response
+import httpx
+from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 from .application.service import InstanceService
+from .application.errors import ManagerError
+from .config import get_settings
 from .domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 
 
@@ -102,5 +108,63 @@ def build_router(get_service: object) -> APIRouter:
         service: InstanceService = Depends(get_service),
     ) -> InstanceResponse:
         return InstanceResponse.from_entity(service.touch(instance_id))
+
+    @router.post("/{instance_id}/predict")
+    def predict_remote(
+        instance_id: str,
+        request_id: str = Form(min_length=1, max_length=128),
+        parameters: str = Form(default="{}"),
+        file: UploadFile = File(),
+        service: InstanceService = Depends(get_service),
+    ) -> Response:
+        instance = service.get_instance(instance_id)
+        if instance.status is not InstanceStatus.HEALTHY:
+            raise ManagerError("INSTANCE_NOT_READY", "远端算法实例尚未就绪", 409)
+        try:
+            parsed_parameters = json.loads(parameters)
+        except ValueError as exc:
+            raise ManagerError("INPUT_INVALID", "算法参数必须为 JSON 对象") from exc
+        if not isinstance(parsed_parameters, dict):
+            raise ManagerError("INPUT_INVALID", "算法参数必须为 JSON 对象")
+        settings = get_settings()
+        input_root = settings.data_root / "remote-inputs"
+        input_root.mkdir(parents=True, exist_ok=True)
+        # Algorithms run as uid 10001 and mount /data read-only.
+        input_root.chmod(0o755)
+        input_path: Path | None = None
+        try:
+            with NamedTemporaryFile(dir=input_root, suffix=".input", delete=False) as target:
+                input_path = Path(target.name)
+                size = 0
+                while chunk := file.file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > settings.max_input_bytes:
+                        raise ManagerError("INPUT_TOO_LARGE", "远端输入图片超过大小限制", 413)
+                    target.write(chunk)
+            if size == 0:
+                raise ManagerError("INPUT_INVALID", "远端输入图片为空")
+            input_path.chmod(0o644)
+            service.touch(instance.id)
+            response = httpx.post(
+                f"{instance.endpoint}/predict",
+                json={
+                    "request_id": request_id,
+                    "input": {"asset_uri": f"file:///data/remote-inputs/{input_path.name}"},
+                    "parameters": parsed_parameters,
+                },
+                timeout=settings.prediction_timeout_seconds,
+            )
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                media_type=response.headers.get("content-type", "application/json"),
+            )
+        except httpx.TimeoutException as exc:
+            raise ManagerError("PREDICTION_TIMEOUT", "远端算法推理超时", 504) from exc
+        except httpx.HTTPError as exc:
+            raise ManagerError("ALGORITHM_UNAVAILABLE", "远端管理服务无法连接算法容器", 502) from exc
+        finally:
+            if input_path is not None:
+                input_path.unlink(missing_ok=True)
 
     return router

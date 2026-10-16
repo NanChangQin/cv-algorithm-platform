@@ -38,12 +38,18 @@ class TaskService:
         asset_id: UUID | None = None,
         asset_uri: str | None = None,
         retry_of: UUID | None = None,
+        node_id: str | None = None,
+        gpu_device_ids: tuple[str, ...] = (),
     ) -> InferenceTask:
         algorithm = self._algorithms.get(algorithm_version_id)
         if algorithm is None or algorithm.project_id != self._project_id:
             raise ApplicationError("ALGORITHM_NOT_FOUND", "算法版本不存在", 404)
         if algorithm.status != AlgorithmStatus.AVAILABLE:
             raise ApplicationError("ALGORITHM_NOT_AVAILABLE", "算法版本当前不可用", 409)
+        if gpu_device_ids and not node_id:
+            raise ApplicationError("PLACEMENT_INVALID", "指定 GPU 时必须选择运行服务器")
+        if gpu_device_ids and algorithm.manifest.runtime.device.value == "cpu":
+            raise ApplicationError("PLACEMENT_INVALID", "该算法仅支持 CPU，不能指定 GPU")
 
         resolved_uri = self._resolve_asset_uri(asset_id, asset_uri)
         try:
@@ -62,6 +68,8 @@ class TaskService:
             retry_of=retry_of,
             project_id=self._project_id,
             owner_id=self._actor,
+            node_id=node_id,
+            gpu_device_ids=gpu_device_ids,
         )
         self._tasks.add(task)
         self._queue.submit(str(task.id))
@@ -113,6 +121,8 @@ class TaskService:
             asset_id=original.asset_id,
             asset_uri=original.asset_uri,
             retry_of=original.id,
+            node_id=original.node_id,
+            gpu_device_ids=original.gpu_device_ids,
         )
 
     def _resolve_asset_uri(self, asset_id: UUID | None, asset_uri: str | None) -> str:

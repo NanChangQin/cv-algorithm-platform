@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +19,10 @@ class Settings(BaseSettings):
     idle_timeout_seconds: int = 1800
     health_monitor_seconds: int = Field(default=15, ge=5, le=300)
     health_failure_threshold: int = Field(default=3, ge=1, le=20)
+    data_root: Path = Path("/data")
+    max_input_bytes: int = 25 * 1024 * 1024
+    prediction_timeout_seconds: float = 120
+    gpu_access_mode: Literal["device-request", "runtime"] = "device-request"
 
 
 @lru_cache

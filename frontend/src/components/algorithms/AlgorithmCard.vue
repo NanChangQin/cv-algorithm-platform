@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Algorithm } from '@/types/algorithm'
+import { algorithmStatusLabel, runtimeStatusLabel } from '@/utils/presentation'
 
 defineProps<{ algorithm: Algorithm; selected?: boolean }>()
 defineEmits<{ select: [algorithm: Algorithm] }>()
@@ -21,8 +22,8 @@ const taskLabels: Record<Algorithm['task_type'], string> = {
     @click="$emit('select', algorithm)"
   >
     <div class="card-heading">
-      <span class="algorithm-icon">{{ algorithm.key.startsWith('yolo') ? 'YO' : 'FR' }}</span>
-      <span class="availability"><i /> {{ algorithm.status === 'available' ? '可用' : algorithm.status }}</span>
+      <span class="algorithm-icon">{{ algorithm.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '').slice(0, 2).toUpperCase() }}</span>
+      <span class="availability" :class="{ unavailable: algorithm.status !== 'available' }"><i /> {{ algorithmStatusLabel[algorithm.status] ?? algorithm.status }}</span>
     </div>
     <strong>{{ algorithm.name }}</strong>
     <p>{{ algorithm.description }}</p>
@@ -31,7 +32,7 @@ const taskLabels: Record<Algorithm['task_type'], string> = {
       <span>{{ algorithm.framework }}</span>
       <span>{{ algorithm.device.toUpperCase() }}</span>
     </div>
-    <footer><span>v{{ algorithm.version }}</span><span>{{ algorithm.container_status }}</span></footer>
-    <footer><span>最近调用</span><span>{{ algorithm.last_called_at ? new Date(algorithm.last_called_at).toLocaleString() : '暂无' }}</span></footer>
+    <footer><span>v{{ algorithm.version }}</span><span>{{ runtimeStatusLabel[algorithm.container_status] ?? '未启动' }}</span></footer>
+    <div class="algorithm-last-run"><span>最近调用</span><span>{{ algorithm.last_called_at ? new Date(algorithm.last_called_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '暂无记录' }}</span></div>
   </button>
 </template>

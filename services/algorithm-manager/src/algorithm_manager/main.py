@@ -23,6 +23,7 @@ def get_service() -> InstanceService:
         settings.host_data_root,
         settings.host_model_root,
         settings.health_timeout_seconds,
+        gpu_access_mode=settings.gpu_access_mode,
     )
     return InstanceService(InMemoryInstanceRepository(), runtime)
 

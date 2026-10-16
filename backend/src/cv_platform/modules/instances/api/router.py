@@ -11,6 +11,20 @@ from .schemas import RuntimeInstanceResponse
 router = APIRouter(tags=["instances"])
 
 
+@router.get("/execution-resources")
+def execution_resources(
+    container: ApplicationContainer = Depends(get_container),
+) -> dict[str, object]:
+    # Task submitters need names/cards, not administrative Manager URLs.
+    return {
+        "nodes": [
+            {"id": node.id, "name": node.name}
+            for node in container.algorithm_manager.list_nodes() if node.enabled
+        ],
+        "gpus": container.algorithm_manager.list_gpus(),
+    }
+
+
 def get_service(
     request: Request,
     container: ApplicationContainer = Depends(get_container),

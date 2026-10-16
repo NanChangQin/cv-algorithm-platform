@@ -70,12 +70,18 @@ export interface InferenceTask {
   error_message: string | null
   retry_of: string | null
   project_id: string
+  node_id: string | null
+  gpu_device_ids: string[]
+  execution_node_id: string | null
+  execution_gpu_device_ids: string[]
 }
 
 export interface CreateTaskPayload {
   algorithm_version_id: string
   asset_id: string
   parameters: Record<string, unknown>
+  node_id?: string
+  gpu_device_ids?: string[]
 }
 
 export interface TaskResultResponse {

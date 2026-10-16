@@ -31,6 +31,10 @@ class InferenceTask:
     owner_id: str = "local-admin"
     retry_of: UUID | None = None
     project_id: UUID = DEFAULT_PROJECT_ID
+    node_id: str | None = None
+    gpu_device_ids: tuple[str, ...] = ()
+    execution_node_id: str | None = None
+    execution_gpu_device_ids: tuple[str, ...] = ()
 
     @classmethod
     def queued(
@@ -43,6 +47,8 @@ class InferenceTask:
         retry_of: UUID | None = None,
         project_id: UUID = DEFAULT_PROJECT_ID,
         owner_id: str = "local-admin",
+        node_id: str | None = None,
+        gpu_device_ids: tuple[str, ...] = (),
     ) -> "InferenceTask":
         now = datetime.now(UTC)
         return cls(
@@ -57,6 +63,8 @@ class InferenceTask:
             retry_of=retry_of,
             project_id=project_id,
             owner_id=owner_id,
+            node_id=node_id,
+            gpu_device_ids=gpu_device_ids,
         )
 
     def transition(
@@ -68,6 +76,8 @@ class InferenceTask:
         error_code: str | None = None,
         error_message: str | None = None,
         cancelled_by: str | None = None,
+        execution_node_id: str | None = None,
+        execution_gpu_device_ids: tuple[str, ...] | None = None,
     ) -> "InferenceTask":
         if self.status in TERMINAL_STATUSES:
             raise ValueError(f"cannot transition terminal task from {self.status} to {status}")
@@ -84,4 +94,9 @@ class InferenceTask:
             result=result,
             error_code=error_code,
             error_message=error_message,
+            execution_node_id=execution_node_id or self.execution_node_id,
+            execution_gpu_device_ids=(
+                self.execution_gpu_device_ids
+                if execution_gpu_device_ids is None else execution_gpu_device_ids
+            ),
         )

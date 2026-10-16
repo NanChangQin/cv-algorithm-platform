@@ -82,11 +82,18 @@ class LocalTaskQueue:
             instance = self._instances.start_algorithm(
                 task.algorithm_version_id,
                 task.project_id,
+                node_id=task.node_id,
+                gpu_device_ids=task.gpu_device_ids,
             )
             if self._cancelled(task_id):
                 return
 
-            task = task.transition(TaskStatus.RUNNING, container_id=instance.id)
+            task = task.transition(
+                TaskStatus.RUNNING,
+                container_id=instance.id,
+                execution_node_id=instance.node_id,
+                execution_gpu_device_ids=instance.gpu_device_ids,
+            )
             self._tasks.save(task)
             result = self._predictions.predict(
                 instance,

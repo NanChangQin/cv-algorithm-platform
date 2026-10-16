@@ -30,3 +30,4 @@ class RuntimeRequest:
     memory_mb: int
     cpu_count: float = 1
     gpu_device_ids: tuple[str, ...] = ()
+    node_id: str | None = None

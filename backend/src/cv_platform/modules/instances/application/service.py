@@ -1,3 +1,4 @@
+from dataclasses import replace
 from uuid import UUID
 
 from ....core.errors import ApplicationError
@@ -34,8 +35,16 @@ class RuntimeInstanceService:
         self,
         algorithm_id: UUID,
         project_id: UUID | None = None,
+        *,
+        node_id: str | None = None,
+        gpu_device_ids: tuple[str, ...] = (),
     ) -> RuntimeInstance:
-        return self._manager.ensure_running(self._runtime_request(algorithm_id, project_id))
+        request = self._runtime_request(algorithm_id, project_id)
+        if gpu_device_ids and request.device == "cpu":
+            raise ApplicationError("PLACEMENT_INVALID", "该算法仅支持 CPU，不能指定 GPU")
+        return self._manager.ensure_running(
+            replace(request, node_id=node_id, gpu_device_ids=gpu_device_ids)
+        )
 
     def ensure_replicas(
         self,

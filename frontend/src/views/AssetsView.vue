@@ -58,6 +58,7 @@ async function downloadSelected() {
         <strong>{{ asset.original_name }}</strong>
         <span>{{ asset.width }} × {{ asset.height }} · {{ formatBytes(asset.size_bytes) }}</span>
         <small class="mono">{{ asset.sha256.slice(0, 14) }}…</small>
+        <RouterLink class="asset-run-link" :to="{ path: '/', query: { asset: asset.id } }">用此图片推理 →</RouterLink>
       </div>
     </article>
   </div>

@@ -1,0 +1,23 @@
+[Unit]
+Description=CV platform GPU execution node (%i)
+Requires=docker.service
+Wants=network-online.target
+After=docker.service network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=%i
+SupplementaryGroups=docker
+WorkingDirectory=/home/%i/docker/cv-platform-node
+Environment=DOCKER_CONFIG=/home/%i/.docker
+ExecStart=/usr/bin/docker compose -f compose.gpu-node.yaml up -d --force-recreate --pull never --wait --wait-timeout 90
+ExecStop=/usr/bin/docker compose -f compose.gpu-node.yaml stop
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=120
+TimeoutStopSec=45
+
+[Install]
+WantedBy=multi-user.target

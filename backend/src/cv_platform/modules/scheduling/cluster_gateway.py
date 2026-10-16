@@ -97,26 +97,49 @@ class ClusterAlgorithmManagerGateway:
         return instances
 
     def ensure_running(self, request: RuntimeRequest) -> RuntimeInstance:
-        current = [
-            instance
-            for instance in self.list_instances()
-            if instance.algorithm_version_id == request.algorithm_version_id
-            and instance.status == "healthy"
-        ]
-        if current:
-            selected = min(
-                current,
-                key=lambda item: item.last_used_at or item.updated_at,
-            )
-            return self._gateway_for_instance(selected.id).ensure_running(request)
+        if request.gpu_device_ids and not request.node_id:
+            raise ApplicationError("PLACEMENT_INVALID", "指定 GPU 时必须选择运行服务器")
+        if request.device == "cpu" and request.gpu_device_ids:
+            raise ApplicationError("PLACEMENT_INVALID", "CPU 算法不能指定 GPU")
+        nodes = (
+            [self.validate_node(request.node_id)] if request.node_id else self._enabled_nodes()
+        )
+        current = []
         candidates = []
-        for node in self._enabled_nodes():
+        for node in nodes:
             gateway = self._gateway(node)
             try:
                 instances = gateway.list_instances()
-                gpus = gateway.list_gpus()
-            except ApplicationError:
+                gpus = gateway.list_gpus() if request.device != "cpu" else []
+            except ApplicationError as exc:
+                if request.node_id:
+                    raise ApplicationError(
+                        "RUNTIME_NODE_UNAVAILABLE", f"无法连接所选服务器：{node.name}", 503
+                    ) from exc
                 continue
+            if request.gpu_device_ids:
+                available_ids = {str(gpu["index"]) for gpu in gpus}
+                if not set(request.gpu_device_ids) <= available_ids:
+                    raise ApplicationError(
+                        "GPU_UNAVAILABLE", "所选 GPU 不存在或无法检测，请刷新服务器资源", 409
+                    )
+                gpus = [gpu for gpu in gpus if str(gpu["index"]) in request.gpu_device_ids]
+            if request.device == "gpu" and not gpus:
+                if request.node_id:
+                    raise ApplicationError("GPU_UNAVAILABLE", "所选服务器未检测到可用 GPU", 409)
+                continue
+            for instance in instances:
+                if (
+                    instance.algorithm_version_id == request.algorithm_version_id
+                    and instance.image == request.image
+                    and instance.status == "healthy"
+                    and (request.device == "auto" or instance.device == request.device)
+                    and (
+                        not request.gpu_device_ids
+                        or set(instance.gpu_device_ids) == set(request.gpu_device_ids)
+                    )
+                ):
+                    current.append((instance, node, gateway))
             best_gpu = max(
                 gpus,
                 key=lambda gpu: int(gpu.get("memory_total_mb", 0))
@@ -126,13 +149,20 @@ class ClusterAlgorithmManagerGateway:
             free_gpu_memory = (
                 int(best_gpu.get("memory_total_mb", 0))
                 - int(best_gpu.get("memory_used_mb", 0))
-                if best_gpu
-                else 0
+                if best_gpu else 0
             )
-            if request.device == "gpu" and not gpus:
-                continue
-            score = free_gpu_memory - len(instances) * 1024
-            candidates.append((score, node, gateway, best_gpu))
+            candidates.append((free_gpu_memory - len(instances) * 1024, node, gateway, best_gpu))
+        if current:
+            selected, node, gateway = min(
+                current,
+                key=lambda item: item[0].last_used_at or item[0].updated_at,
+            )
+            instance = gateway.ensure_running(
+                replace(request, device=selected.device, gpu_device_ids=selected.gpu_device_ids)
+            )
+            with self._lock:
+                self._instance_routes[instance.id] = node.id
+            return instance
         if not candidates:
             raise ApplicationError("RUNTIME_NODE_UNAVAILABLE", "没有可用算法运行节点", 503)
         _, node, gateway, best_gpu = max(candidates, key=lambda item: item[0])
@@ -140,10 +170,19 @@ class ClusterAlgorithmManagerGateway:
         if request.device in {"gpu", "auto"} and best_gpu is not None:
             scheduled_request = replace(
                 request,
-                gpu_device_ids=(str(best_gpu["index"]),),
+                device="gpu",
+                gpu_device_ids=request.gpu_device_ids or (str(best_gpu["index"]),),
             )
         elif request.device == "auto":
             scheduled_request = replace(request, device="cpu", gpu_device_ids=())
+        # Different cards on the same host need independent, stable container names.
+        suffix = (
+            "gpu-" + "-".join(scheduled_request.gpu_device_ids)
+            if scheduled_request.gpu_device_ids else scheduled_request.device
+        )
+        scheduled_request = replace(
+            scheduled_request, container_name=f"{request.container_name}-{suffix}"
+        )
         instance = gateway.ensure_running(scheduled_request)
         with self._lock:
             self._instance_routes[instance.id] = node.id
@@ -248,6 +287,14 @@ class ClusterAlgorithmManagerGateway:
 
     def _enabled_nodes(self) -> list[RuntimeNode]:
         return [node for node in self.list_nodes() if node.enabled]
+
+    def validate_node(self, node_id: str) -> RuntimeNode:
+        node = next((item for item in self.list_nodes() if item.id == node_id), None)
+        if node is None:
+            raise ApplicationError("RUNTIME_NODE_NOT_FOUND", "所选运行服务器不存在", 404)
+        if not node.enabled:
+            raise ApplicationError("RUNTIME_NODE_DISABLED", "所选运行服务器已停用", 409)
+        return node
 
     def _gateway(self, node: RuntimeNode) -> HttpAlgorithmManagerGateway:
         return HttpAlgorithmManagerGateway(node.manager_url, node_id=node.id)

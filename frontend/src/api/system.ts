@@ -2,6 +2,8 @@ import { request } from './http'
 import type { RuntimeInstance } from '@/types/instance'
 
 export interface GpuInfo {
+  node_id: string
+  node_name: string
   index: number
   name: string
   memory_total_mb: number
@@ -19,6 +21,7 @@ export interface AuditEvent {
 }
 
 export const systemApi = {
+  executionResources: () => request<{ nodes: Array<{ id: string; name: string }>; gpus: GpuInfo[] }>('/execution-resources'),
   gpus: () => request<GpuInfo[]>('/system/gpus'),
   instances: () => request<RuntimeInstance[]>('/instances'),
   logs: (instanceId: string) => request<string[]>(`/instances/${instanceId}/logs`),

@@ -28,3 +28,4 @@ def test_manager_payload_uses_gateway_node_id() -> None:
 
     assert instance.node_id == "gpu-node-1"
     assert instance.gpu_device_ids == ("0",)
+    assert instance.endpoint == "http://manager/instances/container-1"

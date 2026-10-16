@@ -1,0 +1,33 @@
+name: cv-platform-gpu-node
+
+# Standalone execution node: no frontend, database or platform worker required.
+services:
+  algorithm-manager:
+    image: cv-platform/algorithm-manager:dev
+    restart: unless-stopped
+    ports:
+      - "${CV_NODE_BIND_IP:-0.0.0.0}:${CV_NODE_MANAGER_PORT:-8010}:8010"
+    environment:
+      ALGORITHM_MANAGER_DOCKER_NETWORK: cv-platform-gpu-node_algorithm-runtime
+      ALGORITHM_MANAGER_HOST_DATA_ROOT: ${CV_NODE_ROOT:-/srv/cv-platform-node}/data
+      ALGORITHM_MANAGER_HOST_MODEL_ROOT: ${CV_NODE_ROOT:-/srv/cv-platform-node}/models
+      ALGORITHM_MANAGER_DATA_ROOT: /data
+      ALGORITHM_MANAGER_PACKAGE_ROOT: /packages
+      ALGORITHM_MANAGER_GPU_ACCESS_MODE: runtime
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${CV_NODE_ROOT:-/srv/cv-platform-node}/data:/data
+      - ${CV_NODE_ROOT:-/srv/cv-platform-node}/packages:/packages
+    networks:
+      - default
+      - algorithm-runtime
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  algorithm-runtime:
+    internal: true
+    name: cv-platform-gpu-node_algorithm-runtime

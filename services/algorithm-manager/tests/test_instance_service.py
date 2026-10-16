@@ -1,6 +1,7 @@
 from algorithm_manager.application.service import InstanceService
 from algorithm_manager.domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 from algorithm_manager.infrastructure.memory_repository import InMemoryInstanceRepository
+from dataclasses import replace
 
 
 class FakeRuntime:
@@ -62,6 +63,17 @@ def test_ensure_running_reuses_healthy_instance() -> None:
     assert second.id == first.id
     assert runtime.created == 1
     assert runtime.started == [first.id]
+
+
+def test_ensure_running_keeps_gpu_placement_separate() -> None:
+    runtime = FakeRuntime()
+    service = InstanceService(InMemoryInstanceRepository(), runtime)
+    first = service.ensure_running(replace(build_spec(), gpu_device_ids=("0",)))
+    second = service.ensure_running(replace(build_spec(), gpu_device_ids=("1",)))
+    reused = service.ensure_running(replace(build_spec(), gpu_device_ids=("0",)))
+    assert second.id != first.id
+    assert reused.id == first.id
+    assert runtime.created == 2
 
 
 def test_stop_and_remove_instance() -> None:

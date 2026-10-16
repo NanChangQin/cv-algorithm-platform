@@ -101,7 +101,10 @@ class HttpAlgorithmManagerGateway:
             algorithm_version_id=str(payload["algorithm_version_id"]),
             image=str(payload["image"]),
             container_name=str(payload["container_name"]),
-            endpoint=str(payload["endpoint"]),
+            endpoint=(
+                str(payload["endpoint"]) if self._node_id == "local"
+                else f"{self._base_url}/instances/{payload['id']}"
+            ),
             status=str(payload["status"]),
             device=str(payload["device"]),
             created_at=datetime.fromisoformat(str(payload["created_at"])),

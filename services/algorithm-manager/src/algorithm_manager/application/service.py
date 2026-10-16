@@ -24,7 +24,22 @@ class InstanceService:
 
     def ensure_running(self, spec: ContainerSpec) -> AlgorithmInstance:
         with self._locks[spec.algorithm_version_id]:
-            current = self._repository.find_by_algorithm(spec.algorithm_version_id)
+            current = min(
+                (
+                    item for item in self._repository.find_all_by_algorithm(spec.algorithm_version_id)
+                    if item.image == spec.image
+                    and (spec.device == "auto" or item.device == spec.device)
+                    and (
+                        not spec.gpu_device_ids
+                        or set(item.gpu_device_ids) == set(spec.gpu_device_ids)
+                    )
+                ),
+                key=lambda item: (
+                    item.status is not InstanceStatus.HEALTHY,
+                    item.last_used_at or item.updated_at,
+                ),
+                default=None,
+            )
             if current is not None and current.status is InstanceStatus.HEALTHY:
                 try:
                     healthy = self._runtime.is_healthy(current)
@@ -206,6 +221,9 @@ class InstanceService:
         instance = self._required(instance_id).touch()
         self._repository.save(instance)
         return instance
+
+    def get_instance(self, instance_id: str) -> AlgorithmInstance:
+        return self._required(instance_id)
 
     def list_gpus(self) -> list[dict[str, object]]:
         with self._gpu_lock:

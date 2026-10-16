@@ -4,6 +4,10 @@ import { authApi, sessionRole } from '@/api/auth'
 
 export const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return to.path !== from.path ? { top: 0 } : undefined
+  },
   routes: [
     { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
     { path: '/', name: 'workspace', component: () => import('@/views/WorkspaceView.vue') },

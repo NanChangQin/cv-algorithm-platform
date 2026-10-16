@@ -200,6 +200,7 @@ weights/</pre>
     <select v-model="algorithmStatus"><option value="">全部状态</option><option value="available">可用</option><option value="disabled">停用</option><option value="uploaded">已上传</option><option value="building">构建中</option><option value="failed">失败</option></select>
   </div>
   <div v-if="loading" class="empty-state">正在加载…</div>
+  <div v-else-if="!filteredAlgorithms.length" class="empty-state"><strong>没有匹配的算法</strong><p>尝试修改筛选条件，或上传新的算法包。</p></div>
   <div v-else class="algorithm-grid">
     <AlgorithmCard
       v-for="item in filteredAlgorithms"
@@ -220,6 +221,7 @@ weights/</pre>
       <div><dt>创建者</dt><dd>{{ selected.created_by }}</dd></div>
     </dl>
     <div class="runtime-actions">
+      <RouterLink v-if="selected.status === 'available'" class="primary-button compact-button" :to="{ path: '/', query: { algorithm: selected.id } }">使用此算法 →</RouterLink>
       <button
         v-if="canBuild && ['uploaded', 'failed'].includes(selected.status)"
         class="primary-button compact-button"

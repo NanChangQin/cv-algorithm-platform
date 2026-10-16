@@ -125,7 +125,7 @@ def build_container() -> ApplicationContainer:
         algorithms,
         assets,
         instances,
-        HttpAlgorithmPredictionGateway(settings.prediction_timeout_seconds),
+        HttpAlgorithmPredictionGateway(settings.prediction_timeout_seconds, settings.storage_root),
         settings.task_worker_count,
     )
     if settings.queue_backend == "postgres":

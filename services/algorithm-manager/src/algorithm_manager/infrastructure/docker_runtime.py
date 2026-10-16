@@ -24,6 +24,7 @@ class DockerContainerRuntime:
         host_model_root: Path,
         health_timeout_seconds: float = 60,
         health_interval_seconds: float = 1,
+        gpu_access_mode: str = "device-request",
     ) -> None:
         self._client = client
         self._network = network
@@ -31,6 +32,7 @@ class DockerContainerRuntime:
         self._host_model_root = host_model_root.resolve()
         self._health_timeout = health_timeout_seconds
         self._health_interval = health_interval_seconds
+        self._gpu_access_mode = gpu_access_mode
 
     @classmethod
     def from_environment(
@@ -39,6 +41,7 @@ class DockerContainerRuntime:
         host_data_root: Path,
         host_model_root: Path,
         health_timeout_seconds: float = 60,
+        gpu_access_mode: str = "device-request",
     ) -> "DockerContainerRuntime":
         import docker
 
@@ -48,22 +51,13 @@ class DockerContainerRuntime:
             host_data_root,
             host_model_root,
             health_timeout_seconds,
+            gpu_access_mode=gpu_access_mode,
         )
 
     def create(self, spec: ContainerSpec) -> tuple[str, str]:
-        device_requests = None
+        gpu_options = {}
         if spec.device == "gpu" or spec.gpu_device_ids:
-            from docker.types import DeviceRequest
-
-            if spec.gpu_device_ids:
-                device_requests = [
-                    DeviceRequest(
-                        device_ids=list(spec.gpu_device_ids),
-                        capabilities=[["gpu"]],
-                    )
-                ]
-            else:
-                device_requests = [DeviceRequest(count=-1, capabilities=[["gpu"]])]
+            gpu_options = self._gpu_options(spec.gpu_device_ids)
 
         container = self._client.containers.create(
             image=spec.image,
@@ -73,7 +67,7 @@ class DockerContainerRuntime:
             mem_limit=f"{spec.memory_mb}m",
             nano_cpus=int(spec.cpu_count * 1_000_000_000),
             pids_limit=256,
-            device_requests=device_requests,
+            **gpu_options,
             privileged=False,
             read_only=True,
             cap_drop=["ALL"],
@@ -210,7 +204,7 @@ class DockerContainerRuntime:
                 ],
                 remove=True,
                 network_disabled=True,
-                device_requests=[{"Driver": "nvidia", "Count": -1, "Capabilities": [["gpu"]]}],
+                **self._gpu_options(()),
             )
         except Exception:
             return []
@@ -228,3 +222,20 @@ class DockerContainerRuntime:
                     }
                 )
         return gpus
+
+    def _gpu_options(self, gpu_device_ids: tuple[str, ...]) -> dict[str, Any]:
+        if self._gpu_access_mode == "runtime":
+            return {
+                "runtime": "nvidia",
+                "environment": {
+                    "NVIDIA_VISIBLE_DEVICES": ",".join(gpu_device_ids) or "all",
+                    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+                },
+            }
+        from docker.types import DeviceRequest
+
+        request = (
+            DeviceRequest(device_ids=list(gpu_device_ids), capabilities=[["gpu"]])
+            if gpu_device_ids else DeviceRequest(count=-1, capabilities=[["gpu"]])
+        )
+        return {"device_requests": [request]}

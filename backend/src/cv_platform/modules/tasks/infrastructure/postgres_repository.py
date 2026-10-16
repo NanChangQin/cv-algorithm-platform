@@ -41,6 +41,10 @@ class PostgresTaskRepository:
             owner_id=str(row["owner_label"]),
             retry_of=row["retry_of"],
             project_id=row["project_id"],
+            node_id=row["node_id"],
+            gpu_device_ids=tuple(row["gpu_device_ids"] or []),
+            execution_node_id=row["execution_node_id"],
+            execution_gpu_device_ids=tuple(row["execution_gpu_device_ids"] or []),
         )
 
     def add(self, task: InferenceTask) -> None:
@@ -53,10 +57,12 @@ class PostgresTaskRepository:
                     asset_id, asset_uri, parameters, status, container_id,
                     result_type, result, error_code, error_message, retry_of,
                     cancelled_by, cancelled_by_label, created_at, updated_at,
-                    started_at, completed_at, cancelled_at
+                    started_at, completed_at, cancelled_at,
+                    node_id, gpu_device_ids, execution_node_id, execution_gpu_device_ids
                 ) VALUES (
                     %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s
                 )
                 """,
                 (
@@ -80,6 +86,10 @@ class PostgresTaskRepository:
                     task.started_at,
                     task.completed_at,
                     task.cancelled_at,
+                    task.node_id,
+                    Jsonb(list(task.gpu_device_ids)),
+                    task.execution_node_id,
+                    Jsonb(list(task.execution_gpu_device_ids)),
                 ),
             )
 
@@ -93,7 +103,7 @@ class PostgresTaskRepository:
                     result_type = %s, result = %s, error_code = %s,
                     error_message = %s, cancelled_by_label = %s,
                     updated_at = %s, started_at = %s, completed_at = %s,
-                    cancelled_at = %s
+                    cancelled_at = %s, execution_node_id = %s, execution_gpu_device_ids = %s
                 WHERE id = %s
                 """,
                 (
@@ -109,6 +119,8 @@ class PostgresTaskRepository:
                     task.started_at,
                     task.completed_at,
                     task.cancelled_at,
+                    task.execution_node_id,
+                    Jsonb(list(task.execution_gpu_device_ids)),
                     task.id,
                 ),
             )

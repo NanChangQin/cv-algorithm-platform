@@ -50,11 +50,15 @@ def create_task(
         ).id
     if algorithm_version_id is None:
         raise ApplicationError("ALGORITHM_NOT_FOUND", "算法版本不存在", 404)
+    if payload.node_id is not None:
+        container.algorithm_manager.validate_node(payload.node_id)
     task = service.create_task(
         algorithm_version_id,
         payload.parameters,
         asset_id=payload.asset_id,
         asset_uri=payload.asset_uri,
+        node_id=payload.node_id,
+        gpu_device_ids=tuple(payload.gpu_device_ids),
     )
     return TaskResponse.model_validate(task)
 

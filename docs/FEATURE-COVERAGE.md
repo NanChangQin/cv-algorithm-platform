@@ -47,8 +47,8 @@
 |---|---|---|
 | 视频文件 | 已实现 | 受控 MP4/AVI/MOV/MKV/WebM 上传，OpenCV 抽帧，逐帧异步推理 |
 | 摄像头与 RTSP | 已实现 | `camera:N`、RTSP/RTSPS 媒体源，媒体运行与状态展示 |
-| 多 GPU 调度 | 已实现 | 基于显存选择具体 GPU，Docker DeviceRequest 仅暴露选定索引 |
-| 多服务器调度 | 已实现 | 多 Manager 节点注册、容错发现、实例路由与跨节点副本分配 |
+| 多 GPU 调度 | 已实现 | 工作台可自动调度或指定服务器与 GPU；严格匹配实例设备；支持 DeviceRequest / NVIDIA runtime；请求与实际执行位置持久化 |
+| 多服务器调度 | 已实现 | 多 Manager 节点注册、容错发现、跨节点副本分配；远端 Manager 代理推理、按需传图与清理；独立 GPU 节点 Compose，详见 GPU-NODES.md |
 | DAG 工作流 | 已实现 | 有环校验、串行/并行拓扑执行、运行列表、取消与失败传播 |
 | BentoML 适配 | 已实现 | 生成当前 class-based Service ASGI 包装器、bentofile 和构建命令 |
 | Kubernetes/KServe 适配 | 已实现 | 生成安全 InferenceService、资源请求/限制、HPA 配置和部署命令 |
@@ -63,5 +63,5 @@
 - 图片、视频、算法包和模型文件保留在宿主机受控目录；数据库记录与文件目录应作为同一个恢复点备份。
 - Algorithm Manager 会通过 Docker 标签重新发现受管容器。
 - 推理和构建由独立 Worker 从 PostgreSQL 原子领取；Backend 重启不影响排队任务，Worker 重启会重新领取中断任务。媒体运行与工作流协调器暂仍在 Backend 进程内。
-- 当前持久 Worker 面向单服务器部署；多 Worker 横向扩展、跨节点共享文件仍需要租约/心跳机制以及共享存储或对象存储。
+- 当前持久 Worker 面向单主服务器部署，可调用多个局域网 GPU 节点；图片输入按需传输，不要求共享目录。算法镜像和模型需在目标节点预先准备；额外输出文件的跨节点访问、多 Worker 横向扩展仍需后续完善。
 - 不叠加数据库组合时仍可显式使用 `CV_PLATFORM_PERSISTENCE_BACKEND=memory` 进行轻量开发，但不适合作为服务器长期运行模式。
