@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID
 
 from .entities import ImageAsset
@@ -13,6 +13,8 @@ class AssetQuery:
     # 按文件名模糊匹配，不区分大小写
     text: str | None = None
     ids: tuple[UUID, ...] = ()
+    # newest：最新上传在前；name：按文件名（抽帧图片即按帧序）
+    order: Literal["newest", "name"] = "newest"
     limit: int | None = None
     offset: int = 0
 

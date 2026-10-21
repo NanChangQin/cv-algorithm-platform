@@ -54,6 +54,9 @@ def test_assets_are_paged_and_searchable(client: TestClient) -> None:
     )
     assert {item["id"] for item in picked.json()} == {uploaded[0]["id"], uploaded[3]["id"]}
 
+    by_name = client.get("/api/v1/assets", params={"sort": "name", "limit": 2})
+    assert [item["original_name"] for item in by_name.json()] == ["park.png", "street-1.png"]
+
     # 不传 limit 时与旧接口一致，返回全部
     assert len(client.get("/api/v1/assets").json()) == 4
 

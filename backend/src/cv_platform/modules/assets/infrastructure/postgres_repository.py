@@ -84,7 +84,8 @@ class PostgresAssetRepository:
 
     def query(self, criteria: AssetQuery) -> list[ImageAsset]:
         where, params = _where(criteria)
-        sql = f"SELECT * FROM image_assets {where} ORDER BY created_at DESC, id DESC"
+        order = "original_name, id" if criteria.order == "name" else "created_at DESC, id DESC"
+        sql = f"SELECT * FROM image_assets {where} ORDER BY {order}"
         if criteria.limit is not None:
             sql += " LIMIT %s"
             params.append(criteria.limit)
