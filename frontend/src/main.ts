@@ -18,4 +18,18 @@ function reportUnhandled(reason: unknown) {
 app.config.errorHandler = reportUnhandled
 window.addEventListener('unhandledrejection', (event) => reportUnhandled(event.reason))
 
+// 发版后旧页面引用的分包文件已被替换，切换页面会加载失败；刷新一次拿到新版本。
+// 10 秒内不重复刷新，避免文件确实缺失时陷入循环。
+window.addEventListener('vite:preloadError', (event) => {
+  const key = 'cv-platform:reloaded-for-update'
+  try {
+    if (Date.now() - Number(sessionStorage.getItem(key) ?? 0) < 10_000) return
+    sessionStorage.setItem(key, String(Date.now()))
+  } catch {
+    return
+  }
+  event.preventDefault()
+  window.location.reload()
+})
+
 app.use(router).mount('#app')
