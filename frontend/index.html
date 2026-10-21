@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="多算法计算机视觉托管、运行与结果可视化平台" />
     <title>CV Algorithm Studio</title>
+    <script>
+      // 在样式加载前应用手动选择的外观，避免深色用户先看到一闪而过的浅色页面
+      try { var theme = localStorage.getItem('cv-platform-theme'); if (theme === 'light' || theme === 'dark') document.documentElement.setAttribute('data-theme', theme) } catch (error) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

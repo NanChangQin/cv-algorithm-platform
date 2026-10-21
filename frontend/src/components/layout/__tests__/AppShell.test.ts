@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import AppShell from '../AppShell.vue'
 
 vi.mock('@/api/auth', () => ({ authenticationMode: { get: () => false }, sessionRole: { get: () => 'admin' }, authApi: { logout: vi.fn() } }))
+vi.mock('@/api/projects', () => ({ projectsApi: { list: vi.fn().mockResolvedValue([{ id: 'p1', name: '默认项目' }]) } }))
 
 describe('responsive navigation', () => {
   it('closes the drawer after navigation and with Escape', async () => {
@@ -18,7 +19,7 @@ describe('responsive navigation', () => {
     expect(wrapper.classes()).toContain('menu-open')
     expect(document.activeElement).toBe(wrapper.find('.brand').element)
     await wrapper.trigger('keydown', { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(wrapper.find('a[href="/users"]').element)
+    expect(document.activeElement).toBe(wrapper.find('a[href="/system"]').element)
     await wrapper.trigger('keydown', { key: 'Tab' })
     expect(document.activeElement).toBe(wrapper.find('.brand').element)
     await wrapper.find('a[href="/tasks"]').trigger('click')

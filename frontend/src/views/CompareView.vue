@@ -201,12 +201,12 @@ onUnmounted(() => window.clearInterval(polling))
   <template v-if="!comparisonId">
     <div v-if="!algorithmsLoading && availableAlgorithms.length < 2" class="empty-state">
       <strong>至少需要两个可用算法才能对比</strong>
-      <p>当前只有 {{ availableAlgorithms.length }} 个可用算法版本。在算法中心上传并发布更多算法，或启用已停用的版本。</p>
-      <RouterLink class="secondary-button" to="/algorithms">前往算法中心</RouterLink>
+      <p>当前只有 {{ availableAlgorithms.length }} 个可用算法版本。在算法库导入并发布更多算法，或启用已停用的版本。</p>
+      <RouterLink class="secondary-button" to="/algorithms">前往算法库</RouterLink>
     </div>
     <div v-else class="compare-builder">
       <section class="section-block">
-        <header class="section-heading"><div><span class="step-number">1</span><h2>选择图片</h2></div><RouterLink to="/assets">资源中心 →</RouterLink></header>
+        <header class="section-heading"><div><span class="step-number">1</span><h2>选择图片</h2></div><RouterLink to="/assets">图片库 →</RouterLink></header>
         <UploadDropzone :multiple="false" :disabled="uploading" :progress="uploadProgress" compact title="拖入一张图片，或点击选择" hint="上传后自动选中" @files="handleFiles" />
         <AssetPicker v-if="assets.length" v-model="selectedAssetIds" :assets="assets" />
       </section>
