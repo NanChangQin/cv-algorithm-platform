@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 
 from ....core.container import ApplicationContainer
@@ -70,6 +70,16 @@ def create_comparison(
         payload.parameters,
     )
     return to_response(comparison, container)
+
+
+@router.get("", response_model=list[ComparisonResponse])
+def list_comparisons(
+    limit: int = Query(default=20, ge=1, le=100),
+    service: ComparisonService = Depends(get_service),
+    container: ApplicationContainer = Depends(get_container),
+) -> list[ComparisonResponse]:
+    recent = sorted(service.list(), key=lambda item: item.created_at, reverse=True)[:limit]
+    return [to_response(item, container) for item in recent]
 
 
 @router.get("/{comparison_id}", response_model=ComparisonResponse)
