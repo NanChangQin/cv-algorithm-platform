@@ -20,11 +20,13 @@ coverage/
 /frontend/vite.config.d.ts
 
 # Runtime data
-data/
+# results、models、data 只匹配仓库根目录，避免误伤源码里的同名目录（如 frontend/src/components/results/）
+/data/
+/results/
+/models/
+/runtime/
 storage/
 uploads/
-results/
-models/
 *.pt
 *.pth
 *.onnx
