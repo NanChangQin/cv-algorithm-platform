@@ -1,65 +1,152 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+
 import { assetsApi } from '@/api/assets'
-import { useAssets } from '@/composables/useAssets'
+import UploadDropzone from '@/components/assets/UploadDropzone.vue'
+import { useAlgorithms } from '@/composables/useAlgorithms'
+import { useAssets, type UploadFailure } from '@/composables/useAssets'
+import { toast } from '@/composables/useToast'
+import type { ImageAsset } from '@/types/asset'
+import { errorMessage } from '@/utils/errors'
+import { formatBytes, formatDateTime } from '@/utils/presentation'
 
-const { assets, loading, uploading, error, refresh, upload } = useAssets()
+const PAGE_SIZE = 48
+const MAX_SELECTION = 100
+const { assets, loading, uploading, uploadProgress, error, refresh, upload } = useAssets()
+const { availableAlgorithms } = useAlgorithms()
 const selected = ref<string[]>([])
+const query = ref('')
+const sortBy = ref<'newest' | 'name'>('newest')
+const visibleCount = ref(PAGE_SIZE)
+const downloading = ref(false)
+const failures = ref<UploadFailure[]>([])
+const previewIndex = ref<number | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
 
-async function handleFiles(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  if (files.length) await upload(files)
-  input.value = ''
+const filtered = computed(() => {
+  const keyword = query.value.trim().toLowerCase()
+  const items = keyword ? assets.value.filter((asset) => asset.original_name.toLowerCase().includes(keyword)) : [...assets.value]
+  return sortBy.value === 'name'
+    ? items.sort((a, b) => a.original_name.localeCompare(b.original_name, 'zh-CN', { numeric: true }))
+    : items.sort((a, b) => b.created_at.localeCompare(a.created_at))
+})
+const shown = computed(() => filtered.value.slice(0, visibleCount.value))
+const preview = computed<ImageAsset | null>(() => previewIndex.value === null ? null : filtered.value[previewIndex.value] ?? null)
+watch([query, sortBy], () => { visibleCount.value = PAGE_SIZE })
+
+async function handleFiles(files: File[]) {
+  failures.value = []
+  const outcome = await upload(files)
+  failures.value = outcome.failed
+  if (outcome.uploaded.length) toast.success(`已上传 ${outcome.uploaded.length} 张图片`)
 }
-
-function formatBytes(bytes: number) {
-  return bytes < 1024 * 1024
-    ? `${(bytes / 1024).toFixed(1)} KB`
-    : `${(bytes / 1024 / 1024).toFixed(1)} MB`
+function toggle(id: string) {
+  if (selected.value.includes(id)) selected.value = selected.value.filter((item) => item !== id)
+  else if (selected.value.length < MAX_SELECTION) selected.value = [...selected.value, id]
+  else toast.info(`一次最多选择 ${MAX_SELECTION} 张`)
+}
+function selectFiltered() {
+  selected.value = [...new Set([...selected.value, ...filtered.value.map((asset) => asset.id)])].slice(0, MAX_SELECTION)
 }
 async function downloadSelected() {
-  const blob = await assetsApi.download(selected.value)
-  const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'cv-assets.zip'; link.click(); URL.revokeObjectURL(link.href)
+  downloading.value = true
+  try {
+    const blob = await assetsApi.download(selected.value)
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'cv-assets.zip'; link.click(); URL.revokeObjectURL(link.href)
+  } catch (reason) {
+    toast.error(errorMessage(reason, '打包下载失败'))
+  } finally { downloading.value = false }
 }
+
+async function openPreview(asset: ImageAsset) {
+  previewIndex.value = filtered.value.findIndex((item) => item.id === asset.id)
+  await nextTick()
+  closeButton.value?.focus()
+}
+function step(offset: number) {
+  if (previewIndex.value === null || !filtered.value.length) return
+  previewIndex.value = (previewIndex.value + offset + filtered.value.length) % filtered.value.length
+}
+function onKeydown(event: KeyboardEvent) {
+  if (previewIndex.value === null) return
+  if (event.key === 'Escape') previewIndex.value = null
+  else if (event.key === 'ArrowRight') step(1)
+  else if (event.key === 'ArrowLeft') step(-1)
+}
+window.addEventListener('keydown', onKeydown)
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <header class="page-heading">
-    <span class="eyebrow">CONTROLLED FILE STORAGE</span>
-    <h1>资源中心</h1>
-    <p>图片经过格式、MIME、尺寸与内容校验后存入本地受控目录，同一原图可供多个任务复用。</p>
+  <header class="page-heading page-heading-actions">
+    <div><h1>资源中心</h1><p>图片经过格式、尺寸与内容校验后存入受控目录，同一张图可以被多个任务复用。</p></div>
+    <button class="secondary-button" :disabled="loading" @click="refresh">{{ loading ? '刷新中…' : '刷新' }}</button>
   </header>
-  <p v-if="error" class="alert">{{ error }}</p>
-  <div class="toolbar">
-    <span>{{ assets.length }} 张图片</span>
-    <div class="toolbar-actions">
-      <button class="secondary-button" @click="refresh">刷新</button>
-      <button v-if="selected.length" class="secondary-button" @click="downloadSelected">下载 {{ selected.length }} 张 ZIP</button>
-      <label class="primary-button upload-button">
-        {{ uploading ? '上传中…' : '上传图片' }}
-        <input
-          type="file"
-          multiple
-          accept="image/jpeg,image/png,image/bmp,image/webp"
-          :disabled="uploading"
-          @change="handleFiles"
-        />
-      </label>
-    </div>
+  <UploadDropzone :disabled="uploading" :progress="uploadProgress" accept-paste @files="handleFiles" />
+  <div v-if="failures.length" class="alert" role="alert">
+    <strong>{{ failures.length }} 张图片没有上传成功</strong>
+    <ul class="failure-list"><li v-for="item in failures.slice(0, 8)" :key="item.name"><span class="mono">{{ item.name }}</span>：{{ item.message }}</li></ul>
+    <button class="text-button" @click="failures = []">知道了</button>
   </div>
-  <div v-if="loading" class="empty-state">正在加载…</div>
-  <div v-else-if="assets.length === 0" class="empty-state">尚未上传图片</div>
-  <div v-else class="asset-grid">
-    <article v-for="asset in assets" :key="asset.id" class="asset-card">
-      <label class="asset-selector"><input v-model="selected" type="checkbox" :value="asset.id" />选择</label>
-      <img :src="assetsApi.contentUrl(asset.id)" :alt="asset.original_name" loading="lazy" />
-      <div>
-        <strong>{{ asset.original_name }}</strong>
-        <span>{{ asset.width }} × {{ asset.height }} · {{ formatBytes(asset.size_bytes) }}</span>
-        <small class="mono">{{ asset.sha256.slice(0, 14) }}…</small>
-        <RouterLink class="asset-run-link" :to="{ path: '/', query: { asset: asset.id } }">用此图片推理 →</RouterLink>
+  <p v-else-if="error" class="alert" role="alert">{{ error }}</p>
+
+  <div class="asset-toolbar">
+    <input v-model="query" type="search" placeholder="按文件名搜索" aria-label="按文件名搜索图片" />
+    <select v-model="sortBy" aria-label="排序方式"><option value="newest">最新上传在前</option><option value="name">按文件名</option></select>
+    <span class="muted-copy">{{ query ? `匹配 ${filtered.length} / ${assets.length} 张` : `${assets.length} 张图片` }}</span>
+  </div>
+  <div v-if="selected.length" class="selection-bar" role="region" aria-label="已选图片操作">
+    <strong>已选 {{ selected.length }} 张</strong>
+    <button class="text-button" @click="selected = []">清空选择</button>
+    <span class="selection-bar-actions">
+      <RouterLink v-if="availableAlgorithms.length" class="primary-button compact-button" :to="{ path: '/', query: { assets: selected.slice(0, 50).join(',') } }">{{ selected.length > 50 ? '用前 50 张推理 →' : '用选中图片推理 →' }}</RouterLink>
+      <button class="secondary-button" :disabled="downloading" @click="downloadSelected">{{ downloading ? '正在打包…' : '下载 ZIP' }}</button>
+    </span>
+  </div>
+
+  <div v-if="loading && !assets.length" class="empty-state">正在加载…</div>
+  <div v-else-if="!assets.length" class="empty-state"><strong>还没有图片</strong><p>把图片拖到上方区域，或直接粘贴截图即可上传。</p></div>
+  <div v-else-if="!filtered.length" class="empty-state"><strong>没有匹配的图片</strong><p>换个关键词试试。</p></div>
+  <template v-else>
+    <div class="list-footer asset-list-head">
+      <button class="text-button" @click="selectFiltered">{{ query ? '选择全部搜索结果' : '全选' }}</button>
+    </div>
+    <div class="asset-grid">
+      <article v-for="asset in shown" :key="asset.id" class="asset-card" :class="{ selected: selected.includes(asset.id) }">
+        <label class="asset-selector"><input type="checkbox" :checked="selected.includes(asset.id)" :aria-label="`选择 ${asset.original_name}`" @change="toggle(asset.id)" />选择</label>
+        <button type="button" class="asset-thumb" :aria-label="`预览 ${asset.original_name}`" @click="openPreview(asset)">
+          <img :src="assetsApi.thumbnailUrl(asset.id, 320)" :alt="asset.original_name" loading="lazy" decoding="async" />
+        </button>
+        <div>
+          <strong :title="asset.original_name">{{ asset.original_name }}</strong>
+          <span>{{ asset.width }} × {{ asset.height }} · {{ formatBytes(asset.size_bytes) }}</span>
+          <small>{{ formatDateTime(asset.created_at) }}</small>
+          <RouterLink v-if="availableAlgorithms.length" class="asset-run-link" :to="{ path: '/', query: { asset: asset.id } }">用此图片推理 →</RouterLink>
+        </div>
+      </article>
+    </div>
+    <button v-if="filtered.length > shown.length" class="secondary-button load-more" @click="visibleCount += PAGE_SIZE">显示更多（还有 {{ filtered.length - shown.length }} 张）</button>
+  </template>
+
+  <div v-if="preview" class="lightbox" role="dialog" aria-modal="true" :aria-label="`预览 ${preview.original_name}`" @click.self="previewIndex = null">
+    <div class="lightbox-body">
+      <header>
+        <div><strong>{{ preview.original_name }}</strong><small>{{ preview.width }} × {{ preview.height }} · {{ formatBytes(preview.size_bytes) }} · {{ formatDateTime(preview.created_at) }}</small></div>
+        <button ref="closeButton" type="button" class="icon-button" aria-label="关闭预览" @click="previewIndex = null">×</button>
+      </header>
+      <div class="lightbox-stage">
+        <button v-if="filtered.length > 1" type="button" class="lightbox-nav prev" aria-label="上一张" @click="step(-1)">‹</button>
+        <img :src="assetsApi.contentUrl(preview.id)" :alt="preview.original_name" />
+        <button v-if="filtered.length > 1" type="button" class="lightbox-nav next" aria-label="下一张" @click="step(1)">›</button>
       </div>
-    </article>
+      <footer>
+        <small class="mono">SHA-256 {{ preview.sha256.slice(0, 16) }}…</small>
+        <span class="toolbar-actions">
+          <a class="secondary-button" :href="assetsApi.contentUrl(preview.id)" :download="preview.original_name">下载原图</a>
+          <RouterLink v-if="availableAlgorithms.length > 1" class="secondary-button" :to="{ path: '/compare', query: { asset: preview.id } }">多算法对比</RouterLink>
+          <RouterLink v-if="availableAlgorithms.length" class="primary-button compact-button" :to="{ path: '/', query: { asset: preview.id } }">用此图片推理 →</RouterLink>
+        </span>
+      </footer>
+    </div>
   </div>
 </template>
