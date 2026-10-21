@@ -11,13 +11,18 @@ vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
   return { algorithms, availableAlgorithms: algorithms, loading: ref(false), error: ref('') }
 } }))
 vi.mock('@/composables/useAssets', () => ({ useAssets: () => ({
-  assets: ref([{ id: 'asset-1', original_name: 'image.jpg', width: 10, height: 10 }]),
-  uploading: ref(false), error: ref(''), upload: vi.fn(),
+  assets: ref([
+    { id: 'asset-1', original_name: 'image.jpg', width: 10, height: 10 },
+    { id: 'asset-2', original_name: 'second.jpg', width: 10, height: 10 },
+  ]),
+  uploading: ref(false), uploadProgress: ref(null), error: ref(''), upload: vi.fn(),
 }) }))
 vi.mock('@/composables/useTasks', () => ({ useTasks: () => ({
   tasks: ref([]), submitting: ref(false), error: ref(''), create: calls.create,
 }) }))
 
+import AssetPicker from '@/components/assets/AssetPicker.vue'
+import { ApiError } from '@/api/http'
 import WorkspaceView from '../WorkspaceView.vue'
 
 describe('task execution placement', () => {
@@ -67,7 +72,7 @@ describe('task execution placement', () => {
 
   it('blocks invalid numeric parameters before submitting', async () => {
     calls.parameters = { confidence: { type: 'number', title: '置信度', default: 0.5, minimum: 0, maximum: 1 } }
-    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { RouterLink: true } } })
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { RouterLink: true, ParameterForm: false } } })
     await flushPromises()
     await wrapper.find('input[type="number"]').setValue('2')
     expect(wrapper.text()).toContain('置信度不能大于 1')
@@ -85,5 +90,46 @@ describe('task execution placement', () => {
     expect(calls.push).not.toHaveBeenCalled()
     expect((wrapper.find('fieldset select').element as HTMLSelectElement).value).toBe('dell')
     expect(wrapper.text()).toContain('image.jpg')
+  })
+
+  it('submits one task per selected image and opens the active task list', async () => {
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    wrapper.findComponent(AssetPicker).vm.$emit('update:modelValue', ['asset-1', 'asset-2'])
+    await flushPromises()
+    expect(wrapper.find('button.primary-button').text()).toContain('批量推理 2 张图片')
+    await wrapper.find('button.primary-button').trigger('click')
+    await flushPromises()
+    expect(calls.create.mock.calls.map(([payload]) => payload.asset_id)).toEqual(['asset-1', 'asset-2'])
+    expect(calls.push).toHaveBeenCalledWith({ path: '/tasks', query: { status: 'active' } })
+  })
+
+  it('waits and retries when the platform rate-limits a batch', async () => {
+    vi.useFakeTimers()
+    try {
+      calls.create
+        .mockRejectedValueOnce(new ApiError('请求过于频繁，请稍后重试', 429, 'RATE_LIMITED'))
+        .mockResolvedValue({ id: 'task-1' })
+      const wrapper = shallowMount(WorkspaceView, { global: { stubs: { RouterLink: true } } })
+      await flushPromises()
+      wrapper.findComponent(AssetPicker).vm.$emit('update:modelValue', ['asset-1', 'asset-2'])
+      await flushPromises()
+      await wrapper.find('button.primary-button').trigger('click')
+      await flushPromises()
+      expect(calls.create).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(3000)
+      await flushPromises()
+      expect(calls.create).toHaveBeenCalledTimes(3)
+      expect(calls.push).toHaveBeenCalledWith({ path: '/tasks', query: { status: 'active' } })
+    } finally { vi.useRealTimers() }
+  })
+
+  it('does not wait for server discovery when scheduling automatically', async () => {
+    calls.resources.mockReturnValue(new Promise(() => {}))
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    expect(wrapper.find('button.primary-button').attributes('disabled')).toBeUndefined()
+    await wrapper.find('button.primary-button').trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ asset_id: 'asset-1', node_id: undefined }))
   })
 })

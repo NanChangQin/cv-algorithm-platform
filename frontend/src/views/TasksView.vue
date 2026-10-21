@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { tasksApi } from '@/api/tasks'
 import { systemApi } from '@/api/system'
 import TaskTable from '@/components/tasks/TaskTable.vue'
@@ -8,6 +9,8 @@ import { useAssets } from '@/composables/useAssets'
 import { useTasks } from '@/composables/useTasks'
 import { taskStatusLabel } from '@/utils/status'
 import { nodeLabel } from '@/utils/presentation'
+import { errorMessage } from '@/utils/errors'
+import { toast } from '@/composables/useToast'
 
 const { algorithms } = useAlgorithms()
 const { assets } = useAssets()
@@ -15,7 +18,9 @@ const { tasks, loading, pendingId, error, refresh, cancel, retry } = useTasks()
 const nodes = ref<Array<{ id: string; name: string }>>([])
 const query = ref('')
 const algorithmFilter = ref('')
-const statusFilter = ref('')
+// 批量提交后会带着 ?status=active 跳转过来
+const initialStatus = useRoute()?.query?.status
+const statusFilter = ref(typeof initialStatus === 'string' ? initialStatus : '')
 const nodeFilter = ref('')
 const selectedResults = ref<string[]>([])
 const page = ref(1)
@@ -63,7 +68,8 @@ async function downloadArchive() {
     const blob = await tasksApi.archive(selectedResults.value)
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob); link.download = 'cv-results.zip'; link.click(); URL.revokeObjectURL(link.href)
-  } catch (reason) { downloadError.value = reason instanceof Error ? reason.message : '结果下载失败' }
+    toast.success(`已打包 ${selectedResults.value.length} 个结果`)
+  } catch (reason) { downloadError.value = errorMessage(reason, '结果下载失败') }
   finally { downloading.value = false }
 }
 </script>
