@@ -4,6 +4,7 @@ from ..modules.algorithms.api.router import router as algorithms_router
 from ..modules.assets.api.router import router as assets_router
 from ..modules.comparisons.api.router import router as comparisons_router
 from ..modules.deployments.api import router as deployments_router
+from ..modules.evaluations.api import router as evaluations_router
 from ..modules.instances.api.router import router as instances_router
 from ..modules.media.api import router as media_router
 from ..modules.operations.api import router as operations_router
@@ -19,6 +20,7 @@ api_router = APIRouter()
 api_router.include_router(algorithms_router)
 api_router.include_router(assets_router)
 api_router.include_router(comparisons_router)
+api_router.include_router(evaluations_router)
 api_router.include_router(tasks_router)
 api_router.include_router(task_events_router)
 api_router.include_router(instances_router)
