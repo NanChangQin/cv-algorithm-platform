@@ -103,6 +103,23 @@ def create_app() -> FastAPI:
         request_started = time.perf_counter()
         request_id = request.headers.get("X-Request-ID", str(uuid4()))
         request.state.request_id = request_id
+        is_api = request.url.path.startswith(settings.api_prefix)
+        # 免登录模式下没有 Cookie 可依赖 SameSite 保护：任何网页都能借用户的浏览器向内网平台
+        # 提交表单（上传文件、导入算法包）。浏览器会为跨站请求带上 Sec-Fetch-Site: cross-site，
+        # 平台前端自身是 same-origin，curl 等非浏览器客户端不带该头，均不受影响。
+        if (
+            is_api
+            and request.method in {"POST", "PUT", "PATCH", "DELETE"}
+            and request.headers.get("Sec-Fetch-Site") == "cross-site"
+        ):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "code": "CROSS_SITE_REQUEST",
+                    "message": "拒绝来自其他网站的写操作请求",
+                    "request_id": request_id,
+                },
+            )
         authorization = request.headers.get("Authorization", "")
         header_token = authorization[7:] if authorization.startswith("Bearer ") else None
         token = header_token or request.cookies.get("cv_session")
@@ -122,7 +139,6 @@ def create_app() -> FastAPI:
             )
         request.state.session = session
         actor = session.username if session else "anonymous"
-        is_api = request.url.path.startswith(settings.api_prefix)
         if is_api and request.url.path not in public_paths and session is None:
             return JSONResponse(
                 status_code=401,
