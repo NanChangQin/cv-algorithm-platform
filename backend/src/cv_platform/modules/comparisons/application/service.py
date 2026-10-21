@@ -61,5 +61,5 @@ class ComparisonService:
             raise ApplicationError("COMPARISON_NOT_FOUND", "对比任务不存在", 404)
         return comparison
 
-    def list(self) -> list[AlgorithmComparison]:
-        return [item for item in self._repository.list() if item.project_id == self._project_id]
+    def list_recent(self, limit: int) -> list[AlgorithmComparison]:
+        return self._repository.list_recent(self._project_id, limit)

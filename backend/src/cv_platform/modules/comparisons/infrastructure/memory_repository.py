@@ -20,3 +20,6 @@ class InMemoryComparisonRepository:
     def list(self) -> list[AlgorithmComparison]:
         with self._lock:
             return sorted(self._items.values(), key=lambda item: item.created_at, reverse=True)
+
+    def list_recent(self, project_id: UUID, limit: int) -> list[AlgorithmComparison]:
+        return [item for item in self.list() if item.project_id == project_id][:limit]

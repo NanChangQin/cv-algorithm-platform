@@ -4,7 +4,7 @@ from uuid import UUID
 from cv_algorithm_sdk import AlgorithmStatus
 
 from ....core.errors import ApplicationError
-from ...tasks.domain.repositories import TaskRepository
+from ...tasks.domain.repositories import TaskQuery, TaskRepository
 from ..domain.entities import AlgorithmVersion, BuildJob
 from ..domain.repositories import AlgorithmRepository, BuildJobRepository
 from ..infrastructure.manager_build_gateway import ManagerBuildGateway
@@ -135,9 +135,7 @@ class AlgorithmService:
 
     def delete(self, algorithm_id: UUID, *, remove_image: bool = False) -> None:
         algorithm = self.get_algorithm(algorithm_id)
-        if self._tasks and any(
-            task.algorithm_version_id == algorithm_id for task in self._tasks.list()
-        ):
+        if self._tasks and self._tasks.count(TaskQuery(algorithm_version_id=algorithm_id)):
             raise ApplicationError("ALGORITHM_IN_USE", "算法版本已有任务引用，不能删除", 409)
         if self._instance_gateway is not None:
             for instance in self._instance_gateway.list_instances():

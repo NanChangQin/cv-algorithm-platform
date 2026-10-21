@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 from uuid import UUID
@@ -7,10 +8,10 @@ from cv_algorithm_sdk import AlgorithmStatus, TaskStatus
 from ....core.errors import ApplicationError
 from ...algorithms.domain.repositories import AlgorithmRepository
 from ...assets.domain.entities import ImageAsset
-from ...assets.domain.repositories import AssetRepository
+from ...assets.domain.repositories import AssetQuery, AssetRepository
 from ..domain.entities import InferenceTask, TERMINAL_STATUSES
 from ..domain.execution import TaskQueue
-from ..domain.repositories import TaskRepository
+from ..domain.repositories import TaskQuery, TaskRepository, TaskSearch
 from ....core.project_context import DEFAULT_PROJECT_ID
 
 
@@ -101,18 +102,51 @@ class TaskService:
         *,
         algorithm_version_id: UUID | None = None,
         asset_id: UUID | None = None,
-        status: TaskStatus | None = None,
+        statuses: tuple[TaskStatus, ...] = (),
+        node_id: str | None = None,
         created_after: datetime | None = None,
-    ) -> list[InferenceTask]:
-        tasks = [item for item in self._tasks.list() if item.project_id == self._project_id]
-        return [
-            task
-            for task in tasks
-            if (algorithm_version_id is None or task.algorithm_version_id == algorithm_version_id)
-            and (asset_id is None or task.asset_id == asset_id)
-            and (status is None or task.status is status)
-            and (created_after is None or task.created_at >= created_after)
-        ]
+        ids: tuple[UUID, ...] = (),
+        search: TaskSearch | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[InferenceTask], int]:
+        """返回当前页的任务和符合条件的总数。"""
+        criteria = TaskQuery(
+            project_id=self._project_id,
+            algorithm_version_id=algorithm_version_id,
+            asset_id=asset_id,
+            statuses=statuses,
+            node_id=node_id,
+            created_after=created_after,
+            ids=ids,
+            search=search,
+            limit=limit,
+            offset=offset,
+        )
+        items = self._tasks.query(criteria)
+        total = len(items) if limit is None and not offset else self._tasks.count(criteria)
+        return items, total
+
+    def resolve_search(self, text: str, nodes: Iterable[tuple[str, str]]) -> TaskSearch:
+        """把搜索词解析成名称命中的算法、图片和节点；nodes 为 (节点 ID, 名称)。"""
+        needle = text.lower()
+        algorithm_ids = tuple(
+            item.id
+            for item in self._algorithms.list()
+            if item.project_id == self._project_id
+            and (needle in item.manifest.name.lower() or needle in item.manifest.id)
+        )
+        asset_ids = tuple(
+            item.id for item in self._assets.query(AssetQuery(self._project_id, text=text))
+        )
+        node_ids = tuple(
+            node_id for node_id, name in nodes
+            if needle in node_id.lower() or needle in name.lower()
+        )
+        return TaskSearch(text, algorithm_ids, asset_ids, node_ids)
+
+    def count_by_status(self) -> dict[TaskStatus, int]:
+        return self._tasks.count_by_status(self._project_id)
 
     def get_task(self, task_id: UUID) -> InferenceTask:
         task = self._tasks.get(task_id)
@@ -151,13 +185,7 @@ class TaskService:
             asset = self._assets.get(asset_id)
         elif asset_uri and asset_uri.startswith("file:///data/"):
             # asset_uri 只能指向本项目已上传的图片，否则任何人都能让算法读取 /data 下的其他文件
-            asset = next(
-                (
-                    item for item in self._assets.list()
-                    if item.project_id == self._project_id and item.algorithm_uri == asset_uri
-                ),
-                None,
-            )
+            asset = self._assets.find_by_algorithm_uri(self._project_id, asset_uri)
         else:
             raise ApplicationError("INPUT_INVALID", "必须选择已上传的图片资源")
         if asset is None or asset.project_id != self._project_id:

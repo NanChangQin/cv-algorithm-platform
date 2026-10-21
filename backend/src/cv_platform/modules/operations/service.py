@@ -135,21 +135,13 @@ class OperationsService:
         return sorted(policies, key=lambda item: str(item.algorithm_version_id))
 
     def reconcile(self, project_id: UUID | None = None) -> dict[str, object]:
-        active_statuses = {
-            TaskStatus.QUEUED,
-            TaskStatus.PREPARING,
-            TaskStatus.STARTING,
-            TaskStatus.RUNNING,
-        }
-        tasks = self._tasks.list()
+        active_counts = self._tasks.count_by_algorithm(
+            (TaskStatus.QUEUED, TaskStatus.PREPARING, TaskStatus.STARTING, TaskStatus.RUNNING)
+        )
         outcomes = []
         now = datetime.now(UTC)
         for policy in self.list_policies(project_id):
-            active = sum(
-                task.algorithm_version_id == policy.algorithm_version_id
-                and task.status in active_statuses
-                for task in tasks
-            )
+            active = active_counts.get(policy.algorithm_version_id, 0)
             desired = max(
                 policy.min_replicas,
                 min(policy.max_replicas, math.ceil(active / policy.target_concurrency)),
@@ -201,21 +193,15 @@ class OperationsService:
         return {"reconciled_at": datetime.now(UTC).isoformat(), "items": outcomes}
 
     def metrics(self, project_id: UUID | None = None) -> dict[str, object]:
-        tasks = [
-            item for item in self._tasks.list()
-            if project_id is None or item.project_id == project_id
-        ]
-        counts: dict[str, int] = {}
-        inference_times = []
-        for task in tasks:
-            counts[task.status.value] = counts.get(task.status.value, 0) + 1
-            if task.result is not None:
-                inference_times.append(task.result.timing.inference_ms)
-        average = sum(inference_times) / len(inference_times) if inference_times else 0
+        counts = {
+            status.value: total
+            for status, total in self._tasks.count_by_status(project_id).items()
+        }
+        average, samples = self._tasks.inference_time_stats(project_id)
         return {
             "tasks_by_status": counts,
             "average_inference_ms": round(average, 3),
-            "completed_samples": len(inference_times),
+            "completed_samples": samples,
             "autoscaling_policies": len(self.list_policies(project_id)),
             "runtime_instances": sum(
                 self._instance_in_project(instance.algorithm_version_id, project_id)

@@ -15,6 +15,7 @@ from .core.errors import install_exception_handlers
 from .core.metrics import METRICS
 from .core.seed import seed_demo_data
 from .dependencies import get_container
+from .modules.tasks.domain.repositories import TaskQuery
 
 
 def create_app() -> FastAPI:
@@ -24,20 +25,20 @@ def create_app() -> FastAPI:
     async def lifespan(_: FastAPI):
         container = get_container()
         if settings.queue_backend == "local":
-            for task in container.tasks.list():
-                if task.status in {
-                    TaskStatus.QUEUED,
-                    TaskStatus.PREPARING,
-                    TaskStatus.STARTING,
-                    TaskStatus.RUNNING,
-                }:
-                    container.tasks.save(
-                        task.transition(
-                            TaskStatus.FAILED,
-                            error_code="TASK_INTERRUPTED",
-                            error_message="平台重启导致任务中断",
-                        )
+            interrupted = TaskQuery(statuses=(
+                TaskStatus.QUEUED,
+                TaskStatus.PREPARING,
+                TaskStatus.STARTING,
+                TaskStatus.RUNNING,
+            ))
+            for task in container.tasks.query(interrupted):
+                container.tasks.save(
+                    task.transition(
+                        TaskStatus.FAILED,
+                        error_code="TASK_INTERRUPTED",
+                        error_message="平台重启导致任务中断",
                     )
+                )
         container.media_runs.recover_incomplete()
         container.workflows.recover_incomplete()
         seed_demo_data(container)
@@ -61,6 +62,8 @@ def create_app() -> FastAPI:
                 container.build_executor.shutdown()
             container.workflows.shutdown()
             container.media_runs.shutdown()
+            if container.database is not None:
+                container.database.close()
 
     app = FastAPI(
         title=settings.app_name,
@@ -76,6 +79,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["X-Total-Count"],
     )
     install_exception_handlers(app)
     public_paths = {"/health", f"{settings.api_prefix}/auth/login"}

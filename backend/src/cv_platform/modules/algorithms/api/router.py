@@ -48,11 +48,7 @@ def response_context(
         current = statuses.get(version_id)
         if current != "healthy":
             statuses[version_id] = instance.status
-    last_calls: dict[UUID, object] = {}
-    for task in container.tasks.list():
-        if task.project_id != project_id:
-            continue
-        last_calls.setdefault(task.algorithm_version_id, task.created_at)
+    last_calls = container.tasks.last_created_by_algorithm(project_id)
     return {
         algorithm.id: (
             statuses.get(algorithm.id, "stopped"),

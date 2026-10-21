@@ -2,7 +2,7 @@ from uuid import UUID
 import io
 import zipfile
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 
 from ....core.container import ApplicationContainer
@@ -39,8 +39,23 @@ def upload_assets(
 
 
 @router.get("", response_model=list[AssetResponse])
-def list_assets(service: AssetService = Depends(get_service)) -> list[AssetResponse]:
-    return [AssetResponse.model_validate(item) for item in service.list_assets()]
+def list_assets(
+    response: Response,
+    q: str | None = Query(default=None, max_length=200),
+    ids: list[UUID] = Query(default_factory=list, max_length=200),
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    service: AssetService = Depends(get_service),
+) -> list[AssetResponse]:
+    """不传 limit 时返回全部（兼容旧调用）；总数放在 X-Total-Count 响应头。"""
+    items, total = service.list_assets(
+        text=q.strip() if q and q.strip() else None,
+        ids=tuple(ids),
+        limit=limit,
+        offset=offset,
+    )
+    response.headers["X-Total-Count"] = str(total)
+    return [AssetResponse.model_validate(item) for item in items]
 
 
 @router.get("/{asset_id}", response_model=AssetResponse)
