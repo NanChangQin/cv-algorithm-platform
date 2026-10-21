@@ -5,7 +5,7 @@ from tempfile import NamedTemporaryFile
 from typing import BinaryIO
 from urllib.parse import quote
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from ....core.errors import ApplicationError
 from ..domain.storage import StoredImage
@@ -100,6 +100,33 @@ class LocalAssetStorage:
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
+
+    def thumbnail(self, storage_key: str, size: int) -> Path:
+        """返回不超过 size×size 的 JPEG 缩略图；按内容哈希缓存，生成一次后直接复用。"""
+        source = self.resolve(storage_key)
+        target = self._root / "thumbnails" / str(size) / f"{source.stem}.jpg"
+        if target.is_file():
+            return target
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(source) as image:
+            preview = ImageOps.exif_transpose(image)
+            preview.thumbnail((size, size), Image.Resampling.LANCZOS)
+            if preview.mode in {"RGBA", "LA", "P"}:
+                preview = preview.convert("RGBA")
+                background = Image.new("RGB", preview.size, "white")
+                background.paste(preview, mask=preview.getchannel("A"))
+                preview = background
+            elif preview.mode != "RGB":
+                preview = preview.convert("RGB")
+            with NamedTemporaryFile(dir=target.parent, suffix=".tmp", delete=False) as handle:
+                temporary = Path(handle.name)
+            try:
+                preview.save(temporary, format="JPEG", quality=82, optimize=True)
+                temporary.chmod(0o644)
+                os.replace(temporary, target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return target
 
     def resolve(self, storage_key: str, *, must_exist: bool = True) -> Path:
         candidate = (self._root / storage_key).resolve()

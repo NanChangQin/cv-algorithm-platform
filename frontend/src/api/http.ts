@@ -63,6 +63,32 @@ export async function requestBlob(path: string, init?: RequestInit): Promise<Blo
   return response.blob()
 }
 
+/** 带上传进度的 POST（fetch 无法报告上传进度）。onProgress 收到 0–1 的比例。 */
+export function uploadRequest<T>(path: string, body: FormData, onProgress?: (ratio: number) => void): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', `${apiBaseUrl}${path}`)
+    xhr.withCredentials = true
+    xhr.setRequestHeader('Accept', 'application/json')
+    const projectId = localStorage.getItem(projectKey)
+    if (projectId) xhr.setRequestHeader('X-Project-ID', projectId)
+    xhr.upload.onprogress = (event) => { if (event.lengthComputable) onProgress?.(event.loaded / event.total) }
+    xhr.onload = () => {
+      let payload: unknown = null
+      try { payload = xhr.responseText ? JSON.parse(xhr.responseText) : null } catch { /* 非 JSON 响应按失败处理 */ }
+      if (xhr.status >= 200 && xhr.status < 300) { resolve(payload as T); return }
+      const error = payload as { code?: string; message?: string } | null
+      if (xhr.status === 401) {
+        localStorage.removeItem(tokenKey)
+        if (window.location.pathname !== '/login') window.location.assign('/login')
+      }
+      reject(new ApiError(error?.message ?? (xhr.status === 413 ? '文件太大，超过服务器限制' : '上传失败，请稍后重试'), xhr.status, error?.code))
+    }
+    xhr.onerror = () => reject(new ApiError('网络连接中断，上传失败', 0, 'NETWORK_ERROR'))
+    xhr.send(body)
+  })
+}
+
 export function apiUrl(path: string): string {
   return `${apiBaseUrl}${path}`
 }

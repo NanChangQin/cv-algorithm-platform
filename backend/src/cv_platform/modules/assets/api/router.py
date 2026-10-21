@@ -2,7 +2,7 @@ from uuid import UUID
 import io
 import zipfile
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 
 from ....core.container import ApplicationContainer
@@ -61,6 +61,34 @@ def get_asset_content(
     ).get_asset(asset_id)
     path = container.asset_storage.resolve(asset.storage_key)
     return FileResponse(path, media_type=asset.media_type, filename=asset.original_name)
+
+
+THUMBNAIL_SIZES = {160, 320, 640}
+
+
+@router.get("/{asset_id}/thumbnail", response_class=FileResponse)
+def get_asset_thumbnail(
+    asset_id: UUID,
+    request: Request,
+    size: int = Query(default=320),
+    container: ApplicationContainer = Depends(get_container),
+) -> FileResponse:
+    if size not in THUMBNAIL_SIZES:
+        from ....core.errors import ApplicationError
+
+        raise ApplicationError("THUMBNAIL_SIZE_INVALID", "缩略图尺寸只支持 160、320、640")
+    asset = AssetService(
+        container.assets,
+        container.asset_storage,
+        project_id_from(request),
+    ).get_asset(asset_id)
+    path = container.asset_storage.thumbnail(asset.storage_key, size)
+    # 缩略图文件名即原图内容哈希，同一资源的缩略图不会变化
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=604800, immutable"},
+    )
 
 
 @router.post("/download", response_class=StreamingResponse)

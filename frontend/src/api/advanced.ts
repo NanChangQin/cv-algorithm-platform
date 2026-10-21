@@ -11,10 +11,10 @@ export interface Workflow {
 }
 export interface RuntimeNode { id: string; name: string; manager_url: string; enabled: boolean }
 export interface MediaRun {
-  id: string; source_id: string; algorithm_version_id: string; status: string; frame_task_ids: string[]; error_message: string | null
+  id: string; source_id: string; algorithm_version_id: string; status: string; frame_task_ids: string[]; error_message: string | null; created_at: string; updated_at: string
 }
 export interface WorkflowRun {
-  id: string; workflow_id: string; asset_id: string; status: string; node_tasks: Record<string, string>; error_message: string | null
+  id: string; workflow_id: string; asset_id: string; status: string; node_tasks: Record<string, string>; error_message: string | null; created_at: string
 }
 export interface ScalingPolicy {
   algorithm_version_id: string; min_replicas: number; max_replicas: number; target_concurrency: number; idle_seconds: number
@@ -29,12 +29,14 @@ export const advancedApi = {
     return request<MediaSource>('/media-sources/upload', { method: 'POST', body })
   },
   mediaRuns: () => request<MediaRun[]>('/media-sources/runs'),
+  deleteMediaSource: (id: string) => request<void>(`/media-sources/${id}`, { method: 'DELETE' }),
   startMediaRun: (sourceId: string, payload: { algorithm_version_id: string; parameters: Record<string, unknown>; interval_seconds: number; max_frames: number }) =>
     request<MediaRun>(`/media-sources/${sourceId}/runs`, { method: 'POST', body: JSON.stringify(payload) }),
   workflows: () => request<Workflow[]>('/workflows'),
   createWorkflow: (payload: Omit<Workflow, 'id' | 'created_at'>) =>
     request<Workflow>('/workflows', { method: 'POST', body: JSON.stringify(payload) }),
   workflowRuns: () => request<WorkflowRun[]>('/workflows/runs'),
+  cancelWorkflowRun: (id: string) => request<WorkflowRun>(`/workflows/runs/${id}/cancel`, { method: 'POST' }),
   startWorkflow: (workflowId: string, assetId: string) =>
     request<WorkflowRun>(`/workflows/${workflowId}/runs`, { method: 'POST', body: JSON.stringify({ asset_id: assetId }) }),
   runtimeNodes: () => request<RuntimeNode[]>('/runtime-nodes'),

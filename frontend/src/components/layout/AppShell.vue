@@ -24,7 +24,12 @@ const navigation = [
   { label: '用户角色', to: '/users', icon: 'users', group: '管理与运维', roles: ['admin'] },
 ]
 const visibleNavigation = computed(() => navigation.filter((item) => !item.roles || item.roles.includes(sessionRole.get() ?? 'user')))
-const currentPage = computed(() => route.name === 'task-detail' ? '任务详情' : navigation.find((item) => item.to === route.path)?.label ?? '工作空间')
+const currentPage = computed(() => {
+  if (route.name === 'task-detail') return '任务详情'
+  // /compare/<id> 等子路径归到对应的导航项；首页只做精确匹配
+  const matches = navigation.filter((item) => item.to === route.path || (item.to !== '/' && route.path.startsWith(`${item.to}/`)))
+  return matches.sort((a, b) => b.to.length - a.to.length)[0]?.label ?? '工作空间'
+})
 watch(() => route.fullPath, () => { menuOpen.value = false })
 watch(menuOpen, async (open) => {
   await nextTick()
