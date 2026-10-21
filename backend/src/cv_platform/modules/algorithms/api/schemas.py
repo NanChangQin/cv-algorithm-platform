@@ -2,9 +2,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
-
 from cv_algorithm_sdk import AlgorithmStatus, DeviceType, ResultType
+from pydantic import BaseModel, ConfigDict
 
 from ..domain.entities import AlgorithmVersion, BuildJob, BuildStatus
 

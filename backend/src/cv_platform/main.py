@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from cv_algorithm_sdk import TaskStatus
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
-from cv_algorithm_sdk import TaskStatus
 
 from .api.router import api_router
 from .core.config import get_settings
@@ -166,7 +166,11 @@ def create_app() -> FastAPI:
             if admin_path and session.role is not UserRole.ADMIN:
                 return JSONResponse(
                     status_code=403,
-                    content={"code": "FORBIDDEN", "message": "需要管理员权限", "request_id": request_id},
+                    content={
+                        "code": "FORBIDDEN",
+                        "message": "需要管理员权限",
+                        "request_id": request_id,
+                    },
                 )
             if (
                 (request.url.path.startswith(developer_prefixes) or version_build)
@@ -174,7 +178,11 @@ def create_app() -> FastAPI:
             ):
                 return JSONResponse(
                     status_code=403,
-                    content={"code": "FORBIDDEN", "message": "需要算法开发者权限", "request_id": request_id},
+                    content={
+                        "code": "FORBIDDEN",
+                        "message": "需要算法开发者权限",
+                        "request_id": request_id,
+                    },
                 )
             project_header = request.headers.get("X-Project-ID") or request.query_params.get(
                 "project_id"
@@ -188,7 +196,11 @@ def create_app() -> FastAPI:
                 except ValueError:
                     return JSONResponse(
                         status_code=400,
-                        content={"code": "PROJECT_INVALID", "message": "项目 ID 不合法", "request_id": request_id},
+                        content={
+                            "code": "PROJECT_INVALID",
+                            "message": "项目 ID 不合法",
+                            "request_id": request_id,
+                        },
                     )
             if project_id is None:
                 project_id = container.projects.first_project_id(session.user_id)
@@ -200,7 +212,11 @@ def create_app() -> FastAPI:
             elif project_id is None:
                 return JSONResponse(
                     status_code=403,
-                    content={"code": "PROJECT_REQUIRED", "message": "当前用户尚未加入项目", "request_id": request_id},
+                    content={
+                        "code": "PROJECT_REQUIRED",
+                        "message": "当前用户尚未加入项目",
+                        "request_id": request_id,
+                    },
                 )
             else:
                 viewer_safe_post = request.url.path in {
@@ -222,7 +238,11 @@ def create_app() -> FastAPI:
                     if isinstance(exc, ApplicationError):
                         return JSONResponse(
                             status_code=exc.status_code,
-                            content={"code": exc.code, "message": exc.message, "request_id": request_id},
+                            content={
+                                "code": exc.code,
+                                "message": exc.message,
+                                "request_id": request_id,
+                            },
                         )
                     raise
                 request.state.project_id = project_id

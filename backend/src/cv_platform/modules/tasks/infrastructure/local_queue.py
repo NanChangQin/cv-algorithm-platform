@@ -12,7 +12,6 @@ from ...instances.application.service import RuntimeInstanceService
 from ..domain.execution import AlgorithmPredictionGateway
 from ..domain.repositories import TaskRepository
 
-
 logger = logging.getLogger(__name__)
 
 

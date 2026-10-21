@@ -118,7 +118,8 @@ class PostgresAuthService:
             updated = self._from_user_row(cursor.fetchone())
             if not updated.enabled:
                 cursor.execute(
-                    "UPDATE user_sessions SET revoked_at = now() WHERE user_id = %s AND revoked_at IS NULL",
+                    "UPDATE user_sessions SET revoked_at = now() "
+                    "WHERE user_id = %s AND revoked_at IS NULL",
                     (user_id,),
                 )
             return updated

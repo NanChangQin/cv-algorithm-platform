@@ -2,11 +2,11 @@ from typing import Any
 from uuid import UUID
 
 from ....core.errors import ApplicationError
+from ....core.project_context import DEFAULT_PROJECT_ID
 from ...tasks.application.service import TaskService
 from ..domain.entities import AlgorithmComparison
 from ..infrastructure.memory_repository import InMemoryComparisonRepository
 from ..infrastructure.postgres_repository import PostgresComparisonRepository
-from ....core.project_context import DEFAULT_PROJECT_ID
 
 
 class ComparisonService:

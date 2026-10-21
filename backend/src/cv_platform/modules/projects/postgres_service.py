@@ -54,7 +54,9 @@ class PostgresProjectService:
         return ProjectMembership(
             project_id=row["project_id"],
             user_id=row["user_id"],
-            role=ProjectRole(str(row["membership_role"] if "membership_role" in row else row["role"])),
+            role=ProjectRole(
+                str(row["membership_role"] if "membership_role" in row else row["role"])
+            ),
             joined_at=row["joined_at"],
         )
 

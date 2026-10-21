@@ -4,12 +4,12 @@ from uuid import UUID
 from cv_algorithm_sdk import AlgorithmStatus
 
 from ....core.errors import ApplicationError
+from ....core.project_context import DEFAULT_PROJECT_ID
+from ...instances.domain.gateway import AlgorithmManagerGateway
 from ...tasks.domain.repositories import TaskQuery, TaskRepository
 from ..domain.entities import AlgorithmVersion, BuildJob
 from ..domain.repositories import AlgorithmRepository, BuildJobRepository
 from ..infrastructure.manager_build_gateway import ManagerBuildGateway
-from ...instances.domain.gateway import AlgorithmManagerGateway
-from ....core.project_context import DEFAULT_PROJECT_ID
 from ..infrastructure.package_storage import AlgorithmPackageStorage
 
 

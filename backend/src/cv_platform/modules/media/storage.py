@@ -6,7 +6,6 @@ from typing import BinaryIO
 
 from ...core.errors import ApplicationError
 
-
 VIDEO_TYPES = {
     ".mp4": {"video/mp4"},
     ".avi": {"video/x-msvideo", "video/avi"},

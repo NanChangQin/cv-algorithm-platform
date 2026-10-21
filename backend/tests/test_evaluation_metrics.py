@@ -1,8 +1,7 @@
+from cv_algorithm_sdk import AlgorithmResult
 from pydantic import TypeAdapter
 
-from cv_algorithm_sdk import AlgorithmResult
 from cv_platform.modules.evaluations.metrics import aggregate_metrics, evaluate_result
-
 
 RESULT = TypeAdapter(AlgorithmResult)
 

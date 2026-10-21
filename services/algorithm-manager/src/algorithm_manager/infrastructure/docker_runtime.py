@@ -7,7 +7,6 @@ import httpx
 
 from ..domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 
-
 MANAGED_LABEL = "cv.platform.managed"
 ALGORITHM_LABEL = "cv.platform.algorithm-version-id"
 PORT_LABEL = "cv.platform.internal-port"

@@ -29,7 +29,8 @@ class PlatformMetrics:
         with self._lock:
             for (method, status), value in sorted(self._requests.items()):
                 lines.append(
-                    f'cv_platform_http_requests_total{{method="{method}",status="{status}"}} {value}'
+                    f'cv_platform_http_requests_total{{method="{method}",status="{status}"}} '
+                    f"{value}"
                 )
             lines.extend(
                 [
@@ -39,7 +40,8 @@ class PlatformMetrics:
             )
             for method, value in sorted(self._latency_sum.items()):
                 lines.append(
-                    f'cv_platform_http_request_duration_seconds_sum{{method="{method}"}} {value:.9f}'
+                    f'cv_platform_http_request_duration_seconds_sum{{method="{method}"}} '
+                    f"{value:.9f}"
                 )
             lines.append(
                 "# HELP cv_platform_http_request_duration_seconds_count Observed HTTP requests."
@@ -76,10 +78,14 @@ class PlatformMetrics:
                 [
                     "# HELP cv_platform_queue_depth Durable queue depth.",
                     "# TYPE cv_platform_queue_depth gauge",
-                    f'cv_platform_queue_depth{{kind="inference",state="queued"}} {queue_depths["inference_queued"]}',
-                    f'cv_platform_queue_depth{{kind="inference",state="active"}} {queue_depths["inference_active"]}',
-                    f'cv_platform_queue_depth{{kind="build",state="queued"}} {queue_depths["builds_queued"]}',
-                    f'cv_platform_queue_depth{{kind="build",state="active"}} {queue_depths["builds_active"]}',
+                    'cv_platform_queue_depth{kind="inference",state="queued"} '
+                    f'{queue_depths["inference_queued"]}',
+                    'cv_platform_queue_depth{kind="inference",state="active"} '
+                    f'{queue_depths["inference_active"]}',
+                    'cv_platform_queue_depth{kind="build",state="queued"} '
+                    f'{queue_depths["builds_queued"]}',
+                    'cv_platform_queue_depth{kind="build",state="active"} '
+                    f'{queue_depths["builds_active"]}',
                 ]
             )
         return "\n".join(lines) + "\n"

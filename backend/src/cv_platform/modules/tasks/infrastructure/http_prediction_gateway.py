@@ -3,14 +3,12 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 import httpx
-from pydantic import TypeAdapter, ValidationError
-
 from cv_algorithm_sdk import AlgorithmResult
+from pydantic import TypeAdapter, ValidationError
 
 from ....core.errors import ApplicationError
 from ...instances.domain.models import RuntimeInstance
 from ...instances.infrastructure.http_gateway import manager_headers
-
 
 result_adapter = TypeAdapter(AlgorithmResult)
 

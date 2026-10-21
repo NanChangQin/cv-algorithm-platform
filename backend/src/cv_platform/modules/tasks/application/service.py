@@ -6,13 +6,13 @@ from uuid import UUID
 from cv_algorithm_sdk import AlgorithmStatus, TaskStatus
 
 from ....core.errors import ApplicationError
+from ....core.project_context import DEFAULT_PROJECT_ID
 from ...algorithms.domain.repositories import AlgorithmRepository
 from ...assets.domain.entities import ImageAsset
 from ...assets.domain.repositories import AssetQuery, AssetRepository
-from ..domain.entities import InferenceTask, TERMINAL_STATUSES
+from ..domain.entities import TERMINAL_STATUSES, InferenceTask
 from ..domain.execution import TaskQueue
 from ..domain.repositories import TaskQuery, TaskRepository, TaskSearch
-from ....core.project_context import DEFAULT_PROJECT_ID
 
 
 class TaskService:

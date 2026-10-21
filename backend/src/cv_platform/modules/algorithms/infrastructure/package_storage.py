@@ -2,14 +2,14 @@ import hashlib
 import shutil
 import stat
 import zipfile
+from collections import defaultdict
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
-from collections import defaultdict
 from threading import Lock
 from typing import BinaryIO
 
-from cv_algorithm_sdk import AlgorithmManifest, load_manifest
 import cv_algorithm_sdk
+from cv_algorithm_sdk import AlgorithmManifest, load_manifest
 
 from ....core.errors import ApplicationError
 
@@ -87,9 +87,8 @@ class AlgorithmPackageStorage:
                 total_size = sum(member.file_size for member in members)
                 if total_size > self._max_extracted_bytes:
                     raise ApplicationError("PACKAGE_INVALID", "算法包解压后体积过大")
-                if size := archive_path.stat().st_size:
-                    if total_size / size > 200:
-                        raise ApplicationError("PACKAGE_INVALID", "算法包压缩比异常")
+                if (size := archive_path.stat().st_size) and total_size / size > 200:
+                    raise ApplicationError("PACKAGE_INVALID", "算法包压缩比异常")
                 for member in members:
                     self._validate_member(member)
                     destination = (extract_root / PurePosixPath(member.filename)).resolve()

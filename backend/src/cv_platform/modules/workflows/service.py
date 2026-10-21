@@ -7,13 +7,13 @@ from threading import Event, RLock
 from time import sleep
 from uuid import UUID
 
+from cv_algorithm_sdk import TaskStatus
 from psycopg.types.json import Jsonb
 
 from ...core.database import Database
 from ...core.errors import ApplicationError
+from ...core.project_context import DEFAULT_PROJECT_ID
 from ..algorithms.domain.repositories import AlgorithmRepository
-from cv_algorithm_sdk import TaskStatus
-
 from ..tasks.application.service import TaskService
 from .domain import (
     Workflow,
@@ -22,7 +22,6 @@ from .domain import (
     WorkflowRun,
     WorkflowRunStatus,
 )
-from ...core.project_context import DEFAULT_PROJECT_ID
 
 
 class InMemoryWorkflowService:
@@ -100,7 +99,10 @@ class InMemoryWorkflowService:
         if self._database is None:
             with self._lock:
                 return sorted(
-                    [item for item in self._items.values() if project_id is None or item.project_id == project_id],
+                    [
+                        item for item in self._items.values()
+                        if project_id is None or item.project_id == project_id
+                    ],
                     key=lambda item: item.created_at,
                     reverse=True,
                 )
@@ -166,7 +168,8 @@ class InMemoryWorkflowService:
                 row = cursor.fetchone()
                 if row:
                     cursor.execute(
-                        "SELECT node_key, task_id FROM workflow_run_tasks WHERE workflow_run_id = %s",
+                        "SELECT node_key, task_id FROM workflow_run_tasks "
+                        "WHERE workflow_run_id = %s",
                         (run_id,),
                     )
                     node_tasks = {
@@ -189,7 +192,10 @@ class InMemoryWorkflowService:
         if self._database is None:
             with self._lock:
                 return sorted(
-                    [item for item in self._runs.values() if project_id is None or item.project_id == project_id],
+                    [
+                        item for item in self._runs.values()
+                        if project_id is None or item.project_id == project_id
+                    ],
                     key=lambda item: item.created_at,
                     reverse=True,
                 )

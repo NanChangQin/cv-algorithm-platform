@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, Request
 
-from ...dependencies import get_container
 from ...core.request_context import project_id_from
+from ...dependencies import get_container
 from ..assets.domain.repositories import AssetQuery
 from ..tasks.domain.repositories import TaskQuery
-
 
 router = APIRouter(prefix="/system", tags=["system"])
 

@@ -3,10 +3,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from ...dependencies import get_container
 from ...core.request_context import project_id_from
+from ...dependencies import get_container
 from .service import DeploymentBackend, DeploymentManifestService
-
 
 router = APIRouter(prefix="/deployment-manifests", tags=["deployments"])
 

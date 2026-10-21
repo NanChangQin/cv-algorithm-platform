@@ -4,8 +4,8 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from cv_algorithm_sdk import AlgorithmResult, TaskStatus
-from ....core.project_context import DEFAULT_PROJECT_ID
 
+from ....core.project_context import DEFAULT_PROJECT_ID
 
 TERMINAL_STATUSES = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED}
 

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from contextlib import suppress
 from datetime import UTC, datetime
 from threading import Lock
 from time import monotonic
@@ -26,7 +27,10 @@ class InstanceService:
         with self._locks[spec.algorithm_version_id]:
             current = min(
                 (
-                    item for item in self._repository.find_all_by_algorithm(spec.algorithm_version_id)
+                    item
+                    for item in self._repository.find_all_by_algorithm(
+                        spec.algorithm_version_id
+                    )
                     if item.image == spec.image
                     and (spec.device == "auto" or item.device == spec.device)
                     and (
@@ -133,10 +137,8 @@ class InstanceService:
                     healthy.append(instance)
                 except Exception as exc:
                     if instance is not None:
-                        try:
+                        with suppress(Exception):
                             self._runtime.remove(instance.id)
-                        except Exception:
-                            pass
                         self._repository.delete(instance.id)
                     raise ManagerError("REPLICA_START_FAILED", str(exc), 502) from exc
             removable = sorted(
@@ -177,10 +179,8 @@ class InstanceService:
             self._health_failures[instance.id] += 1
             if self._health_failures[instance.id] < failure_threshold:
                 continue
-            try:
+            with suppress(Exception):
                 self._runtime.stop(instance.id)
-            except Exception:
-                pass
             self._repository.save(
                 instance.transition(
                     InstanceStatus.FAILED,

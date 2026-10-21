@@ -4,11 +4,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
-from ...dependencies import get_container
 from ...core.request_context import project_id_from
+from ...dependencies import get_container
 from ..algorithms.api.schemas import AlgorithmResponse
 from .service import AutoscalingPolicy
-
 
 router = APIRouter(prefix="/operations", tags=["operations"])
 

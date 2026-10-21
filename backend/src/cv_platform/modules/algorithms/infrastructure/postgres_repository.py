@@ -129,7 +129,8 @@ class PostgresAlgorithmRepository:
     def delete(self, algorithm_id: UUID) -> None:
         with self._database.connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE algorithm_versions SET deleted_at = now(), updated_at = now() WHERE id = %s",
+                "UPDATE algorithm_versions SET deleted_at = now(), updated_at = now() "
+                "WHERE id = %s",
                 (algorithm_id,),
             )
 

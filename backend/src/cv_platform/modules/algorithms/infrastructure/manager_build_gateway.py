@@ -1,7 +1,6 @@
 import httpx
-from pydantic import TypeAdapter
-
 from cv_algorithm_sdk import AlgorithmResult
+from pydantic import TypeAdapter
 
 from ....core.errors import ApplicationError
 from ...instances.infrastructure.http_gateway import manager_headers

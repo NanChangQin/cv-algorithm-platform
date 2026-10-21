@@ -9,7 +9,6 @@ from ...core.errors import ApplicationError
 from ...dependencies import get_container
 from .service import UserRole
 
-
 router = APIRouter(tags=["security"])
 
 

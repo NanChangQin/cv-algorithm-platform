@@ -1,13 +1,13 @@
-from uuid import UUID
 import io
 import zipfile
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 
 from ....core.container import ApplicationContainer
-from ....dependencies import get_container
 from ....core.request_context import project_id_from
+from ....dependencies import get_container
 from ..application.service import AssetService
 from .schemas import AssetResponse, BatchUploadResponse
 

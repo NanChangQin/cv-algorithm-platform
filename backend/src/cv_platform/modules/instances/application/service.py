@@ -2,10 +2,10 @@ from dataclasses import replace
 from uuid import UUID
 
 from ....core.errors import ApplicationError
+from ....core.project_context import DEFAULT_PROJECT_ID
 from ...algorithms.domain.repositories import AlgorithmRepository
 from ..domain.gateway import AlgorithmManagerGateway
 from ..domain.models import RuntimeInstance, RuntimeRequest
-from ....core.project_context import DEFAULT_PROJECT_ID
 
 
 class RuntimeInstanceService:

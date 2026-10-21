@@ -72,10 +72,9 @@ class Database:
 
     def is_healthy(self) -> bool:
         try:
-            with self._pool.connection(timeout=5) as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    return cursor.fetchone() is not None
+            with self._pool.connection(timeout=5) as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                return cursor.fetchone() is not None
         except psycopg.Error:
             return False
 

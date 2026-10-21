@@ -7,14 +7,14 @@ from uuid import UUID, uuid4
 
 from psycopg.types.json import Jsonb
 
+from ...core.database import Database
 from ...core.errors import ApplicationError
-from ..tasks.application.service import TaskService
+from ...core.project_context import DEFAULT_PROJECT_ID
 from ..assets.application.service import AssetService
+from ..tasks.application.service import TaskService
+from .postgres_service import PostgresMediaSourceService
 from .service import InMemoryMediaSourceService
 from .worker_gateway import MediaWorkerGateway
-from ...core.project_context import DEFAULT_PROJECT_ID
-from ...core.database import Database
-from .postgres_service import PostgresMediaSourceService
 
 
 class MediaRunStatus(StrEnum):
@@ -45,7 +45,10 @@ class MediaInferenceRun:
         project_id: UUID = DEFAULT_PROJECT_ID,
     ) -> "MediaInferenceRun":
         now = datetime.now(UTC)
-        return cls(uuid4(), source_id, algorithm_version_id, MediaRunStatus.QUEUED, (), now, now, project_id=project_id)
+        return cls(
+            uuid4(), source_id, algorithm_version_id, MediaRunStatus.QUEUED, (), now, now,
+            project_id=project_id,
+        )
 
 
 class MediaRunService:
@@ -130,7 +133,10 @@ class MediaRunService:
         if self._database is None:
             with self._lock:
                 return sorted(
-                    [item for item in self._items.values() if project_id is None or item.project_id == project_id],
+                    [
+                        item for item in self._items.values()
+                        if project_id is None or item.project_id == project_id
+                    ],
                     key=lambda item: item.created_at,
                     reverse=True,
                 )
@@ -222,7 +228,8 @@ class MediaRunService:
             return run
         frame_tasks = [tasks.get_task(task_id) for task_id in run.frame_task_ids]
         if any(task.status.value == "failed" for task in frame_tasks):
-            return self._save(replace(run, status=MediaRunStatus.FAILED, error_message="帧任务失败"))
+            failed = replace(run, status=MediaRunStatus.FAILED, error_message="帧任务失败")
+            return self._save(failed)
         if frame_tasks and all(task.status.value == "completed" for task in frame_tasks):
             return self._save(replace(run, status=MediaRunStatus.COMPLETED))
         return run

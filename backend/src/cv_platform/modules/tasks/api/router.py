@@ -1,18 +1,17 @@
+import json
 from datetime import UTC, datetime
 from io import BytesIO
-import json
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile
 
+from cv_algorithm_sdk import TaskStatus
 from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
-from cv_algorithm_sdk import TaskStatus
-
 from ....core.container import ApplicationContainer
 from ....core.errors import ApplicationError
-from ....dependencies import get_container
 from ....core.request_context import project_id_from
+from ....dependencies import get_container
 from ..application.service import TaskService
 from .schemas import (
     CreateTaskRequest,

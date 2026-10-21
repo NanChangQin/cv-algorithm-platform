@@ -4,8 +4,8 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from ...core.errors import ApplicationError
-from .domain import MediaSource, MediaSourceType
 from ...core.project_context import DEFAULT_PROJECT_ID
+from .domain import MediaSource, MediaSourceType
 
 
 class InMemoryMediaSourceService:
