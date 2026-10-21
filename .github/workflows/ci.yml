@@ -48,3 +48,42 @@ jobs:
         run: PYTHONPATH=src python -m pytest -q
       - name: Cross-service contracts
         run: python -m pytest -q tests
+
+  # 生产环境用 PostgreSQL；同一套后端测试在真实数据库上再跑一遍，覆盖手写 SQL 和迁移
+  postgres:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: cv_platform
+          POSTGRES_USER: cv_platform
+          POSTGRES_PASSWORD: ci-only-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cv_platform -d cv_platform"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CV_PLATFORM_PERSISTENCE_BACKEND: postgres
+      CV_PLATFORM_DATABASE_URL: postgresql+psycopg://cv_platform:ci-only-password@localhost:5432/cv_platform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install ./packages/algorithm-sdk "./backend[dev]" -r database/requirements.txt
+      - name: Migration chain
+        run: python scripts/verify_database_migrations.py
+      - name: Migrations up, down and up again
+        working-directory: database
+        run: |
+          alembic -c alembic.ini upgrade head
+          alembic -c alembic.ini downgrade base
+          alembic -c alembic.ini upgrade head
+      - name: Backend on PostgreSQL
+        working-directory: backend
+        run: python -m pytest -q
