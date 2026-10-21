@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-import type { ObjectDetectionResult } from '@/types/task'
+import type { Detection, ObjectDetectionResult } from '@/types/task'
 
 const props = defineProps<{
   imageUrl: string
@@ -9,7 +9,10 @@ const props = defineProps<{
   confidence: number
   visibleLabels: string[]
   showAnnotations: boolean
+  /** 需要突出显示的检测框（例如鼠标停在结果列表的某一行上） */
+  highlight?: Detection | null
 }>()
+const emit = defineEmits<{ hover: [detection: Detection | null] }>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const stage = ref<HTMLDivElement | null>(null)
@@ -58,17 +61,50 @@ async function render() {
   if (!props.showAnnotations) return
   context.lineWidth = Math.max(2, 3 * scale.value)
   context.font = `${Math.max(12, 14 * scale.value)}px Manrope, sans-serif`
-  for (const detection of visibleDetections.value) {
+  const highlighted = props.highlight && visibleDetections.value.includes(props.highlight) ? props.highlight : null
+  // 高亮框最后绘制，保证在最上层；其余框变淡
+  const ordered = highlighted ? [...visibleDetections.value.filter((item) => item !== highlighted), highlighted] : visibleDetections.value
+  const baseWidth = Math.max(2, 3 * scale.value)
+  for (const detection of ordered) {
+    const active = detection === highlighted
+    const color = active ? '#ffb020' : '#a5ff69'
     const [x1, y1, x2, y2] = detection.bbox.map((value) => value * scale.value) as [number, number, number, number]
     const label = `${detection.label} ${(detection.score * 100).toFixed(1)}%`
+    context.globalAlpha = highlighted && !active ? 0.35 : 1
+    context.lineWidth = active ? baseWidth * 1.8 : baseWidth
     const metrics = context.measureText(label)
-    context.strokeStyle = '#a5ff69'
-    context.fillStyle = '#a5ff69'
+    context.strokeStyle = color
+    context.fillStyle = color
     context.strokeRect(x1, y1, x2 - x1, y2 - y1)
     context.fillRect(x1, Math.max(0, y1 - 22), metrics.width + 10, 22)
     context.fillStyle = '#0b100e'
     context.fillText(label, x1 + 5, Math.max(15, y1 - 6))
   }
+  context.globalAlpha = 1
+}
+
+/** 鼠标所在位置命中的最小检测框，用于和结果列表联动 */
+function detectionAt(event: MouseEvent): Detection | null {
+  if (!props.showAnnotations || !canvas.value) return null
+  const rect = canvas.value.getBoundingClientRect()
+  const x = ((event.clientX - rect.left) / rect.width) * props.result.input.width
+  const y = ((event.clientY - rect.top) / rect.height) * props.result.input.height
+  let best: Detection | null = null
+  let bestArea = Number.POSITIVE_INFINITY
+  for (const detection of visibleDetections.value) {
+    const [x1, y1, x2, y2] = detection.bbox
+    const area = (x2 - x1) * (y2 - y1)
+    if (x >= x1 && x <= x2 && y >= y1 && y <= y2 && area < bestArea) { best = detection; bestArea = area }
+  }
+  return best
+}
+let lastHover: Detection | null = null
+function onPointerMove(event: MouseEvent) {
+  const hit = detectionAt(event)
+  if (hit !== lastHover) { lastHover = hit; emit('hover', hit) }
+}
+function onPointerLeave() {
+  if (lastHover) { lastHover = null; emit('hover', null) }
 }
 
 function downloadRendered() {
@@ -79,7 +115,7 @@ function downloadRendered() {
 }
 
 watch(
-  () => [props.imageUrl, props.result, props.confidence, props.visibleLabels, props.showAnnotations, scale.value],
+  () => [props.imageUrl, props.result, props.confidence, props.visibleLabels, props.showAnnotations, props.highlight, scale.value],
   () => { void render() },
   { deep: true },
 )
@@ -120,7 +156,7 @@ defineExpose({ downloadRendered })
     </div>
     <p v-if="loadError" class="alert" role="alert">{{ loadError }}</p>
     <div ref="stage" class="canvas-stage">
-      <canvas ref="canvas" aria-label="算法检测结果图" />
+      <canvas ref="canvas" aria-label="算法检测结果图" @mousemove="onPointerMove" @mouseleave="onPointerLeave" />
     </div>
   </div>
 </template>
