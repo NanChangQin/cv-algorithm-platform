@@ -116,8 +116,13 @@ def build_container() -> ApplicationContainer:
         audit_log = InMemoryAuditLog()
         media_sources = InMemoryMediaSourceService()
     media_worker = MediaWorkerGateway(settings.media_worker_url)
-    manager = ClusterAlgorithmManagerGateway(settings.algorithm_manager_url, database)
-    build_gateway = ManagerBuildGateway(settings.algorithm_manager_url)
+    manager_token = (
+        settings.manager_api_token.get_secret_value() if settings.manager_api_token else None
+    )
+    manager = ClusterAlgorithmManagerGateway(
+        settings.algorithm_manager_url, database, api_token=manager_token
+    )
+    build_gateway = ManagerBuildGateway(settings.algorithm_manager_url, api_token=manager_token)
     build_executor = LocalBuildQueue(algorithms, build_jobs, build_gateway)
     instances = RuntimeInstanceService(algorithms, manager)
     task_executor = LocalTaskQueue(
@@ -125,7 +130,11 @@ def build_container() -> ApplicationContainer:
         algorithms,
         assets,
         instances,
-        HttpAlgorithmPredictionGateway(settings.prediction_timeout_seconds, settings.storage_root),
+        HttpAlgorithmPredictionGateway(
+            settings.prediction_timeout_seconds,
+            settings.storage_root,
+            manager_api_token=manager_token,
+        ),
         settings.task_worker_count,
     )
     if settings.queue_backend == "postgres":

@@ -51,6 +51,8 @@ CV_PLATFORM_PACKAGE_ROOT=/srv/cv-platform/packages
 CV_PLATFORM_SECURE_COOKIES=false
 ```
 
+多服务器部署或 Manager 端口不只在本机可达时，还需设置 `CV_PLATFORM_MANAGER_API_TOKEN`，并在每个 GPU 节点配置相同的值，见 [GPU 节点访问令牌](GPU-NODES.md#访问令牌节点端口对局域网开放时必须配置)。
+
 `CV_PLATFORM_AUTH_ENABLED=false` 时前端隐藏登录和退出入口，Backend 直接以内置管理员身份处理请求，适合隔离的 GPU 测试服务器。若服务器可能被不受信任的用户访问，必须设置 `CV_PLATFORM_AUTH_ENABLED=true`；若前面有 HTTPS 反向代理，同时将 `CV_PLATFORM_SECURE_COOKIES=true`。不要提交 `.env`。
 
 ## 4. 验证代码与配置

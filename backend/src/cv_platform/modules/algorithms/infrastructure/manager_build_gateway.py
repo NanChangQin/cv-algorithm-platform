@@ -4,12 +4,19 @@ from pydantic import TypeAdapter
 from cv_algorithm_sdk import AlgorithmResult
 
 from ....core.errors import ApplicationError
+from ...instances.infrastructure.http_gateway import manager_headers
 
 
 class ManagerBuildGateway:
-    def __init__(self, base_url: str, timeout_seconds: float = 3600) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout_seconds: float = 3600,
+        api_token: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_seconds
+        self._headers = manager_headers(api_token)
 
     def build(
         self,
@@ -20,6 +27,7 @@ class ManagerBuildGateway:
         try:
             response = httpx.post(
                 f"{self._base_url}/images/build",
+                headers=self._headers,
                 json={
                     "package_path": package_path,
                     "image": image,
@@ -42,6 +50,7 @@ class ManagerBuildGateway:
         try:
             response = httpx.delete(
                 f"{self._base_url}/images",
+                headers=self._headers,
                 params={"image": image},
                 timeout=60,
             )
@@ -64,6 +73,7 @@ class ManagerBuildGateway:
         try:
             response = httpx.post(
                 f"{self._base_url}/instances/ensure",
+                headers=self._headers,
                 json={
                     "algorithm_version_id": f"test-{algorithm_version_id}",
                     "algorithm_key": algorithm_key,
@@ -112,6 +122,7 @@ class ManagerBuildGateway:
                 if "instance" in locals():
                     httpx.delete(
                         f"{self._base_url}/instances/{instance['id']}",
+                        headers=self._headers,
                         timeout=30,
                     )
             except httpx.HTTPError:

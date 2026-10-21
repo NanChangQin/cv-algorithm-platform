@@ -1,16 +1,41 @@
 from datetime import datetime
 import json
+import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .application.service import InstanceService
 from .application.errors import ManagerError
 from .config import get_settings
 from .domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
+
+
+IMAGE_REFERENCE = re.compile(
+    r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$"
+)
+# 平台自身的服务镜像同样以 cv-platform/ 开头，但不能当作算法容器启动。
+PLATFORM_SERVICE_IMAGES = {
+    "cv-platform/algorithm-manager",
+    "cv-platform/backend",
+    "cv-platform/database-migrator",
+    "cv-platform/frontend",
+    "cv-platform/media-worker",
+}
+
+
+def validate_algorithm_image(image: str) -> str:
+    if not IMAGE_REFERENCE.fullmatch(image):
+        raise ValueError("镜像名称不合法")
+    prefixes = get_settings().allowed_image_prefixes
+    if not any(image.startswith(prefix) for prefix in prefixes):
+        raise ValueError(f"只允许运行以 {'、'.join(prefixes)} 开头的算法镜像")
+    if image.rsplit(":", 1)[0] in PLATFORM_SERVICE_IMAGES:
+        raise ValueError("不能把平台服务镜像作为算法容器运行")
+    return image
 
 
 class EnsureInstanceRequest(BaseModel):
@@ -20,9 +45,14 @@ class EnsureInstanceRequest(BaseModel):
     container_name: str = Field(pattern=r"^cv-algorithm-[a-z0-9-]+$")
     internal_port: int = Field(default=8000, ge=1, le=65535)
     device: str = Field(default="cpu", pattern=r"^(cpu|gpu|auto)$")
-    memory_mb: int = Field(default=1024, ge=256)
+    memory_mb: int = Field(default=1024, ge=256, le=262_144)
     cpu_count: float = Field(default=1, ge=0.1, le=64)
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=32)
+
+    @field_validator("image")
+    @classmethod
+    def check_image(cls, value: str) -> str:
+        return validate_algorithm_image(value)
 
     def to_spec(self) -> ContainerSpec:
         data = self.model_dump()

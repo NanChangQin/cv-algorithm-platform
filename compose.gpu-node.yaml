@@ -14,6 +14,8 @@ services:
       ALGORITHM_MANAGER_DATA_ROOT: /data
       ALGORITHM_MANAGER_PACKAGE_ROOT: /packages
       ALGORITHM_MANAGER_GPU_ACCESS_MODE: runtime
+      # 与主平台 .env 的 CV_PLATFORM_MANAGER_API_TOKEN 相同；端口暴露在局域网时必须设置
+      ALGORITHM_MANAGER_API_TOKEN: ${CV_PLATFORM_MANAGER_API_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${CV_NODE_ROOT:-/srv/cv-platform-node}/data:/data

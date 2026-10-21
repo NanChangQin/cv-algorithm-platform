@@ -6,11 +6,23 @@ from ....core.errors import ApplicationError
 from ..domain.models import RuntimeInstance, RuntimeRequest
 
 
+def manager_headers(api_token: str | None) -> dict[str, str]:
+    """Algorithm Manager 访问令牌请求头；未配置令牌时为空。"""
+    return {"Authorization": f"Bearer {api_token}"} if api_token else {}
+
+
 class HttpAlgorithmManagerGateway:
-    def __init__(self, base_url: str, timeout: float = 75, node_id: str = "local") -> None:
+    def __init__(
+        self,
+        base_url: str,
+        timeout: float = 75,
+        node_id: str = "local",
+        api_token: str | None = None,
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._node_id = node_id
+        self._headers = manager_headers(api_token)
 
     def list_instances(self) -> list[RuntimeInstance]:
         payload = self._request("GET", "/instances")
@@ -77,6 +89,7 @@ class HttpAlgorithmManagerGateway:
                 method,
                 f"{self._base_url}{path}",
                 json=json,
+                headers=self._headers,
                 timeout=self._timeout,
             )
         except httpx.HTTPError as exc:

@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     max_input_bytes: int = 25 * 1024 * 1024
     prediction_timeout_seconds: float = 120
     gpu_access_mode: Literal["device-request", "runtime"] = "device-request"
+    # 与主平台共享的访问令牌。设置后，除 /health 外的接口都要求 Authorization: Bearer <令牌>。
+    # 节点端口暴露在局域网时务必设置，否则局域网内任何主机都能启停算法容器。
+    api_token: SecretStr | None = None
+    # 只允许运行这些前缀的算法镜像（平台构建与预置的算法镜像都以 cv-platform/ 开头）。
+    allowed_image_prefixes: list[str] = Field(default_factory=lambda: ["cv-platform/"])
 
 
 @lru_cache
