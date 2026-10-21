@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
         title=settings.app_name,
         version="0.1.0",
         docs_url="/docs" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
         redoc_url=None,
         lifespan=lifespan,
     )
@@ -222,7 +223,12 @@ def create_app() -> FastAPI:
                     raise
                 request.state.project_id = project_id
         if request.method == "POST" and request.url.path in rate_limited_paths:
-            if not container.rate_limiter.allow(f"{actor}:{request.url.path}"):
+            # 未登录（登录接口）或免登录模式下大家都是同一个身份，再按来源 IP 区分，
+            # 避免一个人用完配额后所有人都被限流。来源 IP 依赖 uvicorn 的 --proxy-headers。
+            shared_identity = session is None or not settings.auth_enabled
+            client_ip = request.client.host if request.client else "unknown"
+            rate_key = f"{actor}@{client_ip}" if shared_identity else actor
+            if not container.rate_limiter.allow(f"{rate_key}:{request.url.path}"):
                 return JSONResponse(
                     status_code=429,
                     content={
