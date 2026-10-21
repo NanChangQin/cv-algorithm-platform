@@ -4,7 +4,7 @@ from uuid import UUID
 
 from cv_algorithm_sdk import AlgorithmManifest, AlgorithmStatus
 from psycopg.errors import UniqueViolation
-from psycopg.types.json import Jsonb
+from psycopg.types.json import Json
 
 from ....core.database import Database
 from ..domain.entities import AlgorithmVersion, BuildJob, BuildStatus
@@ -56,7 +56,7 @@ class PostgresAlgorithmRepository:
                         algorithm.manifest.description,
                         algorithm.manifest.schema_version,
                         algorithm.manifest.task_type.value,
-                        Jsonb(manifest),
+                        Json(manifest),
                         algorithm.status.value,
                         algorithm.image,
                         algorithm.internal_port,
@@ -112,7 +112,7 @@ class PostgresAlgorithmRepository:
                 WHERE id = %s AND deleted_at IS NULL
                 """,
                 (
-                    Jsonb(algorithm.manifest.model_dump(mode="json")),
+                    Json(algorithm.manifest.model_dump(mode="json")),
                     algorithm.status.value,
                     algorithm.image,
                     algorithm.internal_port,
