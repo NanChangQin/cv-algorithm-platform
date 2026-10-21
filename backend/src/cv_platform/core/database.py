@@ -37,6 +37,7 @@ class Database:
     """
 
     def __init__(self, conninfo: str, *, max_size: int = 10, timeout: float = 10) -> None:
+        self._conninfo = conninfo
         self._pool: ConnectionPool[Connection[dict[str, object]]] = ConnectionPool(
             conninfo,
             kwargs={"row_factory": dict_row, "connect_timeout": 5},
@@ -56,6 +57,17 @@ class Database:
     @contextmanager
     def connect(self) -> Iterator[Connection[dict[str, object]]]:
         with self._pool.connection() as connection:
+            yield connection
+
+    @contextmanager
+    def dedicated(self) -> Iterator[Connection[dict[str, object]]]:
+        """不经过连接池的自动提交连接，退出时关闭。
+
+        会话级状态（例如 advisory lock）必须用它：池里的连接归还后会话还在，锁也不会释放。
+        """
+        with psycopg.connect(
+            self._conninfo, row_factory=dict_row, connect_timeout=5, autocommit=True
+        ) as connection:
             yield connection
 
     def is_healthy(self) -> bool:

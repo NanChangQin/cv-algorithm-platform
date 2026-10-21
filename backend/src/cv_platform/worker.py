@@ -37,7 +37,8 @@ def run() -> None:
 
     # Only one durable dispatcher is needed on the current single-GPU server.
     # SKIP LOCKED still makes individual claims safe if this is expanded later.
-    with container.database.connect() as lock_connection, lock_connection.cursor() as cursor:
+    # 会话级锁，用独立连接持有；进程退出或连接关闭时自动释放
+    with container.database.dedicated() as lock_connection, lock_connection.cursor() as cursor:
         cursor.execute("SELECT pg_try_advisory_lock(hashtext('cv-platform-durable-worker')) AS locked")
         if not bool(cursor.fetchone()["locked"]):
             raise RuntimeError("another durable worker already owns the dispatcher lock")
