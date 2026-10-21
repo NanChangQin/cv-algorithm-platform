@@ -57,6 +57,26 @@ docker build --pull=false --build-context gpu-env=/path/to/conda/env \
 
 Manager 端口供受信任局域网主服务器访问。节点 Docker socket 只挂载到本机 Manager。
 
+## 访问令牌（节点端口对局域网开放时必须配置）
+
+Manager 能启停算法容器、读取容器日志。未设置令牌时，能访问节点端口的任何主机都可以直接调用这些接口。为主平台和所有节点配置同一个令牌：
+
+```bash
+openssl rand -hex 32   # 生成令牌
+```
+
+1. 先在主平台 `.env` 加 `CV_PLATFORM_MANAGER_API_TOKEN=<令牌>`，重建 Backend、Worker 和本机 Manager。未设置令牌的节点会忽略请求头，所以这一步不影响现有节点。
+2. 再在每个节点的部署目录 `.env`（例如 `/home/dell/docker/cv-platform-node/.env`）加入同一行，执行 `docker compose -f compose.gpu-node.yaml up -d` 或重启 systemd 单元。
+
+配置后，除 `/health` 外的 Manager 接口（包括 `/docs`）都要求 `Authorization: Bearer <令牌>`。可用下面的命令验证，第一条应返回 401，第二条返回 GPU 列表：
+
+```bash
+curl -i http://192.168.8.135:8010/api/v1/system/gpus
+curl -H "Authorization: Bearer <令牌>" http://192.168.8.135:8010/api/v1/system/gpus
+```
+
+无论是否配置令牌，Manager 都只启动 `cv-platform/` 开头的算法镜像（可用 `ALGORITHM_MANAGER_ALLOWED_IMAGE_PREFIXES` 调整），并拒绝把平台自身的服务镜像当作算法容器运行。
+
 ## 平台操作
 
 1. 高级编排 → 运行节点，注册名称与 URL，例如 `dell-gpu`、`Dell RTX 5070 Ti`、`http://192.168.8.135:8010/api/v1`。

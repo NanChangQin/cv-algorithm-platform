@@ -60,9 +60,10 @@ class AlgorithmService:
             for item in self.list_algorithms()
         ):
             raise ApplicationError("ALGORITHM_VERSION_EXISTS", "算法 ID 与版本已存在", 409)
+        # 语义化版本允许 “+构建元数据”，但 Docker 镜像标签不允许 “+”
         image = (
             f"cv-platform/{self._project_id.hex[:12]}-"
-            f"{manifest.id}:{manifest.version}"
+            f"{manifest.id}:{manifest.version.replace('+', '_')}"
         )
         algorithm = AlgorithmVersion.uploaded(
             manifest,

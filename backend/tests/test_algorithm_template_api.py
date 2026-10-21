@@ -53,3 +53,26 @@ def test_downloaded_template_can_be_imported(client: TestClient) -> None:
     assert response.status_code == 201
     assert response.json()["key"] == "template-object-detection"
     assert response.json()["status"] == "uploaded"
+
+
+def test_build_metadata_version_produces_a_valid_image_tag(client: TestClient) -> None:
+    template = client.get("/api/v1/algorithms/template?task_type=classification")
+    source = ZipFile(BytesIO(template.content))
+    package = BytesIO()
+    with ZipFile(package, "w") as target:
+        for item in source.infolist():
+            content = source.read(item)
+            if item.filename == "manifest.yaml":
+                manifest = yaml.safe_load(content)
+                manifest["version"] = "1.0.0+build.7"
+                content = yaml.safe_dump(manifest, allow_unicode=True).encode()
+            target.writestr(item, content)
+
+    response = client.post(
+        "/api/v1/algorithms/import",
+        files={"package": ("template.zip", package.getvalue(), "application/zip")},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["version"] == "1.0.0+build.7"
+    assert response.json()["image"].endswith(":1.0.0_build.7")

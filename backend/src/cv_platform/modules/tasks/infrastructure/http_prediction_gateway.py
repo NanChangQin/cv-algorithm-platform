@@ -9,15 +9,23 @@ from cv_algorithm_sdk import AlgorithmResult
 
 from ....core.errors import ApplicationError
 from ...instances.domain.models import RuntimeInstance
+from ...instances.infrastructure.http_gateway import manager_headers
 
 
 result_adapter = TypeAdapter(AlgorithmResult)
 
 
 class HttpAlgorithmPredictionGateway:
-    def __init__(self, timeout_seconds: float, storage_root: Path = Path("storage")) -> None:
+    def __init__(
+        self,
+        timeout_seconds: float,
+        storage_root: Path = Path("storage"),
+        manager_api_token: str | None = None,
+    ) -> None:
         self._timeout = timeout_seconds
         self._storage_root = storage_root.resolve()
+        # 远端节点的推理请求经过该节点的 Manager 代理，需要携带访问令牌
+        self._manager_headers = manager_headers(manager_api_token)
 
     def predict(
         self,
@@ -34,6 +42,7 @@ class HttpAlgorithmPredictionGateway:
                         f"{instance.endpoint}/predict",
                         data={"request_id": request_id, "parameters": json.dumps(parameters)},
                         files={"file": (source.name, stream, "application/octet-stream")},
+                        headers=self._manager_headers,
                         timeout=self._timeout,
                     )
             else:

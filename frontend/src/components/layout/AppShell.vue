@@ -10,7 +10,7 @@ const route = useRoute()
 const menuOpen = ref(false)
 const sidebarElement = ref<HTMLElement | null>(null)
 const menuButton = ref<HTMLButtonElement | null>(null)
-const authenticationEnabled = authenticationMode.get()
+const authenticationEnabled = computed(() => authenticationMode.get())
 const navigation = [
   { label: '工作台', to: '/', icon: 'home', group: '工作空间' },
   { label: '算法中心', to: '/algorithms', icon: 'layers', group: '工作空间' },
@@ -51,11 +51,13 @@ async function logout() {
   <div class="app-shell" :class="{ 'menu-open': menuOpen }" @keydown.esc="menuOpen = false" @keydown.tab="handleMenuTab">
     <button v-if="menuOpen" class="nav-backdrop" aria-label="关闭导航菜单" @click="menuOpen = false" />
     <aside id="app-navigation" ref="sidebarElement" class="sidebar" :class="{ 'is-open': menuOpen }">
-      <div class="brand-row"><RouterLink class="brand" to="/" @click="menuOpen = false">
-        <span class="brand-mark">CV</span>
-        <span><strong>视觉算法平台</strong><small>Algorithm Studio</small></span>
-      </RouterLink>
-      <button class="icon-button mobile-nav-close" type="button" aria-label="关闭菜单" @click="menuOpen = false"><AppIcon name="close" /></button></div>
+      <div class="brand-row">
+        <RouterLink class="brand" to="/" @click="menuOpen = false">
+          <span class="brand-mark">CV</span>
+          <span><strong>视觉算法平台</strong><small>Algorithm Studio</small></span>
+        </RouterLink>
+        <button class="icon-button mobile-nav-close" type="button" aria-label="关闭菜单" @click="menuOpen = false"><AppIcon name="close" /></button>
+      </div>
 
       <nav aria-label="主导航">
         <div v-for="group in ['工作空间', '管理与运维']" :key="group" class="nav-group">

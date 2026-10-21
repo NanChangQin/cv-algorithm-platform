@@ -13,6 +13,7 @@ services:
       ALGORITHM_MANAGER_HOST_MODEL_ROOT: ${CV_PLATFORM_MODEL_ROOT:-/srv/cv-platform/models}
       ALGORITHM_MANAGER_PACKAGE_ROOT: /packages
       ALGORITHM_MANAGER_BUILD_NETWORK: ${CV_PLATFORM_BUILD_NETWORK:-bridge}
+      ALGORITHM_MANAGER_API_TOKEN: ${CV_PLATFORM_MANAGER_API_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${CV_PLATFORM_PACKAGE_ROOT:-/srv/cv-platform/packages}:/packages
@@ -36,6 +37,7 @@ services:
       CV_PLATFORM_DEBUG: "false"
       CV_PLATFORM_CORS_ORIGINS: '["http://localhost:8080"]'
       CV_PLATFORM_ALGORITHM_MANAGER_URL: http://algorithm-manager:8010/api/v1
+      CV_PLATFORM_MANAGER_API_TOKEN: ${CV_PLATFORM_MANAGER_API_TOKEN:-}
       CV_PLATFORM_STORAGE_ROOT: /storage
       CV_PLATFORM_PACKAGE_ROOT: /packages
       CV_PLATFORM_ADMIN_USERNAME: ${CV_PLATFORM_ADMIN_USERNAME:-admin}

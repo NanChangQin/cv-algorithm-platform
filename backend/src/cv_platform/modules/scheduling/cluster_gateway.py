@@ -22,8 +22,10 @@ class ClusterAlgorithmManagerGateway:
         self,
         default_manager_url: str,
         database: Database | None = None,
+        api_token: str | None = None,
     ) -> None:
         self._database = database
+        self._api_token = api_token
         self._nodes: dict[str, RuntimeNode] = {
             "local": RuntimeNode("local", "Local Docker Node", default_manager_url)
         }
@@ -297,7 +299,9 @@ class ClusterAlgorithmManagerGateway:
         return node
 
     def _gateway(self, node: RuntimeNode) -> HttpAlgorithmManagerGateway:
-        return HttpAlgorithmManagerGateway(node.manager_url, node_id=node.id)
+        return HttpAlgorithmManagerGateway(
+            node.manager_url, node_id=node.id, api_token=self._api_token
+        )
 
     def _gateway_for_instance(self, instance_id: str) -> HttpAlgorithmManagerGateway:
         with self._lock:

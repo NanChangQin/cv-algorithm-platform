@@ -15,12 +15,17 @@ def instance():
                            now, now, node_id="remote", gpu_device_ids=("0",))
 
 
-def test_remote_gateway_streams_the_platform_input(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    ("token", "expected_headers"),
+    [(None, {}), ("node-secret", {"Authorization": "Bearer node-secret"})],
+)
+def test_remote_gateway_streams_the_platform_input(monkeypatch, tmp_path, token, expected_headers):
     source = tmp_path / "assets" / "image.jpg"
     source.parent.mkdir()
     source.write_bytes(b"input-image")
-    def post(url, *, data, files, timeout):
+    def post(url, *, data, files, headers, timeout):
         assert url == "http://remote:8010/api/v1/instances/container/predict"
+        assert headers == expected_headers
         assert data["request_id"] == "request-1"
         assert files["file"][1].read() == b"input-image"
         return httpx.Response(200, json={
@@ -31,7 +36,7 @@ def test_remote_gateway_streams_the_platform_input(monkeypatch, tmp_path):
             "data": {"detections": []},
         })
     monkeypatch.setattr(httpx, "post", post)
-    result = HttpAlgorithmPredictionGateway(5, tmp_path).predict(
+    result = HttpAlgorithmPredictionGateway(5, tmp_path, manager_api_token=token).predict(
         instance(), "request-1", "file:///data/assets/image.jpg", {},
     )
     assert result.request_id == "request-1"

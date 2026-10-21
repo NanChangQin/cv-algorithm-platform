@@ -1,18 +1,22 @@
 import asyncio
+import hmac
+import logging
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
-from .api import build_router
+from .api import build_router, validate_algorithm_image
 from .application.errors import ManagerError
 from .application.service import InstanceService
 from .config import get_settings
 from .infrastructure.docker_runtime import DockerContainerRuntime
 from .infrastructure.memory_repository import InMemoryInstanceRepository
 from .infrastructure.image_builder import ControlledImageBuilder
+
+logger = logging.getLogger(__name__)
 
 
 @lru_cache
@@ -72,12 +76,35 @@ def create_app() -> FastAPI:
         redoc_url=None,
         lifespan=lifespan,
     )
+    token = settings.api_token.get_secret_value() if settings.api_token else ""
+    if token:
+        expected = f"Bearer {token}".encode()
+
+        @app.middleware("http")
+        async def require_api_token(request: Request, call_next):
+            supplied = request.headers.get("Authorization", "").encode()
+            if request.url.path != "/health" and not hmac.compare_digest(supplied, expected):
+                return JSONResponse(
+                    status_code=401,
+                    content={"code": "MANAGER_AUTH_REQUIRED", "message": "缺少或错误的管理服务访问令牌"},
+                )
+            return await call_next(request)
+    else:
+        logger.warning(
+            "ALGORITHM_MANAGER_API_TOKEN 未设置：管理接口不做鉴权，只应在可信网络内访问"
+        )
+
     app.include_router(build_router(get_service), prefix="/api/v1")
 
     class BuildImageRequest(BaseModel):
         package_path: str
         image: str
         framework: str
+
+        @field_validator("image")
+        @classmethod
+        def check_image(cls, value: str) -> str:
+            return validate_algorithm_image(value)
 
     @app.post("/api/v1/images/build", tags=["images"])
     def build_image(payload: BuildImageRequest) -> dict[str, object]:

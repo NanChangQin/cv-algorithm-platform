@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     debug: bool = True
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     algorithm_manager_url: str = "http://localhost:8010/api/v1"
+    # 与各节点 Algorithm Manager 的 ALGORITHM_MANAGER_API_TOKEN 保持一致；为空时不发送令牌。
+    manager_api_token: SecretStr | None = None
     storage_root: Path = Path("storage")
     package_root: Path = Path("storage/packages")
     algorithm_data_root: str = "/data"
