@@ -1,3 +1,5 @@
+import { ref } from 'vue'
+
 import { projectContext, request, sessionToken } from './http'
 
 export interface Session {
@@ -47,16 +49,20 @@ function applySession(session: Session) {
   if (session.default_project_id) projectContext.set(session.default_project_id)
 }
 
+// 角色与登录模式保存在响应式状态中并同步到 localStorage：
+// 首次访问时侧栏先于 /auth/me 渲染，若只读 localStorage，管理员菜单要刷新页面才会出现。
 const sessionRoleKey = 'cv-platform-session-role'
+const roleState = ref(localStorage.getItem(sessionRoleKey))
 export const sessionRole = {
-  get: () => localStorage.getItem(sessionRoleKey),
-  set: (role: string) => localStorage.setItem(sessionRoleKey, role),
-  clear: () => localStorage.removeItem(sessionRoleKey),
+  get: () => roleState.value,
+  set: (role: string) => { roleState.value = role; localStorage.setItem(sessionRoleKey, role) },
+  clear: () => { roleState.value = null; localStorage.removeItem(sessionRoleKey) },
 }
 
 const authenticationModeKey = 'cv-platform-authentication-enabled'
+const authenticationState = ref(localStorage.getItem(authenticationModeKey) === 'true')
 export const authenticationMode = {
-  get: () => localStorage.getItem(authenticationModeKey) === 'true',
-  set: (enabled: boolean) => localStorage.setItem(authenticationModeKey, String(enabled)),
-  clear: () => localStorage.removeItem(authenticationModeKey),
+  get: () => authenticationState.value,
+  set: (enabled: boolean) => { authenticationState.value = enabled; localStorage.setItem(authenticationModeKey, String(enabled)) },
+  clear: () => { authenticationState.value = false; localStorage.removeItem(authenticationModeKey) },
 }
