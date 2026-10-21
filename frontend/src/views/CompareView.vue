@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { HistoryState } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -155,10 +156,20 @@ function prefillFromQuery() {
     const algorithm = availableAlgorithms.value.find((item) => item.id === id)
     if (algorithm && !selectedAlgorithms.value.includes(id)) toggleAlgorithm(algorithm)
   }
+  const savedParameters = window.history.state?.cvComparisonParameters as Record<string, ParameterValues> | undefined
+  if (savedParameters) {
+    parameterValues.value = { ...parameterValues.value, ...savedParameters }
+    window.history.replaceState({ ...window.history.state, cvComparisonParameters: null }, '')
+  }
 }
 function rerun() {
   if (!comparison.value) return
-  void router.push({ path: '/compare', query: { asset: comparison.value.asset_id, algorithms: comparison.value.tasks.map((task) => task.algorithm_version_id).join(',') } })
+  const parameters = Object.fromEntries(comparison.value.tasks.map((task) => [task.algorithm_version_id, task.parameters]))
+  void router.push({
+    path: '/compare',
+    query: { asset: comparison.value.asset_id, algorithms: comparison.value.tasks.map((task) => task.algorithm_version_id).join(',') },
+    state: { cvComparisonParameters: JSON.parse(JSON.stringify(parameters)) as HistoryState },
+  })
 }
 
 watch(availableAlgorithms, prefillFromQuery)

@@ -128,20 +128,36 @@ async function handleFiles(files: File[]) {
   }
 }
 
-function payloadFor(assetId: string) {
+interface FrozenRunConfig {
+  algorithmVersionId: string
+  parameters: ParameterValues
+  nodeId?: string
+  gpuDeviceIds: string[]
+}
+
+function frozenConfig(): FrozenRunConfig {
   return {
-    algorithm_version_id: activeSelection.value!.id,
+    algorithmVersionId: activeSelection.value!.id,
+    parameters: { ...parameterValues.value },
+    nodeId: selectedNodeId.value || undefined,
+    gpuDeviceIds: selectedGpuId.value ? [selectedGpuId.value] : [],
+  }
+}
+
+function payloadFor(assetId: string, config: FrozenRunConfig) {
+  return {
+    algorithm_version_id: config.algorithmVersionId,
     asset_id: assetId,
-    parameters: parameterValues.value,
-    node_id: selectedNodeId.value || undefined,
-    gpu_device_ids: selectedGpuId.value ? [selectedGpuId.value] : [],
+    parameters: config.parameters,
+    node_id: config.nodeId,
+    gpu_device_ids: config.gpuDeviceIds,
   }
 }
 
 /** 平台按账号限流（默认每分钟 60 次），批量提交遇到 429 时等待后继续。 */
-async function createWithRetry(assetId: string) {
+async function createWithRetry(assetId: string, config: FrozenRunConfig) {
   for (let attempt = 0; ; attempt++) {
-    try { return await create(payloadFor(assetId)) } catch (reason) {
+    try { return await create(payloadFor(assetId, config)) } catch (reason) {
       if (!(reason instanceof ApiError && reason.status === 429) || attempt >= 30) throw reason
       taskError.value = ''
       await new Promise((resolve) => window.setTimeout(resolve, 3000))
@@ -152,9 +168,10 @@ async function createWithRetry(assetId: string) {
 async function submitTask() {
   if (!canSubmit.value || !activeSelection.value) return
   const ids = selectedAssets.value.map((asset) => asset.id)
+  const config = frozenConfig()
   if (ids.length === 1) {
     try {
-      const task = await create(payloadFor(ids[0]!))
+      const task = await create(payloadFor(ids[0]!, config))
       await router.push(`/tasks/${task.id}`)
     } catch { /* 保留当前输入，错误显示在表单中 */ }
     return
@@ -162,14 +179,16 @@ async function submitTask() {
   batchProgress.value = { done: 0, total: ids.length }
   try {
     for (const id of ids) {
-      await createWithRetry(id)
+      await createWithRetry(id, config)
       batchProgress.value = { done: batchProgress.value.done + 1, total: ids.length }
     }
     toast.success(`已提交 ${ids.length} 个推理任务`)
     await router.push({ path: '/tasks', query: { status: 'active' } })
   } catch (reason) {
     const done = batchProgress.value?.done ?? 0
-    taskError.value = `已提交 ${done} 个，第 ${done + 1} 个失败：${errorMessage(reason, '创建任务失败')}`
+    selectedAssetIds.value = ids.slice(done)
+    const failedName = assets.value.find((asset) => asset.id === ids[done])?.original_name ?? `第 ${done + 1} 张`
+    taskError.value = `已提交 ${done} 个，${failedName}失败：${errorMessage(reason, '创建任务失败')}。已保留未提交图片，可重新提交。`
   } finally { batchProgress.value = null }
 }
 
