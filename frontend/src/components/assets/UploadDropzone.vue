@@ -12,6 +12,8 @@ const props = withDefaults(defineProps<{
   title?: string
   hint?: string
   compact?: boolean
+  /** 方块样式，放在图片列表里当第一格 */
+  tile?: boolean
 }>(), {
   accept: 'image/jpeg,image/png,image/bmp,image/webp',
   multiple: true,
@@ -21,6 +23,7 @@ const props = withDefaults(defineProps<{
   title: '拖入图片，或点击选择',
   hint: '支持 JPG、PNG、BMP、WebP，可多选',
   compact: false,
+  tile: false,
 })
 const emit = defineEmits<{ files: [files: File[]] }>()
 const input = ref<HTMLInputElement | null>(null)
@@ -69,7 +72,7 @@ defineExpose({ open: () => input.value?.click() })
 <template>
   <label
     class="dropzone"
-    :class="{ dragging, disabled, compact }"
+    :class="{ dragging, disabled, compact, tile }"
     @dragenter.prevent="onDragEnter"
     @dragover.prevent
     @dragleave.prevent="onDragLeave"
@@ -78,7 +81,7 @@ defineExpose({ open: () => input.value?.click() })
     <span class="dropzone-icon" aria-hidden="true">↑</span>
     <span class="dropzone-copy">
       <strong>{{ progress !== null ? `正在上传 ${Math.round(progress * 100)}%` : dragging ? '松开即可上传' : title }}</strong>
-      <small>{{ hint }}<template v-if="acceptPaste">；也可以直接 Ctrl+V 粘贴截图</template></small>
+      <small>{{ hint }}<template v-if="acceptPaste && !tile">；也可以直接 Ctrl+V 粘贴截图</template></small>
     </span>
     <span v-if="progress !== null" class="dropzone-progress" role="progressbar" :aria-valuenow="Math.round(progress * 100)" aria-valuemin="0" aria-valuemax="100"><i :style="{ width: `${progress * 100}%` }" /></span>
     <input ref="input" type="file" :accept="accept" :multiple="multiple" :disabled="disabled" @change="onChange" />

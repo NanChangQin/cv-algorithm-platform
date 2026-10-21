@@ -12,7 +12,35 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 const tokenKey = 'cv-platform-token'
 const projectKey = 'cv-platform-project-id'
 
+export interface Page<T> { items: T[]; total: number }
+
+/** 拼接查询参数：空值跳过，数组按同名参数重复传递（例如 status=queued&status=running）。 */
+export function queryString(params: Record<string, string | number | readonly string[] | null | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    if (Array.isArray(value)) for (const item of value) search.append(key, item)
+    else search.set(key, String(value))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await send(path, init)
+  if (response.status === 204) return undefined as T
+  return (await response.json()) as T
+}
+
+/** 分页列表：当前页的数据，加上服务端在 X-Total-Count 里给出的总数。 */
+export async function requestPage<T>(path: string): Promise<Page<T>> {
+  const response = await send(path)
+  const items = (await response.json()) as T[]
+  const total = Number(response.headers.get('X-Total-Count') ?? items.length)
+  return { items, total: Number.isFinite(total) ? total : items.length }
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const isFormData = init?.body instanceof FormData
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
@@ -35,10 +63,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     throw new ApiError(payload?.message ?? '请求失败，请稍后重试', response.status, payload?.code)
   }
-
-  if (response.status === 204) return undefined as T
-
-  return (await response.json()) as T
+  return response
 }
 
 export async function requestBlob(path: string, init?: RequestInit): Promise<Blob> {
