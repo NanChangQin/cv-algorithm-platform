@@ -31,6 +31,13 @@ class ComparisonService:
         unique_ids = list(dict.fromkeys(algorithm_version_ids))
         if len(unique_ids) < 2:
             raise ApplicationError("COMPARISON_INVALID", "至少选择两个不同算法", 400)
+        # 全部校验通过再创建，避免后面的算法参数不合法时前面的任务成为孤立任务
+        for algorithm_id in unique_ids:
+            self._tasks.validate_task(
+                algorithm_id,
+                parameters.get(str(algorithm_id), {}),
+                asset_id=asset_id,
+            )
         tasks = [
             self._tasks.create_task(
                 algorithm_id,

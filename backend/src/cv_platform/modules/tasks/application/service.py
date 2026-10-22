@@ -6,6 +6,7 @@ from cv_algorithm_sdk import AlgorithmStatus, TaskStatus
 
 from ....core.errors import ApplicationError
 from ...algorithms.domain.repositories import AlgorithmRepository
+from ...assets.domain.entities import ImageAsset
 from ...assets.domain.repositories import AssetRepository
 from ..domain.entities import InferenceTask, TERMINAL_STATUSES
 from ..domain.execution import TaskQueue
@@ -41,6 +42,40 @@ class TaskService:
         node_id: str | None = None,
         gpu_device_ids: tuple[str, ...] = (),
     ) -> InferenceTask:
+        normalized_parameters, asset = self.validate_task(
+            algorithm_version_id,
+            parameters,
+            asset_id=asset_id,
+            asset_uri=asset_uri,
+            node_id=node_id,
+            gpu_device_ids=gpu_device_ids,
+        )
+        task = InferenceTask.queued(
+            algorithm_version_id,
+            asset.algorithm_uri,
+            normalized_parameters,
+            asset_id=asset.id,
+            retry_of=retry_of,
+            project_id=self._project_id,
+            owner_id=self._actor,
+            node_id=node_id,
+            gpu_device_ids=gpu_device_ids,
+        )
+        self._tasks.add(task)
+        self._queue.submit(str(task.id))
+        return task
+
+    def validate_task(
+        self,
+        algorithm_version_id: UUID,
+        parameters: dict[str, Any],
+        *,
+        asset_id: UUID | None = None,
+        asset_uri: str | None = None,
+        node_id: str | None = None,
+        gpu_device_ids: tuple[str, ...] = (),
+    ) -> tuple[dict[str, Any], ImageAsset]:
+        """校验算法、图片与参数但不创建任务，返回规范化参数和输入图片。"""
         algorithm = self._algorithms.get(algorithm_version_id)
         if algorithm is None or algorithm.project_id != self._project_id:
             raise ApplicationError("ALGORITHM_NOT_FOUND", "算法版本不存在", 404)
@@ -51,7 +86,7 @@ class TaskService:
         if gpu_device_ids and algorithm.manifest.runtime.device.value == "cpu":
             raise ApplicationError("PLACEMENT_INVALID", "该算法仅支持 CPU，不能指定 GPU")
 
-        resolved_uri = self._resolve_asset_uri(asset_id, asset_uri)
+        asset = self._resolve_asset(asset_id, asset_uri)
         try:
             normalized_parameters = algorithm.manifest.resolve_parameters(parameters)
         except ValueError as exc:
@@ -59,21 +94,7 @@ class TaskService:
                 "PARAMETER_INVALID",
                 f"算法参数不合法: {exc}",
             ) from exc
-
-        task = InferenceTask.queued(
-            algorithm_version_id,
-            resolved_uri,
-            normalized_parameters,
-            asset_id=asset_id,
-            retry_of=retry_of,
-            project_id=self._project_id,
-            owner_id=self._actor,
-            node_id=node_id,
-            gpu_device_ids=gpu_device_ids,
-        )
-        self._tasks.add(task)
-        self._queue.submit(str(task.id))
-        return task
+        return normalized_parameters, asset
 
     def list_tasks(
         self,
@@ -125,12 +146,20 @@ class TaskService:
             gpu_device_ids=original.gpu_device_ids,
         )
 
-    def _resolve_asset_uri(self, asset_id: UUID | None, asset_uri: str | None) -> str:
+    def _resolve_asset(self, asset_id: UUID | None, asset_uri: str | None) -> ImageAsset:
         if asset_id is not None:
             asset = self._assets.get(asset_id)
-            if asset is None or asset.project_id != self._project_id:
-                raise ApplicationError("ASSET_NOT_FOUND", "图片资源不存在", 404)
-            return asset.algorithm_uri
-        if asset_uri and asset_uri.startswith("file:///data/"):
-            return asset_uri
-        raise ApplicationError("INPUT_INVALID", "必须选择已上传的图片资源")
+        elif asset_uri and asset_uri.startswith("file:///data/"):
+            # asset_uri 只能指向本项目已上传的图片，否则任何人都能让算法读取 /data 下的其他文件
+            asset = next(
+                (
+                    item for item in self._assets.list()
+                    if item.project_id == self._project_id and item.algorithm_uri == asset_uri
+                ),
+                None,
+            )
+        else:
+            raise ApplicationError("INPUT_INVALID", "必须选择已上传的图片资源")
+        if asset is None or asset.project_id != self._project_id:
+            raise ApplicationError("ASSET_NOT_FOUND", "图片资源不存在", 404)
+        return asset

@@ -192,6 +192,7 @@ class MediaRunService:
                 asset = assets.register_local_image(
                     str(frame["relative_path"]),
                     f"frame-{int(frame['index']):08d}.jpg",
+                    remove_source=True,
                 )
                 task = tasks.create_task(
                     run.algorithm_version_id,

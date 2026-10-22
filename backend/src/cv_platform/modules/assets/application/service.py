@@ -61,10 +61,21 @@ class AssetService:
         storage_key: str,
         original_name: str,
         media_type: str = "image/jpeg",
+        *,
+        remove_source: bool = False,
     ) -> ImageAsset:
         path = self._storage.resolve(storage_key)
         with path.open("rb") as stream:
-            return self.upload(stream, Path(original_name).name, media_type)
+            asset = self.upload(stream, Path(original_name).name, media_type)
+        if remove_source:
+            # 内容已复制进按哈希寻址的资源目录，原文件（例如视频抽帧）不再需要
+            path.unlink(missing_ok=True)
+            for directory in (path.parent, path.parent.parent):
+                try:
+                    directory.rmdir()
+                except OSError:
+                    break
+        return asset
 
     def get_asset(self, asset_id: UUID) -> ImageAsset:
         asset = self._repository.get(asset_id)
