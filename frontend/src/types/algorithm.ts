@@ -32,6 +32,21 @@ export type BooleanParameter = ParameterMetadata & { type: 'boolean'; default: b
 export type StringParameter = ParameterMetadata & { type: 'string'; default: string; options?: string[] }
 export type ParameterSpec = NumberParameter | IntegerParameter | BooleanParameter | StringParameter
 
+/** 由训练结果发布的版本记录的来源 */
+export interface ModelLineage {
+  training_run_id: string
+  training_name: string
+  dataset_id: string
+  dataset_name: string | null
+  class_names: string[]
+  base_model: string
+  checkpoint: 'best' | 'last'
+  epoch: number | null
+  epochs_trained: number
+  parameters: { epochs: number; batch: number; imgsz: number; lr0: number; [key: string]: unknown }
+  metrics: { precision: number | null; recall: number | null; map50: number | null; map50_95: number | null }
+}
+
 export interface Algorithm {
   id: string
   key: string
@@ -52,6 +67,8 @@ export interface Algorithm {
   container_status: string
   last_called_at: string | null
   project_id: string
+  /** 由训练发布的版本才有 */
+  lineage?: ModelLineage | null
 }
 
 export interface BuildJob {

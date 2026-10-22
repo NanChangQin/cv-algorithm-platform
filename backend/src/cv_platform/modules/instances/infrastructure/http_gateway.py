@@ -74,6 +74,7 @@ class HttpAlgorithmManagerGateway:
             "memory_mb": request.memory_mb,
             "cpu_count": request.cpu_count,
             "gpu_device_ids": list(request.gpu_device_ids),
+            **({"model_directory": request.model_directory} if request.model_directory else {}),
         }
 
     def _request(

@@ -31,7 +31,7 @@ CHECK_INTERVAL = 60
 
 def model_directory(algorithm: AlgorithmVersion) -> str:
     """节点模型目录下该算法版本使用的子目录。"""
-    return algorithm.manifest.id
+    return algorithm.model_directory or algorithm.manifest.id
 
 
 class DeploymentOrchestrator:
@@ -200,6 +200,17 @@ class DeploymentOrchestrator:
     def _ensure_weights(
         self, target: NodeClient, algorithm: AlgorithmVersion, progress: _Steps
     ) -> tuple[str, bool]:
+        request = self._instances.runtime_request(algorithm.id, algorithm.project_id)
+        if request.model_files:
+            # 训练发布的版本：权重保存在主服务器上，按校验值补齐到节点
+            uploaded = self._cluster.sync_model_files(
+                target.node_id, request,
+                progress=_Transfer(progress, "weights", "从主服务器上传权重"),
+            )
+            directory = request.model_directory
+            if not uploaded:
+                return f"服务器上已有这个版本的权重（models/{directory}）", False
+            return f"已上传 {uploaded} 个文件到 models/{directory}", False
         directory = model_directory(algorithm)
         present = target.request("GET", f"/models/{directory}")["files"]
         if present:

@@ -1,6 +1,9 @@
+import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
+
+MODEL_DIRECTORY = re.compile(r"[a-z0-9][a-z0-9-]*(?:/[a-z0-9][a-z0-9-]*){0,2}")
 
 
 class InstanceStatus(StrEnum):
@@ -22,6 +25,8 @@ class ContainerSpec:
     memory_mb: int = 1024
     cpu_count: float = 1
     gpu_device_ids: tuple[str, ...] = ()
+    # 挂载到 /models 的模型子目录；为空时使用 algorithm_key（训练发布的版本各有自己的目录）
+    model_directory: str | None = None
 
     def __post_init__(self) -> None:
         if not self.algorithm_version_id.strip():
@@ -47,6 +52,10 @@ class ContainerSpec:
             raise ValueError("gpu device ids must be numeric indexes")
         if self.device == "cpu" and self.gpu_device_ids:
             raise ValueError("cpu containers cannot declare gpu device ids")
+        if self.model_directory is not None and not MODEL_DIRECTORY.fullmatch(
+            self.model_directory
+        ):
+            raise ValueError("model_directory must be up to three lowercase path segments")
 
 
 @dataclass(frozen=True, slots=True)

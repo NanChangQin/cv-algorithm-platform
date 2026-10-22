@@ -8,6 +8,7 @@ import {
   trainingStatusTone, type TrainingDataset, type TrainingRun,
 } from '@/api/training'
 import TrainingChart, { type ChartSeries } from '@/components/training/TrainingChart.vue'
+import { useAlgorithms } from '@/composables/useAlgorithms'
 import { toast } from '@/composables/useToast'
 import { errorMessage } from '@/utils/errors'
 import { formatBytes, formatDateTime, formatDuration, nodeLabel } from '@/utils/presentation'
@@ -25,7 +26,47 @@ const followLogs = ref(true)
 const logElement = ref<HTMLElement | null>(null)
 const now = ref(Date.now())
 
+const { algorithms, refresh: refreshAlgorithms } = useAlgorithms()
 const runId = computed(() => String(route.params.id))
+
+// ---- 发布为推理模型 ----
+const publishing = ref(false)
+const publishBusy = ref(false)
+const checkpoint = ref<'best' | 'last'>('best')
+const modelKey = ref('')
+const modelName = ref('')
+const modelVersion = ref('')
+const modelDescription = ref('')
+const published = computed(() => algorithms.value.filter((item) => item.lineage?.training_run_id === runId.value))
+const checkpoints = computed(() => (['best', 'last'] as const).filter((name) => run.value?.artifacts[`weights/${name}.pt`] !== undefined))
+const canPublish = computed(() => Boolean(run.value && ['completed', 'stopped'].includes(run.value.status) && checkpoints.value.length))
+const lastRow = computed(() => rows.value[rows.value.length - 1])
+const keyIssue = computed(() => /^[a-z0-9][a-z0-9-]{2,63}$/.test(modelKey.value) ? '' : '模型 ID 用小写字母、数字和连字符，3 到 64 个字符')
+function startPublishing() {
+  if (!run.value) return
+  publishing.value = true
+  checkpoint.value = checkpoints.value[0] ?? 'best'
+  // 同一次训练再次发布时沿用已有的模型 ID，版本号自动递增
+  modelKey.value = published.value[0]?.key ?? `${run.value.model.replace('.pt', '')}-${run.value.id.slice(0, 6)}`
+  modelName.value = published.value[0]?.name ?? run.value.name
+  modelVersion.value = ''
+  modelDescription.value = ''
+}
+async function publish() {
+  if (!run.value || keyIssue.value || publishBusy.value) return
+  publishBusy.value = true
+  try {
+    const model = await trainingApi.publish(run.value.id, {
+      checkpoint: checkpoint.value, key: modelKey.value, name: modelName.value.trim(),
+      version: modelVersion.value.trim(), description: modelDescription.value.trim(),
+    })
+    toast.success(`已发布 ${model.name} v${model.version}`)
+    publishing.value = false
+    await refreshAlgorithms()
+  } catch (reason) {
+    toast.error(errorMessage(reason, '发布失败'))
+  } finally { publishBusy.value = false }
+}
 const active = computed(() => Boolean(run.value && activeTrainingStatuses.includes(run.value.status)))
 const epochs = computed(() => run.value?.parameters.epochs ?? 1)
 const rows = computed(() => run.value?.metrics ?? [])
@@ -176,12 +217,53 @@ const percentFormat = (value: number) => `${Math.round(value * 100)}%`
       </div>
       <span class="toolbar-actions">
         <button v-if="active" type="button" class="secondary-button danger-button" :disabled="busy || run.status === 'stopping'" @click="stop">{{ run.status === 'stopping' ? '正在停止…' : '停止训练' }}</button>
+        <button v-if="canPublish && !publishing" type="button" class="primary-button compact-button" @click="startPublishing">发布为推理模型</button>
         <a v-if="Object.keys(run.artifacts).length" class="secondary-button" :href="trainingApi.archiveUrl(run.id)" download>下载全部结果</a>
         <button v-if="!active" type="button" class="text-button" :disabled="busy" @click="remove">删除</button>
       </span>
     </header>
 
     <div v-if="run.status === 'failed'" class="alert" role="alert"><strong>训练失败</strong><p>{{ run.error }}</p></div>
+
+    <section v-if="publishing" class="section-block training-form publish-panel" aria-labelledby="publish-title">
+      <header class="section-heading"><div><h2 id="publish-title">发布为推理模型</h2></div><button type="button" class="text-button" @click="publishing = false">取消</button></header>
+      <p class="muted-copy">发布后成为算法库里的一个可用版本，使用通用 YOLO 推理镜像加载这份权重，记录数据集、训练参数和指标；部署时权重会自动同步到目标服务器。</p>
+      <div class="checkpoint-options" role="radiogroup" aria-label="选择权重">
+        <label v-if="checkpoints.includes('best')" :class="['model-option', { selected: checkpoint === 'best' }]">
+          <input v-model="checkpoint" type="radio" value="best" />
+          <strong>best.pt</strong><small>验证集最好的一轮<template v-if="run.best">（第 {{ run.best.epoch }} 轮，mAP50-95 {{ formatMetric(run.best.map50_95) }}）</template></small>
+        </label>
+        <label v-if="checkpoints.includes('last')" :class="['model-option', { selected: checkpoint === 'last' }]">
+          <input v-model="checkpoint" type="radio" value="last" />
+          <strong>last.pt</strong><small>最后一轮<template v-if="lastRow">（第 {{ lastRow.epoch }} 轮，mAP50-95 {{ formatMetric(lastRow['metrics/mAP50-95(B)']) }}）</template></small>
+        </label>
+      </div>
+      <div class="publish-grid">
+        <label class="field-label">模型 ID<input v-model.trim="modelKey" maxlength="64" /><small>同一 ID 的版本可以对比和回滚</small></label>
+        <label class="field-label">显示名称<input v-model="modelName" maxlength="128" /></label>
+        <label class="field-label">版本号<input v-model="modelVersion" maxlength="64" placeholder="自动递增，例如 1.0.1" /></label>
+        <label class="field-label">说明（可选）<input v-model="modelDescription" maxlength="1000" /></label>
+      </div>
+      <p v-if="keyIssue" class="muted-copy">{{ keyIssue }}</p>
+      <button type="button" class="primary-button" :disabled="Boolean(keyIssue) || publishBusy" @click="publish">{{ publishBusy ? '正在发布…' : '发布' }}</button>
+    </section>
+
+    <section v-if="published.length" class="section-block" aria-labelledby="published-title">
+      <header class="section-heading"><div><h2 id="published-title">已发布的模型</h2><span class="count-badge">{{ published.length }}</span></div></header>
+      <ul class="published-list">
+        <li v-for="model in published" :key="model.id">
+          <div>
+            <strong>{{ model.name }} v{{ model.version }}</strong>
+            <small>{{ model.key }} · {{ model.lineage?.checkpoint }}.pt · mAP50-95 {{ formatMetric(model.lineage?.metrics.map50_95) }}</small>
+          </div>
+          <span class="toolbar-actions">
+            <RouterLink class="primary-button compact-button" :to="{ path: '/deployments', query: { algorithm: model.id } }">部署到服务器</RouterLink>
+            <RouterLink class="secondary-button compact-button" :to="{ path: '/', query: { algorithm: model.id } }">在工作台试用</RouterLink>
+            <RouterLink class="text-button" :to="{ path: '/algorithms', query: { selected: model.id } }">版本对比</RouterLink>
+          </span>
+        </li>
+      </ul>
+    </section>
 
     <section class="section-block training-status-panel" aria-label="训练进度">
       <div class="training-progress-line">

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Any
 from uuid import UUID, uuid4
 
 from cv_algorithm_sdk import AlgorithmManifest, AlgorithmStatus
@@ -22,6 +23,10 @@ class AlgorithmVersion:
     created_by: str = "local-admin"
     traffic_weight: int = 100
     project_id: UUID = DEFAULT_PROJECT_ID
+    # 节点模型目录下挂载给容器的子目录；为空时使用算法 ID（预置算法的约定）
+    model_directory: str | None = None
+    # 由训练结果发布的版本：来源训练、数据集、参数、指标和权重校验值
+    lineage: dict[str, Any] | None = None
 
     @classmethod
     def available(

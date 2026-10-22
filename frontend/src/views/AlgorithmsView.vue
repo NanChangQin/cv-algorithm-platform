@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 import { algorithmsApi } from '@/api/algorithms'
 import type { AlgorithmTemplateType } from '@/api/algorithms'
@@ -13,6 +14,7 @@ import type { Algorithm, BuildJob } from '@/types/algorithm'
 import { errorMessage } from '@/utils/errors'
 import { parameterRange, parameterTypeLabel } from '@/utils/parameters'
 import { algorithmStatusLabel, formatDateTime, runtimeStatusLabel, taskTypeLabel } from '@/utils/presentation'
+import { formatMetric } from '@/api/training'
 import { buildProgress, buildStatusLabel } from '@/utils/status'
 
 const { algorithms, availableAlgorithms, loading, error, refresh } = useAlgorithms()
@@ -36,9 +38,26 @@ const filteredAlgorithms = computed(() => algorithms.value.filter((algorithm) =>
 ))
 const selected = computed(() => algorithms.value.find((item) => item.id === selectedId.value) ?? null)
 const siblings = computed(() => selected.value ? algorithms.value.filter((item) => item.key === selected.value!.key && item.id !== selected.value!.id) : [])
+// 训练发布的模型：同一模型的各版本按指标对比
+const family = computed(() => selected.value
+  ? algorithms.value.filter((item) => item.key === selected.value!.key).sort((a, b) => b.created_at.localeCompare(a.created_at))
+  : [])
+const trainedFamily = computed(() => family.value.some((item) => item.lineage))
+const bestInFamily = computed(() => Math.max(...family.value.map((item) => item.lineage?.metrics.map50_95 ?? -1)))
 const canBuild = computed(() => ['admin', 'developer'].includes(sessionRole.get() ?? 'user'))
 const isAdmin = computed(() => sessionRole.get() === 'admin')
 let buildPollTimer: number | undefined
+
+// 从训练页“版本对比”等链接进入时直接打开对应版本
+const route = useRoute()
+let linkedSelectionDone = false
+watch(algorithms, (items) => {
+  if (linkedSelectionDone || typeof route.query.selected !== 'string') return
+  const linked = items.find((item) => item.id === route.query.selected)
+  if (!linked) return
+  linkedSelectionDone = true
+  selectedId.value = linked.id
+}, { immediate: true })
 
 async function select(algorithm: Algorithm) {
   selectedId.value = algorithm.id
@@ -260,7 +279,39 @@ weights/</pre>
         </div>
       </div>
 
-      <template v-if="siblings.length">
+      <template v-if="selected.lineage">
+        <h3 class="detail-subheading">训练来源</h3>
+        <dl class="lineage-list">
+          <div><dt>训练</dt><dd><RouterLink class="text-link" :to="`/training/${selected.lineage.training_run_id}`">{{ selected.lineage.training_name }}</RouterLink></dd></div>
+          <div><dt>数据集</dt><dd>{{ selected.lineage.dataset_name ?? '已删除' }} · {{ selected.lineage.class_names.length }} 类</dd></div>
+          <div><dt>权重</dt><dd>{{ selected.lineage.base_model.replace('.pt', '') }} 微调 · {{ selected.lineage.checkpoint }}.pt<template v-if="selected.lineage.epoch">（第 {{ selected.lineage.epoch }}/{{ selected.lineage.epochs_trained }} 轮）</template></dd></div>
+          <div class="wide"><dt>训练参数</dt><dd>{{ selected.lineage.parameters.epochs }} 轮 · batch {{ selected.lineage.parameters.batch === -1 ? '自动' : selected.lineage.parameters.batch }} · 图片 {{ selected.lineage.parameters.imgsz }} · lr0 {{ selected.lineage.parameters.lr0 }}</dd></div>
+          <div class="wide"><dt>验证集指标</dt><dd>mAP50-95 {{ formatMetric(selected.lineage.metrics.map50_95) }} · mAP50 {{ formatMetric(selected.lineage.metrics.map50) }} · 精确率 {{ formatMetric(selected.lineage.metrics.precision) }} · 召回率 {{ formatMetric(selected.lineage.metrics.recall) }}</dd></div>
+        </dl>
+      </template>
+
+      <template v-if="trainedFamily && family.length > 1">
+        <h3 class="detail-subheading">版本对比</h3>
+        <div class="table-scroll">
+          <table class="data-table version-compare">
+            <thead><tr><th scope="col">版本</th><th scope="col">状态</th><th scope="col">数据集</th><th scope="col">权重</th><th scope="col">mAP50-95</th><th scope="col">mAP50</th><th scope="col">精确率</th><th scope="col">召回率</th></tr></thead>
+            <tbody>
+              <tr v-for="item in family" :key="item.id" :class="{ current: item.id === selected.id }" @click="select(item)">
+                <td><button type="button" class="text-button" @click.stop="select(item)">v{{ item.version }}</button></td>
+                <td>{{ algorithmStatusLabel[item.status] ?? item.status }}</td>
+                <td>{{ item.lineage?.dataset_name ?? '—' }}</td>
+                <td>{{ item.lineage ? `${item.lineage.base_model.replace('.pt', '')} · ${item.lineage.checkpoint}` : '—' }}</td>
+                <td :class="{ best: item.lineage?.metrics.map50_95 === bestInFamily }">{{ formatMetric(item.lineage?.metrics.map50_95) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics.map50) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics.precision) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics.recall) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted-copy">指标来自训练时的验证集；“回滚到此版本”会停用同一模型的其他版本。</p>
+      </template>
+      <template v-else-if="siblings.length">
         <h3 class="detail-subheading">同一算法的其他版本</h3>
         <div class="version-list">
           <button v-for="item in siblings" :key="item.id" type="button" @click="select(item)">
@@ -275,7 +326,7 @@ weights/</pre>
         <div><dt>创建者</dt><dd>{{ selected.created_by }} · {{ formatDateTime(selected.created_at) }}</dd></div>
         <div><dt>最近调用</dt><dd>{{ formatDateTime(selected.last_called_at) }}</dd></div>
         <div><dt>镜像</dt><dd class="mono"><button type="button" class="text-button mono" title="复制" @click="copy(selected.image)">{{ selected.image }}</button></dd></div>
-        <div><dt>包 SHA-256</dt><dd class="mono">{{ selected.package_sha256 ? `${selected.package_sha256.slice(0, 16)}…` : '内置算法' }}</dd></div>
+        <div><dt>包 SHA-256</dt><dd class="mono">{{ selected.package_sha256 ? `${selected.package_sha256.slice(0, 16)}…` : selected.lineage ? '训练发布' : '内置算法' }}</dd></div>
         <div><dt>镜像摘要</dt><dd class="mono">{{ selected.image_digest ? `${selected.image_digest.slice(0, 19)}…` : '尚未构建' }}</dd></div>
       </dl>
       <div v-if="buildJob && buildJob.algorithm_version_id === selected.id" class="build-log">

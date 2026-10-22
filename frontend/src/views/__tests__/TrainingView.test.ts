@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({
   runs: vi.fn(), run: vi.fn(), datasets: vi.fn(), models: vi.fn(), create: vi.fn(), uploadDataset: vi.fn(),
-  stop: vi.fn(), logs: vi.fn(), resources: vi.fn(), push: vi.fn(), route: { params: { id: 'run-1' }, query: {} as Record<string, string> },
+  stop: vi.fn(), logs: vi.fn(), resources: vi.fn(), push: vi.fn(), publish: vi.fn(),
+  algorithms: [] as Array<Record<string, unknown>>, refreshAlgorithms: vi.fn(), route: { params: { id: 'run-1' }, query: {} as Record<string, string> },
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: calls.push }), useRoute: () => calls.route }))
 vi.mock('@/api/system', () => ({ systemApi: { executionResources: calls.resources } }))
@@ -12,9 +13,17 @@ vi.mock('@/api/training', async (importOriginal) => ({
   trainingApi: {
     runs: calls.runs, run: calls.run, datasets: calls.datasets, models: calls.models, create: calls.create,
     uploadDataset: calls.uploadDataset, stop: calls.stop, logs: calls.logs, remove: vi.fn(), deleteDataset: vi.fn(),
+    publish: calls.publish,
     artifactUrl: (id: string, name: string) => `/files/${id}/${name}`, archiveUrl: (id: string) => `/files/${id}.zip`,
   },
 }))
+
+vi.mock('@/composables/useAlgorithms', async () => {
+  const { ref } = await import('vue')
+  const algorithms = ref(calls.algorithms)
+  calls.refreshAlgorithms.mockImplementation(async () => { algorithms.value = [...calls.algorithms] })
+  return { useAlgorithms: () => ({ algorithms, refresh: calls.refreshAlgorithms }) }
+})
 
 import { defaultParameters, progressRatio, progressText, type TrainingRun } from '@/api/training'
 import UploadDropzone from '@/components/assets/UploadDropzone.vue'
@@ -220,5 +229,60 @@ describe('training chart', () => {
     expect(wrapper.find('.chart-tooltip').text()).not.toContain('验证集')
     await overlay.trigger('pointerleave')
     expect(wrapper.find('.chart-tooltip').exists()).toBe(false)
+  })
+})
+
+describe('publishing a trained model', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    calls.algorithms.length = 0
+    calls.datasets.mockResolvedValue([dataset])
+    calls.resources.mockResolvedValue(resources)
+    calls.logs.mockResolvedValue([])
+    calls.run.mockResolvedValue({
+      ...baseRun, status: 'completed', finished_at: '2026-10-22T01:00:00Z',
+      artifacts: { 'weights/best.pt': 5_400_000, 'weights/last.pt': 5_400_000 },
+    })
+  })
+
+  it('publishes the chosen checkpoint and links to deployment and the workbench', async () => {
+    calls.publish.mockImplementation(async () => {
+      const model = { id: 'model-1', key: 'yolo26n-run-1', name: '安全帽 · yolo26n', version: '1.0.0',
+        lineage: { training_run_id: 'run-1', checkpoint: 'last', metrics: { map50_95: 0.41 } } }
+      calls.algorithms.push(model)
+      return model
+    })
+    const wrapper = mount(TrainingRunView, { global: { stubs: { RouterLink: { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } } } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '发布为推理模型')!.trigger('click')
+    const inputs = wrapper.findAll('.publish-grid input')
+    expect((inputs[0]!.element as HTMLInputElement).value).toBe('yolo26n-run-1')
+    expect(wrapper.find('.checkpoint-options').text()).toContain('第 2 轮，mAP50-95 41.0')
+    await wrapper.find('input[value="last"]').setValue(true)
+    await inputs[2]!.setValue('2.0.0')
+    await wrapper.findAll('button').find((button) => button.text() === '发布')!.trigger('click')
+    await flushPromises()
+    expect(calls.publish).toHaveBeenCalledWith('run-1', {
+      checkpoint: 'last', key: 'yolo26n-run-1', name: '安全帽 · yolo26n', version: '2.0.0', description: '',
+    })
+    const links = wrapper.find('.published-list').findAll('a').map((link) => [link.text(), link.attributes('data-to')])
+    expect(links[0]).toEqual(['部署到服务器', JSON.stringify({ path: '/deployments', query: { algorithm: 'model-1' } })])
+    expect(links[1]![0]).toBe('在工作台试用')
+  })
+
+  it('rejects model IDs the platform cannot use', async () => {
+    const wrapper = mount(TrainingRunView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '发布为推理模型')!.trigger('click')
+    await wrapper.findAll('.publish-grid input')[0]!.setValue('Helmet Model')
+    expect(wrapper.text()).toContain('模型 ID 用小写字母')
+    expect(wrapper.findAll('button').find((button) => button.text() === '发布')!.attributes('disabled')).toBeDefined()
+  })
+
+  it('is not offered while training is running', async () => {
+    calls.run.mockResolvedValue(baseRun)
+    const wrapper = mount(TrainingRunView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.findAll('button').some((button) => button.text() === '发布为推理模型')).toBe(false)
   })
 })

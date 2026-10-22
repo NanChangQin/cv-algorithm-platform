@@ -30,6 +30,8 @@ class AlgorithmResponse(BaseModel):
     container_status: str
     last_called_at: datetime | None
     project_id: UUID
+    # 由训练发布的版本：来源训练、数据集、训练参数和指标
+    lineage: dict[str, Any] | None = None
 
     @classmethod
     def from_entity(
@@ -60,6 +62,7 @@ class AlgorithmResponse(BaseModel):
             container_status=container_status,
             last_called_at=last_called_at,
             project_id=entity.project_id,
+            lineage=entity.lineage,
         )
 
 

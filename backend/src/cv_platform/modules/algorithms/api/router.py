@@ -176,6 +176,7 @@ def delete_algorithm(
     # 实例已随版本一起删除，部署记录也不再有意义
     for deployment in container.deployments.list_for_version(algorithm_id):
         container.deployments.delete(deployment.id)
+    container.model_store.delete(algorithm_id)
     return Response(status_code=204)
 
 

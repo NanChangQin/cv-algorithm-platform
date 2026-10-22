@@ -50,6 +50,8 @@ class Settings(BaseSettings):
     database_pool_size: int = Field(default=10, ge=1, le=100)
     # 训练中心：训练镜像需预先构建到训练服务器（runtimes/yolo-trainer）
     training_image: str = "cv-platform/yolo-trainer:dev"
+    # 训练结果发布为推理版本时使用的通用 YOLO 推理镜像（examples/yolo）
+    yolo_inference_image: str = "cv-platform/yolo:dev"
     max_dataset_bytes: int = 10 * 1024 * 1024 * 1024
     max_dataset_files: int = 200_000
     # 后台协调（训练准备、进度同步）的轮询间隔

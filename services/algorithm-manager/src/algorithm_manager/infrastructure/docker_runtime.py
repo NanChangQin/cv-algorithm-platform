@@ -81,7 +81,7 @@ class DockerContainerRuntime:
             },
             volumes={
                 str(self._host_data_root): {"bind": "/data", "mode": "ro"},
-                str(self._safe_model_directory(spec.algorithm_key)): {
+                str(self._safe_model_directory(spec.model_directory or spec.algorithm_key)): {
                     "bind": "/models",
                     "mode": "ro",
                 },
@@ -93,8 +93,8 @@ class DockerContainerRuntime:
         )
         return container.id, f"http://{spec.container_name}:{spec.internal_port}"
 
-    def _safe_model_directory(self, algorithm_key: str) -> Path:
-        candidate = (self._host_model_root / algorithm_key).resolve()
+    def _safe_model_directory(self, directory: str) -> Path:
+        candidate = (self._host_model_root / directory).resolve()
         if self._host_model_root not in candidate.parents:
             raise ValueError("algorithm model directory escaped the configured model root")
         return candidate

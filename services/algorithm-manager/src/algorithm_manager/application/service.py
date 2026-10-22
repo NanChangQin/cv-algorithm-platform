@@ -122,6 +122,7 @@ class InstanceService:
                         if spec.gpu_device_ids
                         else ()
                     ),
+                    model_directory=spec.model_directory,
                 )
                 instance: AlgorithmInstance | None = None
                 try:

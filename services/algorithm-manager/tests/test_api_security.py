@@ -89,3 +89,40 @@ def test_other_images_are_rejected(image):
 def test_memory_request_is_capped():
     with pytest.raises(ValidationError):
         EnsureInstanceRequest(**ensure_payload(memory_mb=10_000_000))
+
+
+@pytest.mark.parametrize("directory", ["trained/0123abcd", "faster-rcnn", "a/b/c"])
+def test_model_directories_inside_the_model_root_are_accepted(directory):
+    request = EnsureInstanceRequest(**ensure_payload(model_directory=directory))
+    assert request.to_spec().model_directory == directory
+
+
+@pytest.mark.parametrize("directory", ["../etc", "/abs", "trained/../x", "a/b/c/d", "Trained/x"])
+def test_model_directories_cannot_escape(directory):
+    with pytest.raises(ValidationError):
+        EnsureInstanceRequest(**ensure_payload(model_directory=directory))
+
+
+def test_published_versions_mount_their_own_model_directory(tmp_path):
+    from types import SimpleNamespace
+
+    from algorithm_manager.domain.models import ContainerSpec
+    from algorithm_manager.infrastructure.docker_runtime import DockerContainerRuntime
+
+    created = {}
+
+    def create(**kwargs):
+        created.update(kwargs)
+        return SimpleNamespace(id="c1")
+
+    runtime = DockerContainerRuntime(
+        SimpleNamespace(containers=SimpleNamespace(create=create)), "net",
+        tmp_path / "data", tmp_path / "models",
+    )
+    spec = dict(algorithm_version_id="v1", algorithm_key="helmet", image="cv-platform/yolo:dev",
+                container_name="cv-algorithm-v1")
+    mount = {"bind": "/models", "mode": "ro"}
+    runtime.create(ContainerSpec(**spec, model_directory="trained/abc"))
+    assert created["volumes"][str(tmp_path / "models/trained/abc")] == mount
+    runtime.create(ContainerSpec(**spec))
+    assert created["volumes"][str(tmp_path / "models/helmet")] == mount

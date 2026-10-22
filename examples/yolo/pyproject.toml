@@ -9,7 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
   "cv-algorithm-sdk",
   "fastapi>=0.116,<1",
-  "ultralytics>=8.3,<9",
+  "ultralytics>=8.4,<9",
   "uvicorn[standard]>=0.35,<1",
 ]
 

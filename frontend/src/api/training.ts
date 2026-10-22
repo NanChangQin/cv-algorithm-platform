@@ -1,4 +1,5 @@
 import { projectUrl, request, uploadRequest } from './http'
+import type { Algorithm } from '@/types/algorithm'
 
 export interface TrainingModel { key: string; label: string; description: string }
 
@@ -93,6 +94,8 @@ export const trainingApi = {
   stop: (id: string) => request<TrainingRun>(`/training/runs/${id}/stop`, { method: 'POST' }),
   remove: (id: string) => request<void>(`/training/runs/${id}`, { method: 'DELETE' }),
   logs: (id: string, tail = 300) => request<string[]>(`/training/runs/${id}/logs?tail=${tail}`),
+  publish: (id: string, payload: { checkpoint: 'best' | 'last'; key: string; name: string; version: string; description: string }) =>
+    request<Algorithm>(`/training/runs/${id}/publish`, { method: 'POST', body: JSON.stringify(payload) }),
   artifactUrl: (id: string, name: string) => projectUrl(`/training/runs/${id}/artifacts/${name.split('/').map(encodeURIComponent).join('/')}`),
   archiveUrl: (id: string) => projectUrl(`/training/runs/${id}/archive`),
 }
