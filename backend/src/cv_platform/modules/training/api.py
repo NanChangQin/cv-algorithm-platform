@@ -8,10 +8,13 @@ from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFil
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 
+from ...core.config import get_settings
 from ...core.container import ApplicationContainer
 from ...core.request_context import project_id_from
 from ...dependencies import get_container
+from ..algorithms.api.schemas import AlgorithmResponse
 from .domain import TRAINING_MODELS, TrainingDataset, TrainingRun, TrainingStatus
+from .publish import ModelPublisher
 from .service import TrainingService
 
 router = APIRouter(prefix="/training", tags=["training"])
@@ -215,6 +218,32 @@ def stop_run(run_id: UUID, service: TrainingService = Depends(get_service)) -> R
 def delete_run(run_id: UUID, service: TrainingService = Depends(get_service)) -> Response:
     service.delete_run(run_id)
     return Response(status_code=204)
+
+
+class PublishRequest(BaseModel):
+    checkpoint: Literal["best", "last"] = "best"
+    key: str = Field(min_length=3, max_length=64)
+    name: str = Field(default="", max_length=128)
+    version: str = Field(default="", max_length=64)
+    description: str = Field(default="", max_length=1000)
+
+
+@router.post("/runs/{run_id}/publish", response_model=AlgorithmResponse, status_code=201)
+def publish_model(
+    run_id: UUID,
+    payload: PublishRequest,
+    request: Request,
+    container: ApplicationContainer = Depends(get_container),
+) -> AlgorithmResponse:
+    publisher = ModelPublisher(
+        container.training, container.training_storage, container.algorithms,
+        container.model_store, get_settings().yolo_inference_image,
+        project_id_from(request), request.state.session.username,
+    )
+    return AlgorithmResponse.from_entity(publisher.publish(
+        run_id, checkpoint=payload.checkpoint, key=payload.key, name=payload.name,
+        version=payload.version, description=payload.description,
+    ))
 
 
 @router.get("/runs/{run_id}/logs", response_model=list[str])

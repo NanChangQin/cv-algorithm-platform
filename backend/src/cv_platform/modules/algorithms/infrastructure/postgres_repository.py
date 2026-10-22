@@ -4,7 +4,7 @@ from uuid import UUID
 
 from cv_algorithm_sdk import AlgorithmManifest, AlgorithmStatus
 from psycopg.errors import UniqueViolation
-from psycopg.types.json import Json
+from psycopg.types.json import Json, Jsonb
 
 from ....core.database import Database
 from ..domain.entities import AlgorithmVersion, BuildJob, BuildStatus
@@ -29,6 +29,8 @@ class PostgresAlgorithmRepository:
             created_by=str(row["created_by_label"]),
             traffic_weight=int(row["traffic_weight"]),
             project_id=row["project_id"],
+            model_directory=row.get("model_directory"),
+            lineage=row.get("lineage"),
         )
 
     def add(self, algorithm: AlgorithmVersion) -> None:
@@ -41,10 +43,11 @@ class PostgresAlgorithmRepository:
                         id, project_id, algorithm_key, name, version, description,
                         schema_version, task_type, manifest, status, image, internal_port,
                         package_storage_key, package_sha256, image_digest, created_by,
-                        created_by_label, traffic_weight, created_at, updated_at
+                        created_by_label, traffic_weight, created_at, updated_at,
+                        model_directory, lineage
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, NULL, %s, %s, %s, %s
+                        %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s
                     )
                     """,
                     (
@@ -67,6 +70,8 @@ class PostgresAlgorithmRepository:
                         algorithm.traffic_weight,
                         algorithm.created_at,
                         algorithm.created_at,
+                        algorithm.model_directory,
+                        Jsonb(algorithm.lineage) if algorithm.lineage is not None else None,
                     ),
                 )
         except UniqueViolation as exc:
@@ -108,7 +113,8 @@ class PostgresAlgorithmRepository:
                 UPDATE algorithm_versions SET
                     manifest = %s, status = %s, image = %s, internal_port = %s,
                     package_storage_key = %s, package_sha256 = %s,
-                    image_digest = %s, traffic_weight = %s, updated_at = now()
+                    image_digest = %s, traffic_weight = %s, model_directory = %s,
+                    lineage = %s, updated_at = now()
                 WHERE id = %s AND deleted_at IS NULL
                 """,
                 (
@@ -120,6 +126,8 @@ class PostgresAlgorithmRepository:
                     algorithm.package_sha256,
                     algorithm.image_digest,
                     algorithm.traffic_weight,
+                    algorithm.model_directory,
+                    Jsonb(algorithm.lineage) if algorithm.lineage is not None else None,
                     algorithm.id,
                 ),
             )

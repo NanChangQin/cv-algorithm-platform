@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import shutil
 import stat
@@ -396,6 +397,8 @@ def _check_line(values: list[str]) -> str | None:
         numbers = [float(value) for value in values]
     except ValueError:
         return "包含非数字内容"
+    if not all(math.isfinite(value) for value in numbers):
+        return "类别编号和坐标必须为有限数值"
     if numbers[0] < 0 or numbers[0] != int(numbers[0]):
         return "类别编号必须是非负整数"
     if any(value < 0 or value > 1.0001 for value in numbers[1:]):

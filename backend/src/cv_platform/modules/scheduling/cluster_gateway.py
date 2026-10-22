@@ -186,6 +186,7 @@ class ClusterAlgorithmManagerGateway:
         scheduled_request = replace(
             scheduled_request, container_name=f"{request.container_name}-{suffix}"
         )
+        self.sync_model_files(node.id, request)
         instance = gateway.ensure_running(scheduled_request)
         with self._lock:
             self._instance_routes[instance.id] = node.id
@@ -247,6 +248,8 @@ class ClusterAlgorithmManagerGateway:
 
         result = []
         for node, gateway, _, _, gpu_ids in candidates:
+            if targets[node.id]:
+                self.sync_model_files(node.id, request)
             scheduled_request = (
                 replace(request, gpu_device_ids=gpu_ids)
                 if request.device in {"gpu", "auto"} and gpu_ids
@@ -298,6 +301,26 @@ class ClusterAlgorithmManagerGateway:
         if not node.enabled:
             raise ApplicationError("RUNTIME_NODE_DISABLED", "所选运行服务器已停用", 409)
         return node
+
+    def sync_model_files(self, node_id: str, request: RuntimeRequest, progress=None) -> int:
+        """训练发布的版本：新建容器前把主服务器上的权重同步到节点，返回上传的文件数。"""
+        if not request.model_files or not request.model_directory:
+            return 0
+        client = self.node_client(node_id)
+        directory = request.model_directory
+        present = client.request("GET", f"/models/{directory}")["files"]
+        uploaded = 0
+        for item in request.model_files:
+            if (present.get(item.name) or {}).get("sha256") == item.sha256:
+                continue
+            client.upload(
+                f"/models/{directory}/files/{item.name}",
+                item.path,
+                headers={"X-Content-SHA256": item.sha256},
+                progress=progress,
+            )
+            uploaded += 1
+        return uploaded
 
     def node_client(self, node_id: str) -> NodeClient:
         """训练、镜像检查等需要直接访问某个节点的操作。"""

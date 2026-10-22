@@ -241,6 +241,15 @@ def test_status_reports_progress_metrics_and_downloadable_files(client, docker, 
     assert client.get(f"/trainings/{RUN_ID}").json()["state"] == "completed"
 
 
+def test_nonfinite_metrics_remain_json_serializable(client, tmp_path):
+    upload(client, dataset_zip())
+    client.post("/trainings", json=start_payload())
+    write_run(tmp_path, {"train/results.csv": "epoch,train/box_loss,map\n1,nan,inf\n"})
+    response = client.get(f"/trainings/{RUN_ID}")
+    assert response.status_code == 200
+    assert response.json()["metrics"] == [{"epoch": 1.0}]
+
+
 def test_crash_and_stop_are_told_apart(client, docker, tmp_path):
     upload(client, dataset_zip())
     client.post("/trainings", json=start_payload())

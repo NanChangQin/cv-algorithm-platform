@@ -48,6 +48,9 @@ class EnsureInstanceRequest(BaseModel):
     memory_mb: int = Field(default=1024, ge=256, le=262_144)
     cpu_count: float = Field(default=1, ge=0.1, le=64)
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=32)
+    model_directory: str | None = Field(
+        default=None, pattern=r"^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*){0,2}$"
+    )
 
     @field_validator("image")
     @classmethod

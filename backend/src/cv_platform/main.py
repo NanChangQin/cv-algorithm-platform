@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
@@ -52,9 +53,19 @@ def create_app() -> FastAPI:
         async def coordinate_background_work() -> None:
             # 多个 Backend 进程时只有持有锁的一个负责推进训练
             while True:
-                if container.coordinator_lock.held():
-                    await asyncio.to_thread(container.training_orchestrator.tick)
-                    await asyncio.to_thread(container.deployment_orchestrator.tick)
+                try:
+                    if container.coordinator_lock.held():
+                        for coordinator in (
+                            container.training_orchestrator, container.deployment_orchestrator,
+                        ):
+                            try:
+                                await asyncio.to_thread(coordinator.tick)
+                            except Exception:
+                                logging.getLogger(__name__).exception(
+                                    "background coordination failed"
+                                )
+                except Exception:
+                    logging.getLogger(__name__).exception("background leader check failed")
                 await asyncio.sleep(settings.coordinator_interval_seconds)
 
         background_tasks = [

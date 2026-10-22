@@ -1,6 +1,5 @@
 import io
 import zipfile
-from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -142,72 +141,17 @@ def test_broken_datasets_are_explained(client: TestClient, entries, message) -> 
     assert message in response.json()["message"]
 
 
-class FakeNode:
-    """模拟训练节点上的 Algorithm Manager。"""
-
-    node_id = "local"
-    node_name = "测试服务器"
-
-    def __init__(self) -> None:
-        self.datasets: dict[str, str] = {}
-        self.uploads = 0
-        self.started: list[dict] = []
-        self.state: dict = {"state": "running", "progress": None, "metrics": [], "files": {}}
-        self.stop_calls = 0
-        self.deleted: list[str] = []
-        self.has_image = True
-        self.gpu_list = [
-            {"index": 0, "name": "A", "memory_total_mb": 16000, "memory_used_mb": 9000},
-            {"index": 1, "name": "B", "memory_total_mb": 16000, "memory_used_mb": 1000},
-        ]
-
-    def gpus(self):
-        return self.gpu_list
-
-    def image_exists(self, image):
-        return self.has_image
-
-    def upload(self, path, source: Path, *, headers, progress=None):
-        self.uploads += 1
-        self.datasets[path.rsplit("/", 1)[-1]] = headers["X-Content-SHA256"]
-        if progress:
-            progress(source.stat().st_size, source.stat().st_size)
-
-    def download(self, path, target: Path):
-        target.parent.mkdir(parents=True, exist_ok=True)
-        content = f"content of {path.rsplit('/files/', 1)[-1]}".encode()
-        target.write_bytes(content)
-        return len(content)
-
-    def request(self, method, path, *, json=None, params=None, timeout=None,
-                allow_missing=False):
-        if method == "GET" and path.startswith("/datasets/"):
-            sha = self.datasets.get(path.rsplit("/", 1)[-1])
-            return {"sha256": sha} if sha else None
-        if method == "POST" and path == "/trainings":
-            self.started.append(json)
-            return {"state": "running"}
-        if method == "POST" and path.endswith("/stop"):
-            self.stop_calls += 1
-            self.state = {**self.state, "state": "stopped"}
-            return self.state
-        if method == "GET" and path.endswith("/logs"):
-            return ["epoch 1", "epoch 2"]
-        if method == "GET" and path.startswith("/trainings/"):
-            return self.state
-        if method == "DELETE":
-            self.deleted.append(path)
-            return None
-        raise AssertionError(f"unexpected {method} {path}")
-
-
-@pytest.fixture
-def node(monkeypatch) -> FakeNode:
-    fake = FakeNode()
-    cluster = get_container().algorithm_manager
-    monkeypatch.setattr(cluster, "node_client", lambda node_id: fake)
-    monkeypatch.setattr(cluster, "node_clients", lambda: [fake])
-    return fake
+@pytest.mark.parametrize("line", [
+    "nan 0.5 0.5 0.2 0.2", "inf 0.5 0.5 0.2 0.2", "0 nan 0.5 0.2 0.2",
+])
+def test_nonfinite_labels_are_dropped_not_stored(client: TestClient, line: str) -> None:
+    entries = ultralytics_layout()
+    entries["labels/train/a.txt"] += line + "\n"
+    dataset = upload_dataset(client, entries)
+    assert dataset["stats"]["invalid_lines"] == 1
+    with stored_zip(dataset["id"]) as archive:
+        assert "nan" not in archive.read("labels/train/a.txt").decode()
+        assert "inf" not in archive.read("labels/train/a.txt").decode()
 
 
 def create_run(client: TestClient, dataset_id: str, **overrides) -> dict:

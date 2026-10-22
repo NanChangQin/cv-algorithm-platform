@@ -8,6 +8,7 @@ from ..modules.algorithms.infrastructure.memory_repository import (
     InMemoryAlgorithmRepository,
     InMemoryBuildJobRepository,
 )
+from ..modules.algorithms.infrastructure.model_store import ModelStore
 from ..modules.algorithms.infrastructure.package_storage import AlgorithmPackageStorage
 from ..modules.algorithms.infrastructure.persistent_queue import PostgresBuildQueue
 from ..modules.algorithms.infrastructure.postgres_repository import (
@@ -98,6 +99,7 @@ class ApplicationContainer:
     training: InMemoryTrainingRepository | PostgresTrainingRepository
     training_storage: TrainingDatasetStorage
     training_orchestrator: TrainingOrchestrator
+    model_store: ModelStore
     deployments: InMemoryDeploymentRepository | PostgresDeploymentRepository
     deployment_orchestrator: DeploymentOrchestrator
     coordinator_lock: LeaderLock
@@ -158,7 +160,8 @@ def build_container() -> ApplicationContainer:
     )
     build_gateway = ManagerBuildGateway(settings.algorithm_manager_url, api_token=manager_token)
     build_executor = LocalBuildQueue(algorithms, build_jobs, build_gateway)
-    instances = RuntimeInstanceService(algorithms, manager)
+    model_store = ModelStore(settings.storage_root / "model-store")
+    instances = RuntimeInstanceService(algorithms, manager, model_store=model_store)
     task_executor = LocalTaskQueue(
         tasks,
         algorithms,
@@ -231,6 +234,7 @@ def build_container() -> ApplicationContainer:
         training_orchestrator=TrainingOrchestrator(
             training, training_storage, manager, settings.training_image
         ),
+        model_store=model_store,
         deployments=deployments,
         deployment_orchestrator=DeploymentOrchestrator(
             deployments, algorithms, manager, instances,

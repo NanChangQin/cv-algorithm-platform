@@ -165,6 +165,19 @@ def test_ready_servers_skip_transfers(client, cluster) -> None:
     assert not any(call.startswith("received") for call in cluster.nodes["local"].calls)
 
 
+def test_partial_model_directory_does_not_skip_missing_weights(client, cluster) -> None:
+    source = cluster.nodes["local"]
+    target = cluster.nodes["dell"]
+    manifest = {"size": 200, "sha256": "b" * 64}
+    source.models["faster-rcnn-resnet50"]["manifest.yaml"] = manifest
+    target.models["faster-rcnn-resnet50"] = {"manifest.yaml": manifest}
+    deployment = deploy(client, detector_id(client))
+    run(cluster, deployment)
+    assert current(client, deployment["id"])["status"] == "running"
+    assert "received /models/faster-rcnn-resnet50/files/model.pth" in target.calls
+    assert "received /models/faster-rcnn-resnet50/files/manifest.yaml" not in target.calls
+
+
 def test_weights_missing_everywhere_are_skipped(client, cluster) -> None:
     cluster.nodes["local"].models = {}
     deployment = deploy(client, detector_id(client))
@@ -331,3 +344,31 @@ def test_users_can_see_deployments_but_only_developers_change_them(client, clust
         "algorithm_version_id": detector_id(client), "node_id": "local",
     }).status_code == 403
     assert client.get("/api/v1/training/runs").status_code == 403
+
+
+def test_published_models_upload_their_weights_from_the_main_server(client, cluster) -> None:
+    from dataclasses import replace
+
+    from cv_platform.modules.algorithms.domain.entities import AlgorithmVersion
+    from cv_platform.modules.training.publish import inference_manifest
+
+    container = get_container()
+    manifest = inference_manifest("helmet-detector", "安全帽", "1.0.0", "", 640)
+    version = AlgorithmVersion.available(manifest, "cv-platform/yolo:dev")
+    store = container.model_store.directory(version.id)
+    store.mkdir(parents=True)
+    weights = store / "model.pt"
+    weights.write_bytes(b"w" * 2048)
+    files = {"model.pt": {"size": 2048, "sha256": "c" * 64}}
+    version = replace(version, model_directory=f"trained/{version.id.hex}",
+                      lineage={"files": files})
+    container.algorithms.add(version)
+    cluster.nodes["dell"].images.add("cv-platform/yolo:dev")
+
+    deployment = deploy(client, str(version.id))
+    run(cluster, deployment)
+    result = current(client, deployment["id"])
+    weights_step = next(step for step in result["steps"] if step["key"] == "weights")
+    assert result["status"] == "running", result
+    assert weights_step["detail"] == f"已上传 1 个文件到 models/trained/{version.id.hex}"
+    assert f"upload /models/trained/{version.id.hex}/files/model.pt" in cluster.nodes["dell"].calls

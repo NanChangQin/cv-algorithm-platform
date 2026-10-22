@@ -12,6 +12,25 @@
 
 训练中心对管理员和算法开发者开放。
 
+## 发布为推理模型
+
+训练结束（完成或手动停止）后，在训练详情点 **发布为推理模型**：
+
+- 选择 `best.pt`（验证集 mAP50-95 最好的一轮）或 `last.pt`（最后一轮），填写模型 ID 和名称；版本号留空时按同一模型 ID 的最高版本递增（第一次为 1.0.0）。
+- 发布后成为算法库里的一个可用版本：推理参数与 YOLO 示例一致，默认推理尺寸取训练时的图片尺寸；使用通用推理镜像 `cv-platform/yolo:dev`（`examples/yolo`，与训练镜像同一 PyTorch / Ultralytics 版本，`CV_PLATFORM_YOLO_INFERENCE_IMAGE` 可修改）。
+- 权重和该版本的 manifest 复制到主服务器的 `<数据目录>/model-store/<版本 ID>/`；部署或推理需要在某台服务器上启动容器时，平台按 SHA-256 把它们同步到该服务器的 `models/trained/<版本 ID>/`，容器只挂载这个目录。删除训练记录不影响已发布的模型。
+- 版本记录来源训练、数据集、基础模型、checkpoint、训练参数和验证集指标。算法库的版本详情显示这些信息，同一模型 ID 的各版本列成对比表（指标最好的高亮），可以直接“回滚到此版本”。
+- 发布后可以直接“部署到服务器”（见 [DEPLOYMENT.md](DEPLOYMENT.md)）或“在工作台试用”。
+
+推理镜像需要先构建到至少一台服务器，部署到其他服务器时会自动传输：
+
+```bash
+docker compose --profile algorithm-images build yolo \
+  --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+```
+
+模型 ID 不能与导入的算法相同；同一 ID 下只放训练发布的版本，保证对比和回滚有意义。迁移 `20261023_0007` 给 `algorithm_versions` 增加 `model_directory`、`lineage` 两列。
+
 ## 数据集格式
 
 ```text

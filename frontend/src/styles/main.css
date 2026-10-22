@@ -1491,3 +1491,23 @@ button.task-algorithm:hover strong { color: var(--accent); }
 @keyframes step-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .step-running .step-icon .app-icon { animation: none; } }
 @media (max-width: 980px) { .deployment-form-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* 训练发布的模型：来源与版本对比 */
+.text-link { color: var(--accent); }
+.text-link:hover { text-decoration: underline; }
+.version-compare tbody tr { cursor: pointer; }
+.version-compare tbody tr:hover { background: var(--surface-2); }
+.version-compare tr.current { background: var(--accent-softer); box-shadow: inset 3px 0 0 var(--accent); }
+.version-compare td.best { color: var(--success); font-weight: 700; }
+.version-compare .text-button { min-height: 0; padding: 0; }
+.publish-panel { display: grid; gap: 4px; }
+.publish-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; align-items: start; }
+.checkpoint-options { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+.published-list { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.published-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.published-list strong, .published-list small { display: block; }
+.published-list strong { color: var(--text-strong); }
+.published-list small { color: var(--muted); font-size: 12px; }
+@media (max-width: 980px) { .publish-grid { grid-template-columns: minmax(0, 1fr); } }
+.algorithm-detail .lineage-list dd { white-space: normal; overflow-wrap: anywhere; }
+.algorithm-detail .lineage-list .wide { grid-column: 1 / -1; }

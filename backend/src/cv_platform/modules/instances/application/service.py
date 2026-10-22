@@ -4,6 +4,7 @@ from uuid import UUID
 from ....core.errors import ApplicationError
 from ....core.project_context import DEFAULT_PROJECT_ID
 from ...algorithms.domain.repositories import AlgorithmRepository
+from ...algorithms.infrastructure.model_store import ModelStore
 from ..domain.gateway import AlgorithmManagerGateway
 from ..domain.models import RuntimeInstance, RuntimeRequest
 
@@ -14,10 +15,12 @@ class RuntimeInstanceService:
         algorithms: AlgorithmRepository,
         manager: AlgorithmManagerGateway,
         project_id: UUID = DEFAULT_PROJECT_ID,
+        model_store: ModelStore | None = None,
     ) -> None:
         self._algorithms = algorithms
         self._manager = manager
         self._project_id = project_id
+        self._model_store = model_store
 
     def list_instances(self, project_id: UUID | None = None) -> list[RuntimeInstance]:
         expected_project_id = project_id or self._project_id
@@ -57,6 +60,9 @@ class RuntimeInstanceService:
             replicas,
         )
 
+    def runtime_request(self, algorithm_id: UUID, project_id: UUID | None = None) -> RuntimeRequest:
+        return self._runtime_request(algorithm_id, project_id)
+
     def _runtime_request(
         self,
         algorithm_id: UUID,
@@ -75,6 +81,8 @@ class RuntimeInstanceService:
             internal_port=algorithm.internal_port,
             device=manifest.runtime.device.value,
             memory_mb=manifest.runtime.min_memory_mb,
+            model_directory=algorithm.model_directory,
+            model_files=self._model_store.files(algorithm) if self._model_store else (),
         )
         return request
 
