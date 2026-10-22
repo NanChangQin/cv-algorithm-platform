@@ -78,7 +78,7 @@ def list_comparisons(
     service: ComparisonService = Depends(get_service),
     container: ApplicationContainer = Depends(get_container),
 ) -> list[ComparisonResponse]:
-    recent = sorted(service.list(), key=lambda item: item.created_at, reverse=True)[:limit]
+    recent = service.list_recent(limit)
     return [to_response(item, container) for item in recent]
 
 

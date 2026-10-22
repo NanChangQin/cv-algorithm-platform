@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from cv_algorithm_sdk import AlgorithmResult, TaskStatus
@@ -8,9 +9,59 @@ from pydantic import TypeAdapter
 
 from ....core.database import Database
 from ..domain.entities import InferenceTask
+from ..domain.repositories import TaskQuery
 
 
 RESULT_ADAPTER = TypeAdapter(AlgorithmResult)
+
+
+def _like_pattern(text: str) -> str:
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _where(criteria: TaskQuery) -> tuple[str, list[object]]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if criteria.project_id is not None:
+        clauses.append("project_id = %s")
+        params.append(criteria.project_id)
+    if criteria.algorithm_version_id is not None:
+        clauses.append("algorithm_version_id = %s")
+        params.append(criteria.algorithm_version_id)
+    if criteria.asset_id is not None:
+        clauses.append("asset_id = %s")
+        params.append(criteria.asset_id)
+    if criteria.statuses:
+        clauses.append("status = ANY(%s)")
+        params.append([item.value for item in criteria.statuses])
+    if criteria.node_id is not None:
+        clauses.append("COALESCE(execution_node_id, node_id) = %s")
+        params.append(criteria.node_id)
+    if criteria.created_after is not None:
+        clauses.append("created_at >= %s")
+        params.append(criteria.created_after)
+    if criteria.ids:
+        clauses.append("id = ANY(%s)")
+        params.append(list(criteria.ids))
+    if criteria.search is not None:
+        search = criteria.search
+        pattern = _like_pattern(search.text)
+        clauses.append(
+            "(id::text ILIKE %s OR algorithm_version_id = ANY(%s::uuid[])"
+            " OR asset_id = ANY(%s::uuid[]) OR COALESCE(execution_node_id, node_id) = ANY(%s::text[])"
+            " OR COALESCE(execution_node_id, node_id) ILIKE %s)"
+        )
+        params.extend(
+            [
+                pattern,
+                list(search.algorithm_ids),
+                list(search.asset_ids),
+                list(search.node_ids),
+                pattern,
+            ]
+        )
+    return (f"WHERE {' AND '.join(clauses)}" if clauses else ""), params
 
 
 class PostgresTaskRepository:
@@ -137,3 +188,65 @@ class PostgresTaskRepository:
             cursor.execute("SELECT * FROM inference_tasks WHERE id = %s", (task_id,))
             row = cursor.fetchone()
             return self._from_row(row) if row else None
+
+    def query(self, criteria: TaskQuery) -> list[InferenceTask]:
+        where, params = _where(criteria)
+        sql = f"SELECT * FROM inference_tasks {where} ORDER BY created_at DESC, id DESC"
+        if criteria.limit is not None:
+            sql += " LIMIT %s"
+            params.append(criteria.limit)
+        if criteria.offset:
+            sql += " OFFSET %s"
+            params.append(criteria.offset)
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return [self._from_row(row) for row in cursor.fetchall()]
+
+    def count(self, criteria: TaskQuery) -> int:
+        where, params = _where(criteria)
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(f"SELECT count(*) AS total FROM inference_tasks {where}", params)
+            row = cursor.fetchone()
+            return int(row["total"]) if row else 0
+
+    def count_by_status(self, project_id: UUID | None = None) -> dict[TaskStatus, int]:
+        where, params = _where(TaskQuery(project_id=project_id))
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                f"SELECT status, count(*) AS total FROM inference_tasks {where} GROUP BY status",
+                params,
+            )
+            return {TaskStatus(str(row["status"])): int(row["total"]) for row in cursor.fetchall()}
+
+    def count_by_algorithm(self, statuses: tuple[TaskStatus, ...]) -> dict[UUID, int]:
+        where, params = _where(TaskQuery(statuses=statuses))
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT algorithm_version_id, count(*) AS total FROM inference_tasks "
+                f"{where} GROUP BY algorithm_version_id",
+                params,
+            )
+            return {row["algorithm_version_id"]: int(row["total"]) for row in cursor.fetchall()}
+
+    def last_created_by_algorithm(self, project_id: UUID) -> dict[UUID, datetime]:
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT algorithm_version_id, max(created_at) AS latest FROM inference_tasks "
+                "WHERE project_id = %s GROUP BY algorithm_version_id",
+                (project_id,),
+            )
+            return {row["algorithm_version_id"]: row["latest"] for row in cursor.fetchall()}
+
+    def inference_time_stats(self, project_id: UUID | None = None) -> tuple[float, int]:
+        where, params = _where(TaskQuery(project_id=project_id))
+        condition = f"{where} AND result IS NOT NULL" if where else "WHERE result IS NOT NULL"
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT avg((result->'timing'->>'inference_ms')::double precision) AS average, "
+                f"count(*) AS samples FROM inference_tasks {condition}",
+                params,
+            )
+            row = cursor.fetchone()
+            if not row or not row["samples"]:
+                return 0.0, 0
+            return float(row["average"] or 0.0), int(row["samples"])

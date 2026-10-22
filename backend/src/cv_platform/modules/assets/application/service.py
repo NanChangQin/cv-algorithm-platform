@@ -4,7 +4,7 @@ from uuid import UUID
 
 from ....core.errors import ApplicationError
 from ..domain.entities import ImageAsset
-from ..domain.repositories import AssetRepository
+from ..domain.repositories import AssetQuery, AssetRepository
 from ..domain.storage import AssetStorage
 from ....core.project_context import DEFAULT_PROJECT_ID
 
@@ -29,13 +29,7 @@ class AssetService:
         declared_media_type: str | None,
     ) -> ImageAsset:
         stored = self._storage.store_image(stream, original_name, declared_media_type)
-        existing = next(
-            (
-                item for item in self._repository.list()
-                if item.sha256 == stored.sha256 and item.project_id == self._project_id
-            ),
-            None,
-        )
+        existing = self._repository.find_by_sha256(self._project_id, stored.sha256)
         if existing is not None:
             return existing
         asset = ImageAsset.create(
@@ -53,8 +47,19 @@ class AssetService:
         self._repository.add(asset)
         return asset
 
-    def list_assets(self) -> list[ImageAsset]:
-        return [item for item in self._repository.list() if item.project_id == self._project_id]
+    def list_assets(
+        self,
+        *,
+        text: str | None = None,
+        ids: tuple[UUID, ...] = (),
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> tuple[list[ImageAsset], int]:
+        """返回当前页的图片和符合条件的总数。"""
+        criteria = AssetQuery(self._project_id, text=text, ids=ids, limit=limit, offset=offset)
+        items = self._repository.query(criteria)
+        total = len(items) if limit is None and not offset else self._repository.count(criteria)
+        return items, total
 
     def register_local_image(
         self,

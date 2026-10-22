@@ -46,6 +46,8 @@ class Settings(BaseSettings):
     postgres_db: str = "cv_platform"
     postgres_user: str = "cv_platform"
     postgres_password: str | None = None
+    # 每个进程（Backend、Worker）各自的连接池上限
+    database_pool_size: int = Field(default=10, ge=1, le=100)
 
 
 @lru_cache

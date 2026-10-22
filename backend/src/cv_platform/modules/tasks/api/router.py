@@ -4,7 +4,7 @@ import json
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from cv_algorithm_sdk import TaskStatus
@@ -14,7 +14,13 @@ from ....core.errors import ApplicationError
 from ....dependencies import get_container
 from ....core.request_context import project_id_from
 from ..application.service import TaskService
-from .schemas import CreateTaskRequest, ResultArchiveRequest, TaskResponse, TaskResultResponse
+from .schemas import (
+    CreateTaskRequest,
+    ResultArchiveRequest,
+    TaskResponse,
+    TaskResultResponse,
+    TaskSummaryResponse,
+)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -65,19 +71,47 @@ def create_task(
 
 @router.get("", response_model=list[TaskResponse])
 def list_tasks(
+    response: Response,
     algorithm_version_id: UUID | None = None,
     asset_id: UUID | None = None,
-    task_status: TaskStatus | None = Query(default=None, alias="status"),
+    task_statuses: list[TaskStatus] = Query(default_factory=list, alias="status"),
+    node_id: str | None = Query(default=None, max_length=64),
     created_after: datetime | None = None,
+    q: str | None = Query(default=None, max_length=200),
+    ids: list[UUID] = Query(default_factory=list, max_length=200),
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     service: TaskService = Depends(get_service),
+    container: ApplicationContainer = Depends(get_container),
 ) -> list[TaskResponse]:
-    tasks = service.list_tasks(
+    """status 可重复传多个；不传 limit 时返回全部（兼容旧调用）；总数放在 X-Total-Count 响应头。"""
+    text = q.strip() if q else ""
+    search = None
+    if text:
+        nodes = [(node.id, node.name) for node in container.algorithm_manager.list_nodes()]
+        search = service.resolve_search(text, nodes)
+    tasks, total = service.list_tasks(
         algorithm_version_id=algorithm_version_id,
         asset_id=asset_id,
-        status=task_status,
+        statuses=tuple(task_statuses),
+        node_id=node_id,
         created_after=created_after,
+        ids=tuple(ids),
+        search=search,
+        limit=limit,
+        offset=offset,
     )
+    response.headers["X-Total-Count"] = str(total)
     return [TaskResponse.model_validate(task) for task in tasks]
+
+
+@router.get("/summary", response_model=TaskSummaryResponse)
+def task_summary(service: TaskService = Depends(get_service)) -> TaskSummaryResponse:
+    counts = service.count_by_status()
+    return TaskSummaryResponse(
+        total=sum(counts.values()),
+        by_status={item.value: counts.get(item, 0) for item in TaskStatus},
+    )
 
 
 @router.post("/results/archive")

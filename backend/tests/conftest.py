@@ -1,8 +1,41 @@
+from collections.abc import Iterator
+
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from cv_platform.core.config import get_settings
+from cv_platform.core.database import conninfo_from_settings
 from cv_platform.dependencies import get_container
 from cv_platform.main import create_app
+
+
+def discard_container() -> None:
+    """关闭缓存容器的连接池再清缓存，避免每个测试泄漏一个数据库连接。"""
+    if get_container.cache_info().currsize:
+        database = get_container().database
+        if database is not None:
+            database.close()
+    get_container.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def isolated_database() -> Iterator[None]:
+    """Postgres 模式（CI 的 postgres 任务）下每个测试从空库开始。"""
+    settings = get_settings()
+    if settings.persistence_backend == "postgres":
+        discard_container()
+        with psycopg.connect(conninfo_from_settings(settings), autocommit=True) as connection:
+            tables = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT tablename FROM pg_tables "
+                    "WHERE schemaname = 'public' AND tablename <> 'alembic_version'"
+                )
+            ]
+            connection.execute(f"TRUNCATE {', '.join(tables)} CASCADE")
+    yield
+    discard_container()
 
 
 class RecordingTaskQueue:

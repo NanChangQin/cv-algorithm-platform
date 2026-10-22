@@ -63,3 +63,8 @@ class TaskResultResponse(BaseModel):
 
 class ResultArchiveRequest(BaseModel):
     task_ids: list[UUID] = Field(min_length=1, max_length=100)
+
+
+class TaskSummaryResponse(BaseModel):
+    total: int
+    by_status: dict[str, int]

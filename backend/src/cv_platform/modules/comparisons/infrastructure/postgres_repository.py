@@ -73,3 +73,18 @@ class PostgresComparisonRepository:
                 """
             )
             return [self._from_row(row) for row in cursor.fetchall()]
+
+    def list_recent(self, project_id: UUID, limit: int) -> list[AlgorithmComparison]:
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT c.*, COALESCE(array_agg(ct.task_id ORDER BY ct.position)
+                    FILTER (WHERE ct.task_id IS NOT NULL), '{}') AS task_ids
+                FROM algorithm_comparisons c
+                LEFT JOIN comparison_tasks ct ON ct.comparison_id = c.id
+                WHERE c.project_id = %s
+                GROUP BY c.id ORDER BY c.created_at DESC LIMIT %s
+                """,
+                (project_id, limit),
+            )
+            return [self._from_row(row) for row in cursor.fetchall()]

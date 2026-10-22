@@ -4,6 +4,20 @@ from uuid import UUID
 
 from ....core.database import Database
 from ..domain.entities import ImageAsset
+from ..domain.repositories import AssetQuery
+
+
+def _where(criteria: AssetQuery) -> tuple[str, list[object]]:
+    clauses = ["project_id = %s", "deleted_at IS NULL"]
+    params: list[object] = [criteria.project_id]
+    if criteria.text:
+        escaped = criteria.text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        clauses.append("original_name ILIKE %s")
+        params.append(f"%{escaped}%")
+    if criteria.ids:
+        clauses.append("id = ANY(%s)")
+        params.append(list(criteria.ids))
+    return "WHERE " + " AND ".join(clauses), params
 
 
 class PostgresAssetRepository:
@@ -68,15 +82,41 @@ class PostgresAssetRepository:
             row = cursor.fetchone()
             return self._from_row(row) if row else None
 
-    def find_by_sha256(self, sha256: str) -> ImageAsset | None:
+    def query(self, criteria: AssetQuery) -> list[ImageAsset]:
+        where, params = _where(criteria)
+        sql = f"SELECT * FROM image_assets {where} ORDER BY created_at DESC, id DESC"
+        if criteria.limit is not None:
+            sql += " LIMIT %s"
+            params.append(criteria.limit)
+        if criteria.offset:
+            sql += " OFFSET %s"
+            params.append(criteria.offset)
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(sql, params)
+            return [self._from_row(row) for row in cursor.fetchall()]
+
+    def count(self, criteria: AssetQuery) -> int:
+        where, params = _where(criteria)
+        with self._database.connect() as connection, connection.cursor() as cursor:
+            cursor.execute(f"SELECT count(*) AS total FROM image_assets {where}", params)
+            row = cursor.fetchone()
+            return int(row["total"]) if row else 0
+
+    def find_by_sha256(self, project_id: UUID, sha256: str) -> ImageAsset | None:
+        return self._find_one("sha256", project_id, sha256)
+
+    def find_by_algorithm_uri(self, project_id: UUID, algorithm_uri: str) -> ImageAsset | None:
+        return self._find_one("algorithm_uri", project_id, algorithm_uri)
+
+    def _find_one(self, column: str, project_id: UUID, value: str) -> ImageAsset | None:
         with self._database.connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT * FROM image_assets
-                WHERE sha256 = %s AND deleted_at IS NULL
+                WHERE project_id = %s AND {column} = %s AND deleted_at IS NULL
                 ORDER BY created_at DESC LIMIT 1
                 """,
-                (sha256,),
+                (project_id, value),
             )
             row = cursor.fetchone()
             return self._from_row(row) if row else None
