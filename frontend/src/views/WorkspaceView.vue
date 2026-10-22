@@ -54,7 +54,12 @@ watch(selectedAssetIds, (ids) => {
   if (!ids.length) focusedAssetId.value = null
   else if (!focusedAssetId.value || !ids.includes(focusedAssetId.value)) focusedAssetId.value = ids[0]!
 })
-watch(library.items, (items) => {
+watch(library.items, (items, previous) => {
+  // 搜索或翻页只替换图片条，已选输入仍需保留供预览和提交。
+  const selected = new Set(selectedAssetIds.value)
+  const retained = new Map(extraAssets.value.filter((asset) => selected.has(asset.id)).map((asset) => [asset.id, asset]))
+  for (const asset of previous ?? []) if (selected.has(asset.id)) retained.set(asset.id, asset)
+  extraAssets.value = [...retained.values()]
   // 没有选择时默认用最新上传的一张
   if (!linkedSelection && !selectedAssetIds.value.length && items[0]) selectedAssetIds.value = [items[0].id]
 }, { immediate: true })

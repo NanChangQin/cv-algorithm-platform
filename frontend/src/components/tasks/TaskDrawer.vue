@@ -96,10 +96,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
         <div v-if="!task" class="empty-state">{{ error ? '暂时无法读取任务。' : '正在加载任务…' }}</div>
         <template v-else>
           <ResultViewer
-            v-if="task.status === 'completed' && result && task.asset_id"
+            v-if="task.status === 'completed' && result"
             compact
             :result="result"
-            :image-url="assetsApi.contentUrl(task.asset_id)"
+            :image-url="task.asset_id ? assetsApi.contentUrl(task.asset_id) : ''"
           />
           <div v-else-if="task.status === 'completed'" class="empty-state">正在读取推理结果…</div>
           <div v-else class="viewer-pending">
