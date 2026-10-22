@@ -88,3 +88,8 @@ export interface TaskResultResponse {
   task_id: string
   result: AlgorithmResult
 }
+
+export interface TaskSummary {
+  total: number
+  by_status: Record<TaskStatus, number>
+}

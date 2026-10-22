@@ -11,6 +11,8 @@ const props = defineProps<{
   showAnnotations: boolean
   /** 需要突出显示的检测框（例如鼠标停在结果列表的某一行上） */
   highlight?: Detection | null
+  /** 适应窗口时画布的最大高度（像素），不传只按宽度适配 */
+  maxHeight?: number
 }>()
 const emit = defineEmits<{ hover: [detection: Detection | null] }>()
 
@@ -31,7 +33,9 @@ const visibleDetections = computed(() => props.result.data.detections.filter(
 function fitToStage() {
   autoFit.value = true
   if (stage.value) {
-    scale.value = Math.min(1, Math.max(0.1, (stage.value.clientWidth - 32) / props.result.input.width))
+    const byWidth = (stage.value.clientWidth - 32) / props.result.input.width
+    const byHeight = props.maxHeight ? props.maxHeight / props.result.input.height : Number.POSITIVE_INFINITY
+    scale.value = Math.min(1, Math.max(0.1, Math.min(byWidth, byHeight)))
   }
 }
 
