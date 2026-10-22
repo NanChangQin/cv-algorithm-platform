@@ -165,6 +165,19 @@ def test_ready_servers_skip_transfers(client, cluster) -> None:
     assert not any(call.startswith("received") for call in cluster.nodes["local"].calls)
 
 
+def test_partial_model_directory_does_not_skip_missing_weights(client, cluster) -> None:
+    source = cluster.nodes["local"]
+    target = cluster.nodes["dell"]
+    manifest = {"size": 200, "sha256": "b" * 64}
+    source.models["faster-rcnn-resnet50"]["manifest.yaml"] = manifest
+    target.models["faster-rcnn-resnet50"] = {"manifest.yaml": manifest}
+    deployment = deploy(client, detector_id(client))
+    run(cluster, deployment)
+    assert current(client, deployment["id"])["status"] == "running"
+    assert "received /models/faster-rcnn-resnet50/files/model.pth" in target.calls
+    assert "received /models/faster-rcnn-resnet50/files/manifest.yaml" not in target.calls
+
+
 def test_weights_missing_everywhere_are_skipped(client, cluster) -> None:
     cluster.nodes["local"].models = {}
     deployment = deploy(client, detector_id(client))

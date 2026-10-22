@@ -51,7 +51,7 @@ def inference_manifest(
                 "title": "最大检测数量", "description": "单张图片最多返回的目标框数量",
             },
             "image_size": {
-                "type": "integer", "default": image_size, "minimum": 320, "maximum": 1280,
+                "type": "integer", "default": image_size, "minimum": 32, "maximum": 2048,
                 "step": 32, "title": "推理输入尺寸",
                 "description": "默认与训练尺寸一致；较大尺寸有利于小目标，但更慢",
             },

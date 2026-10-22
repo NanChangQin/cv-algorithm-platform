@@ -2,6 +2,7 @@ import hashlib
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 import yaml
 from fastapi.testclient import TestClient
 from test_training import RESULTS, create_run, ultralytics_layout, upload_dataset
@@ -10,6 +11,14 @@ from cv_platform.dependencies import get_container
 from cv_platform.modules.instances.domain.models import ModelFile, RuntimeRequest
 from cv_platform.modules.instances.infrastructure.http_gateway import HttpAlgorithmManagerGateway
 from cv_platform.modules.training.publish import next_version
+
+
+@pytest.mark.parametrize("size", [32, 256, 1536, 2048])
+def test_published_manifest_supports_all_training_sizes(size: int) -> None:
+    from cv_platform.modules.training.publish import inference_manifest
+
+    manifest = inference_manifest("size-test", "模型", "1.0.0", "", size)
+    assert manifest.resolve_parameters({})["image_size"] == size
 
 
 def finished_run(client: TestClient, node, *, files=None, status="completed") -> dict:
@@ -53,7 +62,7 @@ def test_best_checkpoint_becomes_an_available_model_with_lineage(client: TestCli
     weights = (stored / "model.pt").read_bytes()
     assert weights == b"content of weights/best.pt"
     assert lineage["files"]["model.pt"]["sha256"] == hashlib.sha256(weights).hexdigest()
-    manifest = yaml.safe_load((stored / "manifest.yaml").read_text())
+    manifest = yaml.safe_load((stored / "manifest.yaml").read_text(encoding="utf-8"))
     assert manifest["id"] == "helmet-detector" and manifest["version"] == "1.0.0"
 
     algorithm = container.algorithms.get(UUID(model["id"]))

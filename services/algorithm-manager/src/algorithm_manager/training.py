@@ -14,6 +14,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -199,8 +200,10 @@ class TrainingService:
             "dataset": "/dataset",
             "output": "/workspace",
         }
-        (run / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2))
-        if os.geteuid() == 0:
+        (run / "config.json").write_text(
+            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
             os.chown(run, ALGORITHM_UID, ALGORITHM_UID)
         else:
             run.chmod(0o777)
@@ -362,7 +365,9 @@ def _read_results(path: Path) -> list[dict[str, float]]:
                 parsed = {}
                 for key, value in row.items():
                     try:
-                        parsed[key.strip()] = float(value)
+                        number = float(value)
+                        if math.isfinite(number):
+                            parsed[key.strip()] = number
                     except (TypeError, ValueError, AttributeError):
                         continue
                 rows.append(parsed)

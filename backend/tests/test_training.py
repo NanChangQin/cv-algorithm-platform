@@ -141,6 +141,19 @@ def test_broken_datasets_are_explained(client: TestClient, entries, message) -> 
     assert message in response.json()["message"]
 
 
+@pytest.mark.parametrize("line", [
+    "nan 0.5 0.5 0.2 0.2", "inf 0.5 0.5 0.2 0.2", "0 nan 0.5 0.2 0.2",
+])
+def test_nonfinite_labels_are_dropped_not_stored(client: TestClient, line: str) -> None:
+    entries = ultralytics_layout()
+    entries["labels/train/a.txt"] += line + "\n"
+    dataset = upload_dataset(client, entries)
+    assert dataset["stats"]["invalid_lines"] == 1
+    with stored_zip(dataset["id"]) as archive:
+        assert "nan" not in archive.read("labels/train/a.txt").decode()
+        assert "inf" not in archive.read("labels/train/a.txt").decode()
+
+
 def create_run(client: TestClient, dataset_id: str, **overrides) -> dict:
     payload = {
         "dataset_id": dataset_id, "model": "yolo26n.pt", "node_id": "local",

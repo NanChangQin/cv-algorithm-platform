@@ -213,8 +213,6 @@ class DeploymentOrchestrator:
             return f"已上传 {uploaded} 个文件到 models/{directory}", False
         directory = model_directory(algorithm)
         present = target.request("GET", f"/models/{directory}")["files"]
-        if present:
-            return f"服务器上已有 {len(present)} 个权重文件（models/{directory}）", False
         for source in self._cluster.node_clients():
             if source.node_id == target.node_id:
                 continue
@@ -224,8 +222,14 @@ class DeploymentOrchestrator:
                 continue
             if not files:
                 continue
-            total = sum(int(item["size"]) for item in files.values())
-            for name, item in files.items():
+            missing = {
+                name: item for name, item in files.items()
+                if (present.get(name) or {}).get("sha256") != item["sha256"]
+            }
+            if not missing:
+                return f"服务器上已有 {len(present)} 个权重文件（models/{directory}）", False
+            total = sum(int(item["size"]) for item in missing.values())
+            for name, item in missing.items():
                 source.relay(
                     target,
                     f"/models/{directory}/files/{name}",
@@ -234,7 +238,10 @@ class DeploymentOrchestrator:
                     size=int(item["size"]),
                     progress=_Transfer(progress, "weights", f"从「{source.node_name}」复制 {name}"),
                 )
-            return f"已从「{source.node_name}」复制 {len(files)} 个权重文件（{_mb(total)}）", False
+            detail = f"已从「{source.node_name}」复制 {len(missing)} 个权重文件（{_mb(total)}）"
+            return detail, False
+        if present:
+            return f"服务器上已有 {len(present)} 个权重文件（models/{directory}）", False
         return "其他服务器上也没有该算法的外部权重目录，按镜像自带的权重运行", True
 
     def _stopped_while_preparing(self, deployment_id: UUID) -> bool:
