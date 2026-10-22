@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     postgres_password: str | None = None
     # 每个进程（Backend、Worker）各自的连接池上限
     database_pool_size: int = Field(default=10, ge=1, le=100)
+    # 训练中心：训练镜像需预先构建到训练服务器（runtimes/yolo-trainer）
+    training_image: str = "cv-platform/yolo-trainer:dev"
+    max_dataset_bytes: int = 10 * 1024 * 1024 * 1024
+    max_dataset_files: int = 200_000
+    # 后台协调（训练准备、进度同步）的轮询间隔
+    coordinator_interval_seconds: float = Field(default=3, ge=0.5, le=60)
 
 
 @lru_cache

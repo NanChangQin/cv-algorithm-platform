@@ -90,6 +90,13 @@ services:
       dockerfile: examples/yolo/Dockerfile
     image: cv-platform/yolo:dev
 
+  yolo-trainer:
+    profiles: ["algorithm-images"]
+    build:
+      context: .
+      dockerfile: runtimes/yolo-trainer/Dockerfile
+    image: cv-platform/yolo-trainer:dev
+
   frontend:
     build:
       context: .

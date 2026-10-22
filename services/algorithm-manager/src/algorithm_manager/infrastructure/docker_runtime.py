@@ -223,18 +223,23 @@ class DockerContainerRuntime:
         return gpus
 
     def _gpu_options(self, gpu_device_ids: tuple[str, ...]) -> dict[str, Any]:
-        if self._gpu_access_mode == "runtime":
-            return {
-                "runtime": "nvidia",
-                "environment": {
-                    "NVIDIA_VISIBLE_DEVICES": ",".join(gpu_device_ids) or "all",
-                    "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
-                },
-            }
-        from docker.types import DeviceRequest
+        return gpu_options(self._gpu_access_mode, gpu_device_ids)
 
-        request = (
-            DeviceRequest(device_ids=list(gpu_device_ids), capabilities=[["gpu"]])
-            if gpu_device_ids else DeviceRequest(count=-1, capabilities=[["gpu"]])
-        )
-        return {"device_requests": [request]}
+
+def gpu_options(gpu_access_mode: str, gpu_device_ids: tuple[str, ...]) -> dict[str, Any]:
+    """Docker 创建容器时使用指定 GPU（未指定时使用全部 GPU）的参数。"""
+    if gpu_access_mode == "runtime":
+        return {
+            "runtime": "nvidia",
+            "environment": {
+                "NVIDIA_VISIBLE_DEVICES": ",".join(gpu_device_ids) or "all",
+                "NVIDIA_DRIVER_CAPABILITIES": "compute,utility",
+            },
+        }
+    from docker.types import DeviceRequest
+
+    request = (
+        DeviceRequest(device_ids=list(gpu_device_ids), capabilities=[["gpu"]])
+        if gpu_device_ids else DeviceRequest(count=-1, capabilities=[["gpu"]])
+    )
+    return {"device_requests": [request]}
