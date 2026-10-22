@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 import signal
-import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Event
 
 from .core.config import get_settings
 from .core.container import build_container
 from .modules.tasks.infrastructure.persistent_queue import PostgresWorkClaimer
-
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +37,9 @@ def run() -> None:
     # SKIP LOCKED still makes individual claims safe if this is expanded later.
     # 会话级锁，用独立连接持有；进程退出或连接关闭时自动释放
     with container.database.dedicated() as lock_connection, lock_connection.cursor() as cursor:
-        cursor.execute("SELECT pg_try_advisory_lock(hashtext('cv-platform-durable-worker')) AS locked")
+        cursor.execute(
+            "SELECT pg_try_advisory_lock(hashtext('cv-platform-durable-worker')) AS locked"
+        )
         if not bool(cursor.fetchone()["locked"]):
             raise RuntimeError("another durable worker already owns the dispatcher lock")
 
@@ -49,7 +49,9 @@ def run() -> None:
             recovered_tasks,
             recovered_builds,
         )
-        _work_loop(container, claimer, stopped, settings.task_worker_count, settings.worker_poll_seconds)
+        _work_loop(
+            container, claimer, stopped, settings.task_worker_count, settings.worker_poll_seconds
+        )
 
 
 def _work_loop(container, claimer, stopped: Event, task_workers: int, poll_seconds: float) -> None:

@@ -1,12 +1,12 @@
-from typing import BinaryIO
 from pathlib import Path
+from typing import BinaryIO
 from uuid import UUID
 
 from ....core.errors import ApplicationError
+from ....core.project_context import DEFAULT_PROJECT_ID
 from ..domain.entities import ImageAsset
 from ..domain.repositories import AssetQuery, AssetRepository
 from ..domain.storage import AssetStorage
-from ....core.project_context import DEFAULT_PROJECT_ID
 
 
 class AssetService:

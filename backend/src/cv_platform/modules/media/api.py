@@ -4,13 +4,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
-from ...dependencies import get_container
 from ...core.request_context import project_id_from
+from ...dependencies import get_container
+from ..assets.application.service import AssetService
+from ..tasks.application.service import TaskService
 from .domain import MediaSourceType
 from .runs import MediaInferenceRun, MediaRunStatus
-from ..tasks.application.service import TaskService
-from ..assets.application.service import AssetService
-
 
 router = APIRouter(prefix="/media-sources", tags=["media"])
 

@@ -11,7 +11,6 @@ from ....core.database import Database
 from ..domain.entities import InferenceTask
 from ..domain.repositories import TaskQuery
 
-
 RESULT_ADAPTER = TypeAdapter(AlgorithmResult)
 
 
@@ -49,7 +48,8 @@ def _where(criteria: TaskQuery) -> tuple[str, list[object]]:
         pattern = _like_pattern(search.text)
         clauses.append(
             "(id::text ILIKE %s OR algorithm_version_id = ANY(%s::uuid[])"
-            " OR asset_id = ANY(%s::uuid[]) OR COALESCE(execution_node_id, node_id) = ANY(%s::text[])"
+            " OR asset_id = ANY(%s::uuid[])"
+            " OR COALESCE(execution_node_id, node_id) = ANY(%s::text[])"
             " OR COALESCE(execution_node_id, node_id) ILIKE %s)"
         )
         params.extend(

@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, Field
 
 from ....core.container import ApplicationContainer
-from ....dependencies import get_container
 from ....core.request_context import project_id_from
+from ....dependencies import get_container
 from ...tasks.api.schemas import TaskResponse
 from ...tasks.application.service import TaskService
 from ..application.service import ComparisonService

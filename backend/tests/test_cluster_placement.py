@@ -5,7 +5,10 @@ import pytest
 
 from cv_platform.core.errors import ApplicationError
 from cv_platform.modules.instances.domain.models import RuntimeInstance, RuntimeRequest
-from cv_platform.modules.scheduling.cluster_gateway import ClusterAlgorithmManagerGateway, RuntimeNode
+from cv_platform.modules.scheduling.cluster_gateway import (
+    ClusterAlgorithmManagerGateway,
+    RuntimeNode,
+)
 
 
 class NodeGateway:
@@ -47,7 +50,9 @@ def request(**kwargs):
 def test_pin_never_reuses_another_node_or_card(monkeypatch):
     manager, nodes = cluster(monkeypatch)
     nodes["local"].instances = [nodes["local"].ensure_running(request(device="gpu"))]
-    nodes["remote"].instances = [nodes["remote"].ensure_running(request(device="gpu", gpu_device_ids=("1",)))]
+    nodes["remote"].instances = [
+        nodes["remote"].ensure_running(request(device="gpu", gpu_device_ids=("1",)))
+    ]
     nodes["local"].requests.clear()
     nodes["remote"].requests.clear()
     instance = manager.ensure_running(request(node_id="remote", gpu_device_ids=("0",)))

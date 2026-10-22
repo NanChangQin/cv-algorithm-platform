@@ -61,12 +61,16 @@ def test_recent_comparisons_are_listed_newest_first(client: TestClient) -> None:
     for _ in range(2):
         response = client.post(
             "/api/v1/comparisons",
-            json={"asset_id": asset["id"], "algorithm_version_ids": [detector_id, str(classifier.id)]},
+            json={
+                "asset_id": asset["id"],
+                "algorithm_version_ids": [detector_id, str(classifier.id)],
+            },
         )
         assert response.status_code == 201
         created.append(response.json()["id"])
 
     listed = client.get("/api/v1/comparisons").json()
     assert [item["id"] for item in listed] == created[::-1]
-    assert {task["algorithm_version_id"] for task in listed[0]["tasks"]} == {detector_id, str(classifier.id)}
+    algorithm_ids = {task["algorithm_version_id"] for task in listed[0]["tasks"]}
+    assert algorithm_ids == {detector_id, str(classifier.id)}
     assert len(client.get("/api/v1/comparisons?limit=1").json()) == 1

@@ -1,6 +1,6 @@
-from datetime import datetime
 import json
 import re
+from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -8,11 +8,10 @@ import httpx
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .application.service import InstanceService
 from .application.errors import ManagerError
+from .application.service import InstanceService
 from .config import get_settings
 from .domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
-
 
 IMAGE_REFERENCE = re.compile(
     r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$"
@@ -192,7 +191,9 @@ def build_router(get_service: object) -> APIRouter:
         except httpx.TimeoutException as exc:
             raise ManagerError("PREDICTION_TIMEOUT", "远端算法推理超时", 504) from exc
         except httpx.HTTPError as exc:
-            raise ManagerError("ALGORITHM_UNAVAILABLE", "远端管理服务无法连接算法容器", 502) from exc
+            raise ManagerError(
+                "ALGORITHM_UNAVAILABLE", "远端管理服务无法连接算法容器", 502
+            ) from exc
         finally:
             if input_path is not None:
                 input_path.unlink(missing_ok=True)

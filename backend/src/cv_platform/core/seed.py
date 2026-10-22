@@ -3,8 +3,8 @@ from uuid import NAMESPACE_URL, uuid5
 
 from cv_algorithm_sdk import AlgorithmManifest
 
-from .container import ApplicationContainer
 from ..modules.algorithms.domain.entities import AlgorithmVersion
+from .container import ApplicationContainer
 
 
 def seed_demo_data(container: ApplicationContainer) -> None:

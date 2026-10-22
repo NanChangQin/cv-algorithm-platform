@@ -9,7 +9,6 @@ from ..domain.entities import BuildStatus
 from ..domain.repositories import AlgorithmRepository, BuildJobRepository
 from .manager_build_gateway import ManagerBuildGateway
 
-
 logger = logging.getLogger(__name__)
 
 

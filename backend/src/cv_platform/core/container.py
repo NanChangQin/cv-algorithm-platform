@@ -1,53 +1,55 @@
 from dataclasses import dataclass
 
+from ..modules.algorithms.application.service import BuildQueue
 from ..modules.algorithms.domain.repositories import AlgorithmRepository, BuildJobRepository
-from ..modules.algorithms.infrastructure.memory_repository import InMemoryAlgorithmRepository
-from ..modules.algorithms.infrastructure.memory_repository import InMemoryBuildJobRepository
+from ..modules.algorithms.infrastructure.local_build_queue import LocalBuildQueue
+from ..modules.algorithms.infrastructure.manager_build_gateway import ManagerBuildGateway
+from ..modules.algorithms.infrastructure.memory_repository import (
+    InMemoryAlgorithmRepository,
+    InMemoryBuildJobRepository,
+)
+from ..modules.algorithms.infrastructure.package_storage import AlgorithmPackageStorage
+from ..modules.algorithms.infrastructure.persistent_queue import PostgresBuildQueue
 from ..modules.algorithms.infrastructure.postgres_repository import (
     PostgresAlgorithmRepository,
     PostgresBuildJobRepository,
 )
-from ..modules.algorithms.infrastructure.package_storage import AlgorithmPackageStorage
-from ..modules.algorithms.infrastructure.manager_build_gateway import ManagerBuildGateway
-from ..modules.algorithms.infrastructure.local_build_queue import LocalBuildQueue
-from ..modules.algorithms.infrastructure.persistent_queue import PostgresBuildQueue
-from ..modules.algorithms.application.service import BuildQueue
+from ..modules.assets.domain.repositories import AssetRepository
 from ..modules.assets.infrastructure.local_storage import LocalAssetStorage
 from ..modules.assets.infrastructure.memory_repository import InMemoryAssetRepository
-from ..modules.assets.domain.repositories import AssetRepository
 from ..modules.assets.infrastructure.postgres_repository import PostgresAssetRepository
-from ..modules.scheduling.cluster_gateway import ClusterAlgorithmManagerGateway
-from ..modules.tasks.infrastructure.memory_repository import InMemoryTaskRepository
-from ..modules.tasks.domain.repositories import TaskRepository
-from ..modules.tasks.infrastructure.postgres_repository import PostgresTaskRepository
-from ..modules.tasks.infrastructure.http_prediction_gateway import (
-    HttpAlgorithmPredictionGateway,
-)
-from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
-from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
-from ..modules.tasks.domain.execution import TaskQueue
-from ..modules.instances.application.service import RuntimeInstanceService
 from ..modules.comparisons.infrastructure.memory_repository import (
     InMemoryComparisonRepository,
 )
 from ..modules.comparisons.infrastructure.postgres_repository import (
     PostgresComparisonRepository,
 )
+from ..modules.instances.application.service import RuntimeInstanceService
+from ..modules.media.postgres_service import PostgresMediaSourceService
+from ..modules.media.runs import MediaRunService
+from ..modules.media.service import InMemoryMediaSourceService
+from ..modules.media.storage import LocalVideoStorage
+from ..modules.media.worker_gateway import MediaWorkerGateway
+from ..modules.operations.service import OperationsService
+from ..modules.projects.postgres_service import PostgresProjectService
+from ..modules.projects.service import InMemoryProjectService
+from ..modules.scheduling.cluster_gateway import ClusterAlgorithmManagerGateway
+from ..modules.security.postgres_service import PostgresAuditLog, PostgresAuthService
 from ..modules.security.service import (
     InMemoryAuditLog,
     LocalAuthService,
     SlidingWindowRateLimiter,
 )
-from ..modules.security.postgres_service import PostgresAuditLog, PostgresAuthService
-from ..modules.media.service import InMemoryMediaSourceService
-from ..modules.media.postgres_service import PostgresMediaSourceService
-from ..modules.media.worker_gateway import MediaWorkerGateway
-from ..modules.media.runs import MediaRunService
-from ..modules.media.storage import LocalVideoStorage
+from ..modules.tasks.domain.execution import TaskQueue
+from ..modules.tasks.domain.repositories import TaskRepository
+from ..modules.tasks.infrastructure.http_prediction_gateway import (
+    HttpAlgorithmPredictionGateway,
+)
+from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
+from ..modules.tasks.infrastructure.memory_repository import InMemoryTaskRepository
+from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
+from ..modules.tasks.infrastructure.postgres_repository import PostgresTaskRepository
 from ..modules.workflows.service import InMemoryWorkflowService
-from ..modules.operations.service import OperationsService
-from ..modules.projects.service import InMemoryProjectService
-from ..modules.projects.postgres_service import PostgresProjectService
 from .config import get_settings
 from .database import Database
 

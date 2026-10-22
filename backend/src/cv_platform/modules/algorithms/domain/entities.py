@@ -4,6 +4,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from cv_algorithm_sdk import AlgorithmManifest, AlgorithmStatus
+
 from ....core.project_context import DEFAULT_PROJECT_ID
 
 

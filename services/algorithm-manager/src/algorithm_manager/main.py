@@ -13,8 +13,8 @@ from .application.errors import ManagerError
 from .application.service import InstanceService
 from .config import get_settings
 from .infrastructure.docker_runtime import DockerContainerRuntime
-from .infrastructure.memory_repository import InMemoryInstanceRepository
 from .infrastructure.image_builder import ControlledImageBuilder
+from .infrastructure.memory_repository import InMemoryInstanceRepository
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,10 @@ def create_app() -> FastAPI:
             if request.url.path != "/health" and not hmac.compare_digest(supplied, expected):
                 return JSONResponse(
                     status_code=401,
-                    content={"code": "MANAGER_AUTH_REQUIRED", "message": "缺少或错误的管理服务访问令牌"},
+                    content={
+                        "code": "MANAGER_AUTH_REQUIRED",
+                        "message": "缺少或错误的管理服务访问令牌",
+                    },
                 )
             return await call_next(request)
     else:

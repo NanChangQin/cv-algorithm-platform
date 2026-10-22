@@ -1,5 +1,6 @@
-import httpx
 from uuid import UUID
+
+import httpx
 
 from ...core.errors import ApplicationError
 

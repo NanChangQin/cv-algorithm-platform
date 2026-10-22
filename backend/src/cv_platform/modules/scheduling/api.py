@@ -4,7 +4,6 @@ from pydantic import BaseModel, Field
 from ...dependencies import get_container
 from .cluster_gateway import RuntimeNode
 
-
 router = APIRouter(prefix="/runtime-nodes", tags=["system"])
 
 

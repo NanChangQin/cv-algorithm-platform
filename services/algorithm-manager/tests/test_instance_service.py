@@ -1,7 +1,8 @@
+from dataclasses import replace
+
 from algorithm_manager.application.service import InstanceService
 from algorithm_manager.domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 from algorithm_manager.infrastructure.memory_repository import InMemoryInstanceRepository
-from dataclasses import replace
 
 
 class FakeRuntime:

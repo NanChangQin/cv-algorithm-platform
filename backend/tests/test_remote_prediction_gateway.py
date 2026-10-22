@@ -5,7 +5,9 @@ import pytest
 
 from cv_platform.core.errors import ApplicationError
 from cv_platform.modules.instances.domain.models import RuntimeInstance
-from cv_platform.modules.tasks.infrastructure.http_prediction_gateway import HttpAlgorithmPredictionGateway
+from cv_platform.modules.tasks.infrastructure.http_prediction_gateway import (
+    HttpAlgorithmPredictionGateway,
+)
 
 
 def instance():

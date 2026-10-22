@@ -4,8 +4,8 @@ from uuid import UUID
 import yaml
 
 from ...core.errors import ApplicationError
-from ..algorithms.domain.repositories import AlgorithmRepository
 from ...core.project_context import DEFAULT_PROJECT_ID
+from ..algorithms.domain.repositories import AlgorithmRepository
 
 
 class DeploymentBackend(StrEnum):

@@ -8,7 +8,6 @@ from ...core.errors import ApplicationError
 from ...dependencies import get_container
 from .service import ProjectRole
 
-
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 

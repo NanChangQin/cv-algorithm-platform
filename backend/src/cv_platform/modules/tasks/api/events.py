@@ -2,16 +2,14 @@ import asyncio
 import json
 from uuid import UUID
 
+from cv_algorithm_sdk import TaskStatus
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
-from cv_algorithm_sdk import TaskStatus
-
 from ....core.container import ApplicationContainer
 from ....core.errors import ApplicationError
-from ....dependencies import get_container
 from ....core.request_context import project_id_from
-
+from ....dependencies import get_container
 
 router = APIRouter(prefix="/task-events", tags=["tasks"])
 

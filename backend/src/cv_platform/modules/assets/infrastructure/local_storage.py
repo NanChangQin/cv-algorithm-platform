@@ -10,7 +10,6 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from ....core.errors import ApplicationError
 from ..domain.storage import StoredImage
 
-
 FORMAT_INFO = {
     "JPEG": (".jpg", "image/jpeg"),
     "PNG": (".png", "image/png"),

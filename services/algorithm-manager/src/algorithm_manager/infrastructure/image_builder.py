@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-
 RUNTIME_IMAGES = {
     "pytorch": "pytorch/pytorch:2.10.0-cuda12.6-cudnn9-runtime",
     "ultralytics": "ultralytics/ultralytics:8.3.0",

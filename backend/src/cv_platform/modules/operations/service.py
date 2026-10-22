@@ -1,17 +1,17 @@
+import hashlib
+import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from threading import RLock
 from uuid import UUID
-import hashlib
-import math
 
 from cv_algorithm_sdk import TaskStatus
 
 from ...core.database import Database
 from ...core.errors import ApplicationError
 from ..algorithms.domain.repositories import AlgorithmRepository
-from ..tasks.domain.repositories import TaskRepository
 from ..instances.application.service import RuntimeInstanceService
+from ..tasks.domain.repositories import TaskRepository
 
 
 @dataclass(frozen=True, slots=True)
