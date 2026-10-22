@@ -16,6 +16,7 @@ from .infrastructure.docker_runtime import DockerContainerRuntime
 from .infrastructure.image_builder import ControlledImageBuilder
 from .infrastructure.memory_repository import InMemoryInstanceRepository
 from .training import TrainingService, build_training_router
+from .transfer import TransferService, build_transfer_router
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,20 @@ def get_training() -> TrainingService:
         shm_mb=settings.training_shm_mb,
         max_dataset_bytes=settings.max_dataset_bytes,
         max_dataset_files=settings.max_dataset_files,
+    )
+
+
+@lru_cache
+def get_transfer() -> TransferService:
+    import docker
+
+    settings = get_settings()
+    return TransferService(
+        docker.from_env(),
+        settings.data_root,
+        settings.package_root,
+        settings.model_root,
+        validate_algorithm_image,
     )
 
 
@@ -117,6 +132,9 @@ def create_app() -> FastAPI:
 
     app.include_router(build_router(get_service), prefix="/api/v1")
     app.include_router(build_training_router(get_training), prefix="/api/v1")
+    app.include_router(
+        build_transfer_router(get_transfer, settings.max_transfer_bytes), prefix="/api/v1"
+    )
 
     class BuildImageRequest(BaseModel):
         package_path: str

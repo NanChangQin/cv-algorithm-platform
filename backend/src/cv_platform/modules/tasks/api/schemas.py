@@ -14,6 +14,8 @@ class CreateTaskRequest(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
     node_id: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{1,63}$")
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=32)
+    # 指定已部署的实例：使用该部署的服务器和 GPU，部署未运行时拒绝
+    deployment_id: UUID | None = None
 
     @model_validator(mode="after")
     def require_input(self) -> "CreateTaskRequest":

@@ -4,6 +4,7 @@ from ..modules.algorithms.api.router import router as algorithms_router
 from ..modules.assets.api.router import router as assets_router
 from ..modules.comparisons.api.router import router as comparisons_router
 from ..modules.deployments.api import router as deployments_router
+from ..modules.deployments.targets import router as deployment_targets_router
 from ..modules.evaluations.api import router as evaluations_router
 from ..modules.instances.api.router import router as instances_router
 from ..modules.media.api import router as media_router
@@ -31,6 +32,7 @@ api_router.include_router(media_router)
 api_router.include_router(workflows_router)
 api_router.include_router(scheduling_router)
 api_router.include_router(deployments_router)
+api_router.include_router(deployment_targets_router)
 api_router.include_router(operations_router)
 api_router.include_router(projects_router)
 api_router.include_router(training_router)

@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router'
 
 import { assetsApi } from '@/api/assets'
+import { deploymentsApi, type Deployment } from '@/api/deployments'
 import { ApiError } from '@/api/http'
 import { tasksApi } from '@/api/tasks'
 import { systemApi, type GpuInfo } from '@/api/system'
@@ -86,7 +87,20 @@ const selectedGpuId = ref('')
 const runtimeLoading = ref(false)
 const runtimeError = ref('')
 const nodeGpus = computed(() => gpus.value.filter((gpu) => gpu.node_id === selectedNodeId.value))
+// 已部署的实例：选中后任务固定在该部署的服务器和 GPU 上运行
+const deployments = ref<Deployment[]>([])
+const selectedDeploymentId = ref('')
+const runningDeployments = computed(() => deployments.value.filter(
+  (item) => item.status === 'running' && item.algorithm_version_id === activeSelection.value?.id,
+))
+const selectedDeployment = computed(() => runningDeployments.value.find((item) => item.id === selectedDeploymentId.value))
+const deploymentLabel = (item: Deployment) => `${nodeLabel(item.node_id, nodes.value)}${item.gpu_device_ids.length ? ` · GPU ${item.gpu_device_ids.join(', ')}` : ' · CPU'}`
+const placementSummary = computed(() => selectedDeployment.value
+  ? `部署实例 · ${deploymentLabel(selectedDeployment.value)}`
+  : `${nodeLabel(selectedNodeId.value, nodes.value)}${selectedGpuId.value ? ` · GPU ${selectedGpuId.value}` : ''}`)
 const placementIssue = computed(() => {
+  if (selectedDeploymentId.value && !runtimeLoading.value && !selectedDeployment.value) return '所选部署实例已不在运行，请重新选择。'
+  if (selectedDeploymentId.value) return ''
   if (runtimeLoading.value || !selectedNodeId.value) return ''
   if (!nodes.value.some((node) => node.id === selectedNodeId.value)) return '原任务的服务器已不可用，请重新选择。'
   if (activeSelection.value?.device === 'gpu' && !nodeGpus.value.length) return '所选服务器未检测到 GPU，请刷新资源或选择其他服务器。'
@@ -101,6 +115,7 @@ watch(selectedNodeId, () => { selectedGpuId.value = '' })
 watch(activeSelection, (algorithm) => {
   resetParameters()
   selectedGpuId.value = ''
+  if (!deployments.value.some((item) => item.id === selectedDeploymentId.value && item.algorithm_version_id === algorithm?.id)) selectedDeploymentId.value = ''
   if (preset.value && algorithm && preset.value.algorithm_version_id === algorithm.id) {
     parameterValues.value = mergeParameters(algorithm.parameters, preset.value.parameters)
     selectedGpuId.value = preset.value.gpu_device_ids.length === 1 ? preset.value.gpu_device_ids[0]! : ''
@@ -111,9 +126,14 @@ async function loadRuntimeResources() {
   runtimeLoading.value = true
   runtimeError.value = ''
   try {
-    const resources = await systemApi.executionResources()
+    const [resources, deployed] = await Promise.all([
+      systemApi.executionResources(),
+      // 部署列表读取失败不影响自动调度和指定服务器
+      deploymentsApi.list().catch(() => [] as Deployment[]),
+    ])
     nodes.value = resources.nodes
     gpus.value = resources.gpus
+    deployments.value = deployed
     if (selectedGpuId.value && !nodeGpus.value.some((gpu) => String(gpu.index) === selectedGpuId.value)) selectedGpuId.value = ''
   } catch (reason) {
     runtimeError.value = errorMessage(reason, '运行资源加载失败')
@@ -126,6 +146,7 @@ interface FrozenRunConfig {
   parameters: ParameterValues
   nodeId?: string
   gpuDeviceIds: string[]
+  deploymentId?: string
 }
 interface BatchRun { total: number; submitted: number; taskIds: Record<string, string> }
 
@@ -163,8 +184,9 @@ function frozenConfig(): FrozenRunConfig {
   return {
     algorithmVersionId: activeSelection.value!.id,
     parameters: { ...parameterValues.value },
-    nodeId: selectedNodeId.value || undefined,
-    gpuDeviceIds: selectedGpuId.value ? [selectedGpuId.value] : [],
+    ...(selectedDeployment.value
+      ? { deploymentId: selectedDeployment.value.id, gpuDeviceIds: [] }
+      : { nodeId: selectedNodeId.value || undefined, gpuDeviceIds: selectedGpuId.value ? [selectedGpuId.value] : [] }),
   }
 }
 function payloadFor(assetId: string, config: FrozenRunConfig): CreateTaskPayload {
@@ -174,6 +196,7 @@ function payloadFor(assetId: string, config: FrozenRunConfig): CreateTaskPayload
     parameters: config.parameters,
     node_id: config.nodeId,
     gpu_device_ids: config.gpuDeviceIds,
+    ...(config.deploymentId ? { deployment_id: config.deploymentId } : {}),
   }
 }
 
@@ -339,6 +362,7 @@ onMounted(async () => {
   const linked = typeof route.query.assets === 'string' ? route.query.assets.split(',').filter(Boolean) : []
   if (typeof route.query.asset === 'string') linked.unshift(route.query.asset)
   if (typeof route.query.algorithm === 'string') selectedAlgorithmId.value = route.query.algorithm
+  if (typeof route.query.deployment === 'string') selectedDeploymentId.value = route.query.deployment
   const fromTask = route.query.from_task
   const resources = loadRuntimeResources()
   if (typeof fromTask === 'string') {
@@ -413,20 +437,26 @@ onUnmounted(() => {
           <p v-if="!Object.keys(activeSelection.parameters).length" class="muted-copy">这个算法没有可调参数。</p>
         </section>
 
-        <details class="config-section placement-section" :open="Boolean(selectedNodeId) || undefined">
+        <details class="config-section placement-section" :open="Boolean(selectedNodeId || selectedDeploymentId) || undefined">
           <summary>
             <span>运行位置</span>
-            <strong>{{ nodeLabel(selectedNodeId, nodes) }}{{ selectedGpuId ? ` · GPU ${selectedGpuId}` : '' }}</strong>
+            <strong>{{ placementSummary }}</strong>
           </summary>
           <fieldset class="execution-placement">
             <legend class="visually-hidden">运行位置</legend>
-            <label>执行服务器
+            <label v-if="runningDeployments.length || selectedDeploymentId">部署实例
+              <select v-model="selectedDeploymentId">
+                <option value="">不指定</option>
+                <option v-for="item in runningDeployments" :key="item.id" :value="item.id">{{ deploymentLabel(item) }}</option>
+              </select>
+            </label>
+            <label v-if="!selectedDeploymentId">执行服务器
               <select v-model="selectedNodeId" :disabled="runtimeLoading && !nodes.length">
                 <option value="">自动调度</option>
                 <option v-for="node in nodes" :key="node.id" :value="node.id">{{ nodeLabel(node.id, nodes) }}</option>
               </select>
             </label>
-            <label v-if="selectedNodeId && activeSelection?.device !== 'cpu'">GPU
+            <label v-if="!selectedDeploymentId && selectedNodeId && activeSelection?.device !== 'cpu'">GPU
               <select v-model="selectedGpuId" :disabled="runtimeLoading">
                 <option value="">自动分配 GPU</option>
                 <option v-for="gpu in nodeGpus" :key="gpu.index" :value="String(gpu.index)">
@@ -434,7 +464,7 @@ onUnmounted(() => {
                 </option>
               </select>
             </label>
-            <small>{{ activeSelection?.device === 'cpu' ? '此算法使用所选服务器的 CPU。' : selectedNodeId ? '任务只在所选服务器运行。' : '平台会根据空闲资源自动选择执行位置。' }}</small>
+            <small>{{ selectedDeploymentId ? '任务在所选部署的实例上运行。' : activeSelection?.device === 'cpu' ? '此算法使用所选服务器的 CPU。' : selectedNodeId ? '任务只在所选服务器运行。' : '平台会根据空闲资源自动选择执行位置。' }}</small>
             <button type="button" class="text-button" :disabled="runtimeLoading" @click="loadRuntimeResources">
               {{ runtimeLoading ? '正在刷新…' : '刷新服务器与 GPU' }}
             </button>

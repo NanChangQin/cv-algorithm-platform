@@ -24,6 +24,11 @@ from ..modules.comparisons.infrastructure.memory_repository import (
 from ..modules.comparisons.infrastructure.postgres_repository import (
     PostgresComparisonRepository,
 )
+from ..modules.deployments.orchestrator import DeploymentOrchestrator
+from ..modules.deployments.repository import (
+    InMemoryDeploymentRepository,
+    PostgresDeploymentRepository,
+)
 from ..modules.evaluations.repository import (
     InMemoryEvaluationRepository,
     PostgresEvaluationRepository,
@@ -93,6 +98,8 @@ class ApplicationContainer:
     training: InMemoryTrainingRepository | PostgresTrainingRepository
     training_storage: TrainingDatasetStorage
     training_orchestrator: TrainingOrchestrator
+    deployments: InMemoryDeploymentRepository | PostgresDeploymentRepository
+    deployment_orchestrator: DeploymentOrchestrator
     coordinator_lock: LeaderLock
     database: Database | None
 
@@ -122,6 +129,9 @@ def build_container() -> ApplicationContainer:
         training: InMemoryTrainingRepository | PostgresTrainingRepository = (
             PostgresTrainingRepository(database)
         )
+        deployments: InMemoryDeploymentRepository | PostgresDeploymentRepository = (
+            PostgresDeploymentRepository(database)
+        )
     else:
         algorithms = InMemoryAlgorithmRepository()
         build_jobs = InMemoryBuildJobRepository()
@@ -138,6 +148,7 @@ def build_container() -> ApplicationContainer:
         audit_log = InMemoryAuditLog()
         media_sources = InMemoryMediaSourceService()
         training = InMemoryTrainingRepository()
+        deployments = InMemoryDeploymentRepository()
     media_worker = MediaWorkerGateway(settings.media_worker_url)
     manager_token = (
         settings.manager_api_token.get_secret_value() if settings.manager_api_token else None
@@ -219,6 +230,11 @@ def build_container() -> ApplicationContainer:
         training_storage=training_storage,
         training_orchestrator=TrainingOrchestrator(
             training, training_storage, manager, settings.training_image
+        ),
+        deployments=deployments,
+        deployment_orchestrator=DeploymentOrchestrator(
+            deployments, algorithms, manager, instances,
+            settings.storage_root / "deployment-staging",
         ),
         coordinator_lock=LeaderLock(database, "cv-platform-coordinator"),
         database=database,

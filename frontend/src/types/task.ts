@@ -82,6 +82,8 @@ export interface CreateTaskPayload {
   parameters: Record<string, unknown>
   node_id?: string
   gpu_device_ids?: string[]
+  /** 在指定的部署实例上运行（使用其服务器和 GPU） */
+  deployment_id?: string
 }
 
 export interface TaskResultResponse {

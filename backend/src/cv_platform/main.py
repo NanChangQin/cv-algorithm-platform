@@ -54,6 +54,7 @@ def create_app() -> FastAPI:
             while True:
                 if container.coordinator_lock.held():
                     await asyncio.to_thread(container.training_orchestrator.tick)
+                    await asyncio.to_thread(container.deployment_orchestrator.tick)
                 await asyncio.sleep(settings.coordinator_interval_seconds)
 
         background_tasks = [
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
                 with suppress(asyncio.CancelledError):
                     await task
             container.training_orchestrator.shutdown()
+            container.deployment_orchestrator.shutdown()
             container.coordinator_lock.release()
             container.task_queue.shutdown()
             container.build_queue.shutdown()
@@ -191,8 +193,13 @@ def create_app() -> FastAPI:
                         "request_id": request_id,
                     },
                 )
+            # 部署列表所有人可看（工作台选择部署实例），创建和启停需要开发者权限
+            deployment_write = request.url.path.startswith(
+                f"{settings.api_prefix}/deployments"
+            ) and request.method != "GET"
             if (
-                (request.url.path.startswith(developer_prefixes) or version_build)
+                (request.url.path.startswith(developer_prefixes) or version_build
+                 or deployment_write)
                 and session.role not in {UserRole.ADMIN, UserRole.DEVELOPER}
             ):
                 return JSONResponse(

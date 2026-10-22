@@ -57,6 +57,8 @@ docker build --pull=false --build-context gpu-env=/path/to/conda/env \
 
 Manager 端口供受信任局域网主服务器访问。节点 Docker socket 只挂载到本机 Manager。
 
+节点的 `models/` 目录同时挂载进 Manager（`/models`），平台据此检查和复制权重；训练任务的数据集和输出放在 `data/training/`。训练和定向部署见 [TRAINING.md](TRAINING.md)、[DEPLOYMENT.md](DEPLOYMENT.md)。
+
 ## 访问令牌（节点端口对局域网开放时必须配置）
 
 Manager 能启停算法容器、读取容器日志。未设置令牌时，能访问节点端口的任何主机都可以直接调用这些接口。为主平台和所有节点配置同一个令牌：

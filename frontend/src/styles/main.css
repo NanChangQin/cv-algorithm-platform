@@ -1465,3 +1465,29 @@ button.task-algorithm:hover strong { color: var(--accent); }
   .training-row .training-time { display: none; }
   .stat-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* 模型部署 */
+.deployment-form-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+.deployment-list { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; list-style: none; }
+.deployment-card { display: grid; gap: 12px; align-content: start; padding: 14px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.deployment-card > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.deployment-card > header strong, .deployment-card > header small { display: block; }
+.deployment-card > header strong { color: var(--text-strong); }
+.deployment-card > header small { color: var(--muted); font-size: 12px; }
+.deployment-card .alert { margin: 0; }
+.deployment-steps { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.deployment-steps li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; font-size: 13px; }
+.deployment-steps strong { display: block; color: var(--text); font-weight: 500; }
+.deployment-steps small { display: block; color: var(--muted); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.step-icon { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--text-faint); background: var(--surface-3); }
+.step-icon .app-icon { width: 13px; height: 13px; }
+.step-done .step-icon { color: var(--success); background: var(--success-soft); }
+.step-skipped .step-icon { color: var(--muted); }
+.step-failed .step-icon { color: var(--danger); background: var(--danger-soft); }
+.step-failed small { color: var(--danger); }
+.step-running .step-icon { color: var(--accent); background: var(--accent-soft); }
+.step-running .step-icon .app-icon { animation: step-spin 1.2s linear infinite; }
+.step-pending strong { color: var(--muted); }
+@keyframes step-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .step-running .step-icon .app-icon { animation: none; } }
+@media (max-width: 980px) { .deployment-form-grid { grid-template-columns: minmax(0, 1fr); } }

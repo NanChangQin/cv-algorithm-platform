@@ -121,6 +121,58 @@ class NodeClient:
             partial.unlink(missing_ok=True)
         return size
 
+    def relay(
+        self,
+        target: NodeClient,
+        source_path: str,
+        target_path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+        size: int | None = None,
+        progress: ProgressCallback | None = None,
+    ) -> Any:
+        """把本节点上的文件边下载边上传到另一个节点，不在主服务器落盘。"""
+        try:
+            with httpx.stream(
+                "GET",
+                f"{self._base_url}{source_path}",
+                params=params,
+                headers=self._headers,
+                timeout=httpx.Timeout(self._timeout, read=1800),
+            ) as response:
+                if response.is_error:
+                    response.read()
+                    self._raise_for_error(response)
+
+                def chunks() -> Iterator[bytes]:
+                    sent = 0
+                    for chunk in response.iter_bytes(4 * CHUNK_BYTES):
+                        sent += len(chunk)
+                        if progress:
+                            progress(sent, size)
+                        yield chunk
+
+                uploaded = httpx.put(
+                    f"{target._base_url}{target_path}",
+                    content=chunks(),
+                    params=params,
+                    headers={
+                        **target._headers,
+                        **(headers or {}),
+                        "Content-Type": "application/octet-stream",
+                    },
+                    timeout=httpx.Timeout(target._timeout, write=1800, read=1800),
+                )
+        except httpx.HTTPError as exc:
+            raise ApplicationError(
+                "TRANSFER_FAILED",
+                f"从「{self.node_name}」传输到「{target.node_name}」时连接中断",
+                503,
+            ) from exc
+        target._raise_for_error(uploaded)
+        return uploaded.json() if uploaded.content else None
+
     # 节点能力 -------------------------------------------------------------
 
     def gpus(self) -> list[dict[str, Any]]:
@@ -148,6 +200,11 @@ class NodeClient:
         message = body.get("message")
         if message is None and isinstance(body.get("detail"), list):
             message = "请求参数不符合节点要求"
+        if response.status_code == 404 and "code" not in body:
+            # 没有业务错误码的 404：节点上的 Algorithm Manager 还没有这个接口
+            raise ApplicationError(
+                "NODE_OUTDATED", "该服务器的 Algorithm Manager 版本过旧，请先更新", 409
+            )
         raise ApplicationError(
             str(body.get("code", "NODE_REQUEST_FAILED")),
             str(message or f"节点返回错误（HTTP {response.status_code}）"),
