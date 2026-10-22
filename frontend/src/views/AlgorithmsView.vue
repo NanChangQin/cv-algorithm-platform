@@ -154,7 +154,7 @@ async function copy(text: string) {
 
 <template>
   <header class="page-heading page-heading-actions">
-    <div><h1>算法中心</h1><p>上传算法包后，平台会自动构建、验收并发布，全程无需进入服务器。</p></div>
+    <div><h1>算法库</h1><p>上传算法包后，平台会自动构建、验收并发布，全程无需进入服务器。</p></div>
     <div class="toolbar-actions">
       <button class="secondary-button" :disabled="loading" @click="refresh">{{ loading ? '刷新中…' : '刷新' }}</button>
       <RouterLink v-if="availableAlgorithms.length > 1" class="secondary-button" to="/compare">多算法对比</RouterLink>

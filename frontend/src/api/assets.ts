@@ -1,4 +1,4 @@
-import { apiUrl, projectContext, request, requestBlob, uploadRequest } from './http'
+import { apiUrl, projectContext, queryString, request, requestBlob, requestPage, uploadRequest } from './http'
 import type { BatchUploadResponse, ImageAsset } from '@/types/asset'
 
 function withProject(path: string) {
@@ -8,7 +8,12 @@ function withProject(path: string) {
 }
 
 export const assetsApi = {
-  list: () => request<ImageAsset[]>('/assets'),
+  /** 服务端分页，可按文件名搜索。 */
+  page: (params: { q?: string; limit: number; offset?: number; sort?: 'newest' | 'name' }) =>
+    requestPage<ImageAsset>(`/assets${queryString(params)}`),
+  byIds: (ids: string[]) => ids.length
+    ? request<ImageAsset[]>(`/assets${queryString({ ids })}`)
+    : Promise.resolve([] as ImageAsset[]),
   get: (id: string) => request<ImageAsset>(`/assets/${id}`),
   contentUrl: (id: string) => withProject(`/assets/${id}/content`),
   /** 列表和选择器用缩略图（160/320/640），避免一次性下载所有原图。 */

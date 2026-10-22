@@ -35,6 +35,8 @@ class InMemoryAssetRepository:
     def _matching(self, criteria: AssetQuery) -> list[ImageAsset]:
         with self._lock:
             items = [asset for asset in self._items.values() if _matches(asset, criteria)]
+        if criteria.order == "name":
+            return sorted(items, key=lambda item: (item.original_name, item.id))
         return sorted(items, key=lambda item: (item.created_at, item.id), reverse=True)
 
     def query(self, criteria: AssetQuery) -> list[ImageAsset]:

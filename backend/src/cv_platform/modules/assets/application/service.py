@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Literal
 from uuid import UUID
 
 from ....core.errors import ApplicationError
@@ -52,11 +52,14 @@ class AssetService:
         *,
         text: str | None = None,
         ids: tuple[UUID, ...] = (),
+        order: Literal["newest", "name"] = "newest",
         limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[ImageAsset], int]:
         """返回当前页的图片和符合条件的总数。"""
-        criteria = AssetQuery(self._project_id, text=text, ids=ids, limit=limit, offset=offset)
+        criteria = AssetQuery(
+            self._project_id, text=text, ids=ids, order=order, limit=limit, offset=offset
+        )
         items = self._repository.query(criteria)
         total = len(items) if limit is None and not offset else self._repository.count(criteria)
         return items, total

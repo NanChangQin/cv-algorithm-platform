@@ -1,5 +1,6 @@
 import io
 import zipfile
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile, status
@@ -43,6 +44,7 @@ def list_assets(
     response: Response,
     q: str | None = Query(default=None, max_length=200),
     ids: list[UUID] = Query(default_factory=list, max_length=200),
+    sort: Literal["newest", "name"] = "newest",
     limit: int | None = Query(default=None, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     service: AssetService = Depends(get_service),
@@ -51,6 +53,7 @@ def list_assets(
     items, total = service.list_assets(
         text=q.strip() if q and q.strip() else None,
         ids=tuple(ids),
+        order=sort,
         limit=limit,
         offset=offset,
     )

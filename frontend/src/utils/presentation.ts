@@ -1,4 +1,4 @@
-import type { InferenceTask } from '@/types/task'
+import type { AlgorithmResult, InferenceTask } from '@/types/task'
 
 export const runtimeStatusLabel: Record<string, string> = {
   healthy: '运行中', starting: '启动中', created: '待启动', stopped: '已停止',
@@ -60,3 +60,29 @@ export function formatDateTime(value: string | null | undefined) {
   if (!value) return '—'
   return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
+
+/** 毫秒数显示为“12.3 ms”；缺少数据时显示“—” */
+export function formatMs(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(1)} ms` : '—'
+}
+
+/** “刚刚 / 5 分钟前 / 3 小时前 / 10月20日” */
+export function relativeTime(value: string | null | undefined, now = Date.now()) {
+  if (!value) return '—'
+  const elapsed = now - new Date(value).getTime()
+  if (elapsed < 60_000) return '刚刚'
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)} 分钟前`
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)} 小时前`
+  return new Date(value).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+}
+
+/** 结果的一句话概括，例如“3 个目标”“5 段文本” */
+export function resultSummary(result: AlgorithmResult | null | undefined) {
+  if (!result) return ''
+  if (result.type === 'object_detection') return `${result.data.detections.length} 个目标`
+  if (result.type === 'classification') return `${result.data.predictions.length} 个分类`
+  if (result.type === 'segmentation') return `${result.data.segments.length} 个分割区域`
+  if (result.type === 'ocr') return `${result.data.texts.length} 段文本`
+  return `${result.data.instances.length} 个姿态`
+}
+

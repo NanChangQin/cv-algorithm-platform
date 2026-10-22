@@ -15,9 +15,10 @@ import OcrRenderer from '@/components/results/OcrRenderer.vue'
 import PoseRenderer from '@/components/results/PoseRenderer.vue'
 import SegmentationRenderer from '@/components/results/SegmentationRenderer.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
-import { useAssets } from '@/composables/useAssets'
+import { uploadInBatches } from '@/composables/useAssets'
 import { toast } from '@/composables/useToast'
 import type { Algorithm } from '@/types/algorithm'
+import type { ImageAsset } from '@/types/asset'
 import type { AlgorithmComparison } from '@/types/comparison'
 import type { AlgorithmResult, InferenceTask } from '@/types/task'
 import { errorMessage } from '@/utils/errors'
@@ -29,8 +30,14 @@ const MAX_ALGORITHMS = 8
 const route = useRoute()
 const router = useRouter()
 const { algorithms, availableAlgorithms, loading: algorithmsLoading } = useAlgorithms()
-const { assets, uploading, uploadProgress, upload } = useAssets()
-const selectedAssetIds = ref<string[]>([])
+const picker = ref<InstanceType<typeof AssetPicker> | null>(null)
+const selectedAsset = ref<ImageAsset | null>(null)
+const uploading = ref(false)
+/** 上传进度 0–1；未上传时为 null */
+const uploadProgress = ref<number | null>(null)
+/** 页面上要显示名字的图片（链接带来的图、当前对比、最近对比），按 id 读取 */
+const knownAssets = ref<Record<string, ImageAsset>>({})
+const requestedAssets = new Set<string>()
 const selectedAlgorithms = ref<string[]>([])
 const parameterValues = ref<Record<string, ParameterValues>>({})
 const expanded = ref<string[]>([])
@@ -42,8 +49,7 @@ const overlay = ref(false)
 const creating = ref(false)
 const error = ref('')
 const comparisonId = computed(() => String(route.params.id ?? ''))
-const selectedAsset = computed(() => assets.value.find((item) => item.id === selectedAssetIds.value[0]))
-const comparisonAsset = computed(() => assets.value.find((item) => item.id === comparison.value?.asset_id))
+const comparisonAsset = computed(() => (comparison.value ? knownAssets.value[comparison.value.asset_id] : undefined))
 const chosen = computed(() => selectedAlgorithms.value.map((id) => availableAlgorithms.value.find((item) => item.id === id)).filter((item) => item !== undefined))
 const builderIssue = computed(() => {
   if (!selectedAsset.value) return '请选择一张图片'
@@ -108,10 +114,39 @@ function recentNames(item: AlgorithmComparison) {
   return item.tasks.map((task) => algorithmOf(task)?.name ?? '已删除的算法').join(' vs ')
 }
 
+/** 每张图只读一次；读不到（已删除）的不再重复请求，网络失败的下次再试 */
+async function rememberAssets(ids: string[]) {
+  const missing = [...new Set(ids)].filter((id) => !requestedAssets.has(id))
+  if (!missing.length) return
+  for (const id of missing) requestedAssets.add(id)
+  try {
+    const found = await assetsApi.byIds(missing)
+    knownAssets.value = { ...knownAssets.value, ...Object.fromEntries(found.map((asset) => [asset.id, asset])) }
+  } catch {
+    for (const id of missing) requestedAssets.delete(id)
+  }
+}
+async function selectLinkedAsset(id: string) {
+  await rememberAssets([id])
+  const asset = knownAssets.value[id]
+  if (asset && route.query.asset === id) selectedAsset.value = asset
+}
+
 async function handleFiles(files: File[]) {
-  const outcome = await upload(files)
-  if (outcome.uploaded[0]) selectedAssetIds.value = [outcome.uploaded[0].id]
-  if (outcome.failed[0]) toast.error(`${outcome.failed[0].name}：${outcome.failed[0].message}`)
+  uploading.value = true
+  uploadProgress.value = 0
+  try {
+    const outcome = await uploadInBatches(files, { onProgress: (ratio) => { uploadProgress.value = ratio } })
+    const [uploaded] = outcome.uploaded
+    if (uploaded) {
+      picker.value?.add(outcome.uploaded)
+      selectedAsset.value = uploaded
+    }
+    if (outcome.failed[0]) toast.error(`${outcome.failed[0].name}：${outcome.failed[0].message}`)
+  } finally {
+    uploading.value = false
+    uploadProgress.value = null
+  }
 }
 
 async function createComparison() {
@@ -137,6 +172,7 @@ async function loadComparison() {
     if (loaded.id !== comparisonId.value) return
     comparison.value = loaded
     error.value = ''
+    void rememberAssets([loaded.asset_id])
     for (const task of loaded.tasks) {
       if (task.status === 'completed' && !results.value[task.id]) {
         results.value = { ...results.value, [task.id]: (await tasksApi.result(task.id)).result }
@@ -148,9 +184,10 @@ async function loadComparison() {
 }
 async function loadRecent() {
   try { recent.value = await comparisonsApi.list() } catch { recent.value = [] }
+  void rememberAssets(recent.value.map((item) => item.asset_id))
 }
 function prefillFromQuery() {
-  if (typeof route.query.asset === 'string') selectedAssetIds.value = [route.query.asset]
+  if (typeof route.query.asset === 'string') void selectLinkedAsset(route.query.asset)
   const wanted = typeof route.query.algorithms === 'string' ? route.query.algorithms.split(',') : []
   for (const id of wanted) {
     const algorithm = availableAlgorithms.value.find((item) => item.id === id)
@@ -179,7 +216,6 @@ watch(comparisonId, (id) => {
   else { selectedAlgorithms.value = []; prefillFromQuery(); void loadRecent() }
 })
 watch(() => route.query, () => { if (!comparisonId.value) prefillFromQuery() })
-watch(assets, (items) => { if (!selectedAssetIds.value.length && items[0] && !route.query.asset) selectedAssetIds.value = [items[0].id] }, { immediate: true })
 onMounted(() => {
   prefillFromQuery()
   if (comparisonId.value) void loadComparison()
@@ -201,14 +237,14 @@ onUnmounted(() => window.clearInterval(polling))
   <template v-if="!comparisonId">
     <div v-if="!algorithmsLoading && availableAlgorithms.length < 2" class="empty-state">
       <strong>至少需要两个可用算法才能对比</strong>
-      <p>当前只有 {{ availableAlgorithms.length }} 个可用算法版本。在算法中心上传并发布更多算法，或启用已停用的版本。</p>
-      <RouterLink class="secondary-button" to="/algorithms">前往算法中心</RouterLink>
+      <p>当前只有 {{ availableAlgorithms.length }} 个可用算法版本。在算法库导入并发布更多算法，或启用已停用的版本。</p>
+      <RouterLink class="secondary-button" to="/algorithms">前往算法库</RouterLink>
     </div>
     <div v-else class="compare-builder">
       <section class="section-block">
-        <header class="section-heading"><div><span class="step-number">1</span><h2>选择图片</h2></div><RouterLink to="/assets">资源中心 →</RouterLink></header>
+        <header class="section-heading"><div><span class="step-number">1</span><h2>选择图片</h2></div><RouterLink to="/assets">图片库 →</RouterLink></header>
         <UploadDropzone :multiple="false" :disabled="uploading" :progress="uploadProgress" compact title="拖入一张图片，或点击选择" hint="上传后自动选中" @files="handleFiles" />
-        <AssetPicker v-if="assets.length" v-model="selectedAssetIds" :assets="assets" />
+        <AssetPicker ref="picker" v-model="selectedAsset" :select-first="!route.query.asset" />
       </section>
       <section class="section-block">
         <header class="section-heading"><div><span class="step-number">2</span><h2>选择算法</h2><span class="count-badge">{{ chosen.length }} / {{ MAX_ALGORITHMS }}</span></div></header>
@@ -237,7 +273,7 @@ onUnmounted(() => window.clearInterval(polling))
       <div class="recent-comparisons">
         <RouterLink v-for="item in recent" :key="item.id" :to="`/compare/${item.id}`" class="recent-comparison" :title="recentNames(item)">
           <img :src="assetsApi.thumbnailUrl(item.asset_id, 160)" alt="" loading="lazy" />
-          <span><strong>{{ recentNames(item) }}</strong><small>{{ assets.find((asset) => asset.id === item.asset_id)?.original_name ?? '图片' }} · {{ formatDateTime(item.created_at) }}</small></span>
+          <span><strong>{{ recentNames(item) }}</strong><small>{{ knownAssets[item.asset_id]?.original_name ?? '图片' }} ·{{ formatDateTime(item.created_at) }}</small></span>
           <span class="count-badge">{{ recentStatus(item) }}</span>
         </RouterLink>
       </div>

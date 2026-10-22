@@ -90,6 +90,7 @@ def create_app() -> FastAPI:
         f"{settings.api_prefix}/algorithms/import",
         f"{settings.api_prefix}/tasks",
         f"{settings.api_prefix}/comparisons",
+        f"{settings.api_prefix}/evaluations/runs",
         f"{settings.api_prefix}/auth/login",
     }
     admin_only_prefixes = (
