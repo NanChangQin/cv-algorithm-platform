@@ -1,37 +1,122 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/api/assets', () => ({ assetsApi: { thumbnailUrl: (id: string) => `/thumb/${id}` } }))
+const api = vi.hoisted(() => ({ page: vi.fn() }))
+vi.mock('@/api/assets', () => ({ assetsApi: { page: api.page, thumbnailUrl: (id: string) => `/thumb/${id}` } }))
 import AssetPicker from '../AssetPicker.vue'
 import UploadDropzone from '../UploadDropzone.vue'
 
-const assets = ['bear.jpg', 'cat.png', 'dog.jpg', 'bird.jpg', 'fish.jpg', 'frog.jpg', 'owl.jpg'].map((name, index) => ({
-  id: `asset-${index}`, original_name: name, width: 10, height: 10,
-}))
+function asset(index: number, name = `frame_${String(index).padStart(3, '0')}.jpg`) {
+  return { id: `asset-${index}`, original_name: name, width: 10, height: 10 }
+}
+const library = Array.from({ length: 30 }, (_, index) => asset(index))
+/** 和服务端一致：文件名包含搜索词（不区分大小写），再按 offset/limit 分页 */
+async function serve({ q, limit, offset = 0 }: { q?: string; limit: number; offset?: number }) {
+  const matches = library.filter((item) => !q || item.original_name.toLowerCase().includes(q.toLowerCase()))
+  return { items: matches.slice(offset, offset + limit), total: matches.length }
+}
+const names = (wrapper: VueWrapper) => wrapper.findAll('.asset-option small').map((node) => node.text())
 
 describe('AssetPicker', () => {
-  it('selects a single image on click and builds a batch with the corner toggles', async () => {
-    const wrapper = mount(AssetPicker, { props: { assets, modelValue: ['asset-0'], multiple: true, max: 2 } })
-    await wrapper.findAll('.asset-option-main')[1]!.trigger('click')
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([['asset-1']])
-    await wrapper.findAll('.asset-option-main')[2]!.trigger('click', { ctrlKey: true })
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([['asset-0', 'asset-2']])
+  beforeEach(() => { api.page.mockReset().mockImplementation(serve) })
+  afterEach(() => { vi.useRealTimers() })
 
-    await wrapper.setProps({ modelValue: ['asset-1', 'asset-3'] })
-    expect(wrapper.findAll('.asset-option-check')[3]!.text()).toBe('2')
-    const before = wrapper.emitted('update:modelValue')!.length
-    await wrapper.findAll('.asset-option-check')[4]!.trigger('click')
-    expect(wrapper.emitted('update:modelValue')).toHaveLength(before)
-    await wrapper.findAll('.asset-option-check')[1]!.trigger('click')
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([['asset-3']])
+  it('reads one page at a time from the server', async () => {
+    const wrapper = mount(AssetPicker, { props: { modelValue: null } })
+    await flushPromises()
+    expect(api.page).toHaveBeenCalledTimes(1)
+    expect(api.page).toHaveBeenCalledWith(expect.objectContaining({ limit: 24, offset: 0 }))
+    expect(names(wrapper)).toHaveLength(24)
+    expect(wrapper.find('.asset-picker-more').text()).toBe('显示更多（还有 6 张）')
+
+    await wrapper.find('.asset-picker-more').trigger('click')
+    await flushPromises()
+    expect(api.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 24, offset: 24 }))
+    expect(names(wrapper)).toHaveLength(30)
+    expect(wrapper.find('.asset-picker-more').exists()).toBe(false)
   })
 
-  it('filters by file name and selects the matches', async () => {
-    const wrapper = mount(AssetPicker, { props: { assets, modelValue: [], multiple: true } })
-    await wrapper.find('input[type="search"]').setValue('.png')
-    expect(wrapper.findAll('.asset-option')).toHaveLength(1)
-    await wrapper.findAll('button').find((button) => button.text() === '选择搜索结果')!.trigger('click')
-    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([['asset-1']])
+  it('searches file names on the server and keeps the search box while editing', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(AssetPicker, { props: { modelValue: null } })
+    await flushPromises()
+    await wrapper.find('input[type="search"]').setValue('FRAME_02')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(api.page).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'FRAME_02', offset: 0 }))
+    expect(names(wrapper)).toEqual(library.slice(20).map((item) => item.original_name))
+
+    await wrapper.find('input[type="search"]').setValue('cat')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(wrapper.text()).toContain('没有文件名包含“cat”的图片。')
+    // 清空搜索词时，新结果回来之前搜索框也不能消失
+    await wrapper.find('input[type="search"]').setValue('')
+    expect(wrapper.find('input[type="search"]').exists()).toBe(true)
+    await vi.advanceTimersByTimeAsync(250)
+    expect(names(wrapper)).toHaveLength(24)
+
+    // 放在表单里时，回车不能提交表单
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true })
+    wrapper.find('input[type="search"]').element.dispatchEvent(enter)
+    expect(enter.defaultPrevented).toBe(true)
+  })
+
+  it('keeps a linked image from a later page first without moving or repeating it', async () => {
+    const linked = library[27]!
+    const wrapper = mount(AssetPicker, { props: { modelValue: linked } })
+    await flushPromises()
+    expect(names(wrapper).slice(0, 2)).toEqual(['frame_027.jpg', 'frame_000.jpg'])
+    expect(wrapper.find('.asset-option.selected').text()).toContain('frame_027.jpg')
+
+    await wrapper.findAll('.asset-option-main')[2]!.trigger('click')
+    expect(wrapper.emitted('update:modelValue')!.at(-1)).toEqual([library[1]])
+    await wrapper.setProps({ modelValue: library[1]! })
+    expect(names(wrapper)[0]).toBe('frame_027.jpg')
+    expect(wrapper.find('.asset-picker-more').text()).toBe('显示更多（还有 5 张）')
+
+    await wrapper.find('.asset-picker-more').trigger('click')
+    await flushPromises()
+    expect(names(wrapper)).toHaveLength(30)
+    expect(names(wrapper).filter((name) => name === 'frame_027.jpg')).toHaveLength(1)
+    expect(names(wrapper)[0]).toBe('frame_027.jpg')
+    expect(wrapper.find('.asset-picker-more').exists()).toBe(false)
+  })
+
+  it('still shows an image picked from search results after the search is cleared', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(AssetPicker, { props: { modelValue: null } })
+    await flushPromises()
+    await wrapper.find('input[type="search"]').setValue('029')
+    await vi.advanceTimersByTimeAsync(250)
+    await wrapper.find('.asset-option-main').trigger('click')
+    await wrapper.setProps({ modelValue: library[29]! })
+    await wrapper.find('input[type="search"]').setValue('')
+    await vi.advanceTimersByTimeAsync(250)
+    expect(names(wrapper)[0]).toBe('frame_029.jpg')
+    expect(wrapper.find('.asset-option.selected').text()).toContain('frame_029.jpg')
+  })
+
+  it('selects the newest image only when nothing is selected yet', async () => {
+    const fresh = mount(AssetPicker, { props: { modelValue: null, selectFirst: true } })
+    await flushPromises()
+    expect(fresh.emitted('update:modelValue')).toEqual([[library[0]]])
+    const linked = mount(AssetPicker, { props: { modelValue: library[27]!, selectFirst: true } })
+    await flushPromises()
+    expect(linked.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('puts uploads in front of everything and clears the search so they show up', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(AssetPicker, { props: { modelValue: library[27]! } })
+    await flushPromises()
+    await wrapper.find('input[type="search"]').setValue('frame_01')
+    await vi.advanceTimersByTimeAsync(250)
+    const uploaded = asset(100, 'upload.png')
+    wrapper.vm.add([uploaded])
+    await wrapper.setProps({ modelValue: uploaded })
+    await vi.advanceTimersByTimeAsync(250)
+    expect((wrapper.find('input[type="search"]').element as HTMLInputElement).value).toBe('')
+    expect(names(wrapper).slice(0, 3)).toEqual(['upload.png', 'frame_027.jpg', 'frame_000.jpg'])
+    expect(wrapper.find('.asset-option.selected').text()).toContain('upload.png')
   })
 })
 

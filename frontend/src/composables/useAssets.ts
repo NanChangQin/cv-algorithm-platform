@@ -1,5 +1,3 @@
-import { onMounted, ref } from 'vue'
-
 import { assetsApi } from '@/api/assets'
 import { ApiError } from '@/api/http'
 import type { ImageAsset } from '@/types/asset'
@@ -58,51 +56,4 @@ export function uploadFailureMessage(failed: UploadFailure[]): string {
   return failed.length === 1
     ? `${first.name} 上传失败：${first.message}`
     : `${failed.length} 张图片上传失败，例如 ${first.name}：${first.message}`
-}
-
-export function useAssets() {
-  const assets = ref<ImageAsset[]>([])
-  const loading = ref(false)
-  const uploading = ref(false)
-  /** 上传进度 0–1；未上传时为 null */
-  const uploadProgress = ref<number | null>(null)
-  const error = ref('')
-
-  async function refresh() {
-    loading.value = true
-    error.value = ''
-    try {
-      assets.value = await assetsApi.list()
-    } catch (reason) {
-      error.value = errorMessage(reason, '加载图片失败')
-    } finally {
-      loading.value = false
-    }
-  }
-
-  function merge(items: ImageAsset[]) {
-    const byId = new Map(assets.value.map((asset) => [asset.id, asset]))
-    for (const asset of items) byId.set(asset.id, asset)
-    assets.value = [...byId.values()].sort((a, b) => b.created_at.localeCompare(a.created_at))
-  }
-
-  async function upload(files: File[]): Promise<UploadOutcome> {
-    uploading.value = true
-    uploadProgress.value = 0
-    error.value = ''
-    try {
-      const outcome = await uploadInBatches(files, {
-        onProgress: (ratio) => { uploadProgress.value = ratio },
-        onUploaded: merge,
-      })
-      error.value = uploadFailureMessage(outcome.failed)
-      return outcome
-    } finally {
-      uploading.value = false
-      uploadProgress.value = null
-    }
-  }
-
-  onMounted(refresh)
-  return { assets, loading, uploading, uploadProgress, error, refresh, upload }
 }

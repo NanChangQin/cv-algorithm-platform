@@ -2,78 +2,80 @@
 import { computed, ref, watch } from 'vue'
 
 import { assetsApi } from '@/api/assets'
+import { useAssetPages } from '@/composables/useAssetPages'
 import type { ImageAsset } from '@/types/asset'
 
 const props = withDefaults(defineProps<{
-  assets: ImageAsset[]
-  modelValue: string[]
-  multiple?: boolean
-  max?: number
+  modelValue: ImageAsset | null
   pageSize?: number
-}>(), { multiple: false, max: 50, pageSize: 24 })
-const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
+  /** 没有选中图片时自动选最新的一张 */
+  selectFirst?: boolean
+}>(), { pageSize: 24, selectFirst: false })
+const emit = defineEmits<{ 'update:modelValue': [value: ImageAsset] }>()
 
-const query = ref('')
-const visibleCount = ref(props.pageSize)
-const filtered = computed(() => {
-  const keyword = query.value.trim().toLowerCase()
-  return keyword ? props.assets.filter((asset) => asset.original_name.toLowerCase().includes(keyword)) : props.assets
+// 按页向服务端读取，搜索也交给服务端：图片再多，打开时也只读一页
+const library = useAssetPages(props.pageSize)
+const { items, total, query, loading, error } = library
+/**
+ * 固定在最前面的图片：刚上传的、链接带过来但不在已读取页面里的、在搜索结果里选中的。
+ * 不搜索时显示在最前面，后面的页面里再读到时不重复显示，位置也不会跳动。
+ */
+const pinned = ref<ImageAsset[]>([])
+const shown = computed(() => {
+  if (query.value.trim()) return items.value
+  const front = new Set(pinned.value.map((asset) => asset.id))
+  return [...pinned.value, ...items.value.filter((asset) => !front.has(asset.id))]
 })
-const shown = computed(() => filtered.value.slice(0, visibleCount.value))
-watch(query, () => { visibleCount.value = props.pageSize })
+const remaining = computed(() => total.value - shown.value.length)
+/** 搜索框出现后就一直保留，避免清空搜索词时因结果变少而消失、丢失焦点 */
+const searchable = ref(false)
 
-/** 点击图片只选这一张（和相册一致）；按住 Ctrl/⌘/Shift 点击，或勾选右上角方框才是多选 */
-function choose(asset: ImageAsset, event: MouseEvent) {
-  if (props.multiple && (event.ctrlKey || event.metaKey || event.shiftKey)) toggle(asset)
-  else emit('update:modelValue', [asset.id])
+watch(total, (value) => { if (value > 6) searchable.value = true })
+watch(() => props.modelValue, (asset) => {
+  if (!asset || pinned.value.some((item) => item.id === asset.id)) return
+  if (query.value.trim() || !items.value.some((item) => item.id === asset.id)) pinned.value = [asset, ...pinned.value]
+}, { immediate: true })
+watch(items, (loaded) => {
+  if (props.selectFirst && !props.modelValue && !query.value.trim() && loaded[0]) emit('update:modelValue', loaded[0])
+})
+
+/** 刚上传的图片放到最前面，并清空搜索词让它显示出来 */
+function add(assets: ImageAsset[]) {
+  const known = new Set([...pinned.value, ...items.value].map((asset) => asset.id))
+  const added = assets.filter((asset) => !known.has(asset.id))
+  pinned.value = [...added, ...pinned.value]
+  total.value += added.length
+  query.value = ''
 }
-function toggle(asset: ImageAsset) {
-  const selected = props.modelValue
-  if (selected.includes(asset.id)) emit('update:modelValue', selected.filter((id) => id !== asset.id))
-  else if (selected.length < props.max) emit('update:modelValue', [...selected, asset.id])
-}
-function selectFiltered() {
-  const ids = [...new Set([...props.modelValue, ...filtered.value.map((asset) => asset.id)])].slice(0, props.max)
-  emit('update:modelValue', ids)
-}
+defineExpose({ add })
 </script>
 
 <template>
   <div class="asset-picker">
-    <div v-if="assets.length > 6 || multiple" class="asset-picker-tools">
-      <input v-if="assets.length > 6" v-model="query" type="search" placeholder="按文件名搜索图片" aria-label="按文件名搜索图片" />
-      <template v-if="multiple">
-        <span class="muted-copy">已选 {{ modelValue.length }}<template v-if="modelValue.length >= max">（最多 {{ max }} 张）</template></span>
-        <button type="button" class="text-button" :disabled="!filtered.length" @click="selectFiltered">{{ query ? '选择搜索结果' : '全选' }}</button>
-        <button v-if="modelValue.length > 1" type="button" class="text-button" @click="emit('update:modelValue', modelValue.slice(0, 1))">只保留第一张</button>
-      </template>
+    <div v-if="searchable" class="asset-picker-tools">
+      <input v-model="query" type="search" placeholder="按文件名搜索图片" aria-label="按文件名搜索图片" @keydown.enter.prevent />
     </div>
-    <p v-if="!filtered.length" class="muted-copy">没有文件名包含“{{ query }}”的图片。</p>
-    <div class="asset-picker-grid" aria-label="选择输入图片">
-      <div v-for="asset in shown" :key="asset.id" class="asset-option" :class="{ selected: modelValue.includes(asset.id) }">
+    <p v-if="error" class="alert" role="alert">{{ error }}</p>
+    <p v-else-if="!shown.length" class="muted-copy">
+      {{ loading ? '正在加载图片…' : query.trim() ? `没有文件名包含“${query.trim()}”的图片。` : '图片库里还没有图片。' }}
+    </p>
+    <div v-if="shown.length" class="asset-picker-grid" aria-label="选择输入图片">
+      <div v-for="asset in shown" :key="asset.id" class="asset-option" :class="{ selected: asset.id === modelValue?.id }">
         <button
           type="button"
           class="asset-option-main"
-          :aria-pressed="modelValue.includes(asset.id)"
+          :aria-pressed="asset.id === modelValue?.id"
           :title="`${asset.original_name} · ${asset.width} × ${asset.height}`"
-          @click="choose(asset, $event)"
+          @click="emit('update:modelValue', asset)"
         >
           <img :src="assetsApi.thumbnailUrl(asset.id, 160)" :alt="asset.original_name" loading="lazy" decoding="async" />
           <small>{{ asset.original_name }}</small>
         </button>
-        <button
-          v-if="multiple"
-          type="button"
-          class="asset-option-check"
-          :aria-label="modelValue.includes(asset.id) ? `取消选择 ${asset.original_name}` : `加入多选：${asset.original_name}`"
-          :aria-pressed="modelValue.includes(asset.id)"
-          @click="toggle(asset)"
-        >{{ modelValue.includes(asset.id) ? modelValue.indexOf(asset.id) + 1 : '' }}</button>
-        <span v-else-if="modelValue.includes(asset.id)" class="asset-option-mark" aria-hidden="true">✓</span>
+        <span v-if="asset.id === modelValue?.id" class="asset-option-mark" aria-hidden="true">✓</span>
       </div>
     </div>
-    <button v-if="filtered.length > shown.length" type="button" class="secondary-button asset-picker-more" @click="visibleCount += pageSize">
-      显示更多（还有 {{ filtered.length - shown.length }} 张）
+    <button v-if="remaining > 0" type="button" class="secondary-button asset-picker-more" :disabled="loading" @click="library.loadMore()">
+      {{ loading ? '正在加载…' : `显示更多（还有 ${remaining} 张）` }}
     </button>
   </div>
 </template>

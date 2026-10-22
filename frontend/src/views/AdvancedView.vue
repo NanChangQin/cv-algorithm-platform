@@ -7,8 +7,8 @@ import ParameterForm from '@/components/algorithms/ParameterForm.vue'
 import AssetPicker from '@/components/assets/AssetPicker.vue'
 import UploadDropzone from '@/components/assets/UploadDropzone.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
-import { useAssets } from '@/composables/useAssets'
 import { toast } from '@/composables/useToast'
+import type { ImageAsset } from '@/types/asset'
 import { errorMessage } from '@/utils/errors'
 import { defaultParameters, parameterIssue, type ParameterValues } from '@/utils/parameters'
 import { formatDateTime, nodeLabel, runStatusLabel } from '@/utils/presentation'
@@ -27,7 +27,6 @@ const sourceTypeHint: Record<MediaSource['source_type'], string> = {
 }
 
 const { algorithms, availableAlgorithms } = useAlgorithms()
-const { assets } = useAssets()
 const activeTab = ref<Tab>('media')
 const busy = ref(false)
 const media = ref<MediaSource[]>([])
@@ -55,7 +54,7 @@ const workflowName = ref('')
 const workflowMode = ref<'sequential' | 'parallel'>('sequential')
 const workflowSteps = ref<string[]>([])
 const workflowId = ref('')
-const workflowAssetIds = ref<string[]>([])
+const workflowAsset = ref<ImageAsset | null>(null)
 // 运行节点
 const node = ref<RuntimeNode>({ id: '', name: '', manager_url: '', enabled: true })
 // 扩缩容与灰度
@@ -155,7 +154,9 @@ async function addWorkflow() {
   if (ok) { workflowName.value = ''; workflowSteps.value = [] }
 }
 function startWorkflow() {
-  void act(() => advancedApi.startWorkflow(workflowId.value, workflowAssetIds.value[0]!), '工作流已开始运行', '运行工作流失败')
+  const assetId = workflowAsset.value?.id
+  if (!assetId) return
+  void act(() => advancedApi.startWorkflow(workflowId.value, assetId), '工作流已开始运行', '运行工作流失败')
 }
 function cancelWorkflow(run: WorkflowRun) {
   void act(() => advancedApi.cancelWorkflowRun(run.id), '已取消工作流运行', '取消失败')
@@ -273,8 +274,8 @@ onUnmounted(() => window.clearInterval(polling))
       <form class="stacked-form" @submit.prevent="startWorkflow">
         <label>工作流<select v-model="workflowId" required><option value="" disabled>选择工作流</option><option v-for="item in workflows" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
         <p class="picker-label">输入图片</p>
-        <AssetPicker v-model="workflowAssetIds" :assets="assets" :page-size="12" />
-        <button class="primary-button" :disabled="busy || !workflowId || !workflowAssetIds.length">运行工作流</button>
+        <AssetPicker v-model="workflowAsset" :page-size="12" />
+        <button class="primary-button" :disabled="busy || !workflowId || !workflowAsset">运行工作流</button>
       </form>
     </section>
     <section class="section-block wide">

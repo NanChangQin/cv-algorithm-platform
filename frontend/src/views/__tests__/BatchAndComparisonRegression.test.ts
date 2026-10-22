@@ -19,17 +19,16 @@ vi.mock('@/api/system', () => ({ systemApi: { executionResources: vi.fn().mockRe
   nodes: [{ id: 'dell', name: 'Dell' }, { id: 'local', name: 'Local' }],
   gpus: [{ node_id: 'dell', index: 0, name: 'GPU', memory_total_mb: 100, memory_used_mb: 0 }, { node_id: 'local', index: 0, name: 'GPU', memory_total_mb: 100, memory_used_mb: 0 }],
 }) } }))
-vi.mock('@/api/assets', () => ({ assetsApi: { thumbnailUrl: () => '', contentUrl: () => '', byIds: vi.fn().mockResolvedValue([]) } }))
+vi.mock('@/api/assets', () => ({ assetsApi: {
+  thumbnailUrl: () => '', contentUrl: () => '',
+  byIds: vi.fn(async (ids: string[]) => ids.map((id) => ({ id, original_name: `${id}.png`, width: 10, height: 10 }))),
+} }))
 vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
   const algorithms = ref(['a', 'b'].map((id) => ({ id, name: id, version: '1', status: 'available', device: 'gpu', task_type: 'object_detection',
     parameters: { confidence: { type: 'number', title: '置信度', minimum: 0, maximum: 1, default: 0.4 } },
   })))
   return { algorithms, availableAlgorithms: algorithms, loading: ref(false), error: ref('') }
 } }))
-vi.mock('@/composables/useAssets', () => ({ useAssets: () => ({
-  assets: ref(['i1', 'i2'].map((id) => ({ id, original_name: `${id}.png`, width: 10, height: 10 }))),
-  uploading: ref(false), uploadProgress: ref(null), error: ref(''), upload: vi.fn(),
-}) }))
 vi.mock('@/composables/useAssetPages', () => ({ useAssetPages: () => ({
   items: ref(['i1', 'i2'].map((id) => ({ id, original_name: `${id}.png`, width: 10, height: 10 }))),
   total: ref(2), query: ref(''), loading: ref(false), error: ref(''), hasMore: ref(false),

@@ -891,10 +891,7 @@ kbd { margin: 0 2px; padding: 1px 5px; border: 1px solid var(--line-strong); bor
 .asset-option-main { width: 100%; padding: 0; display: block; border: 0; background: transparent; cursor: pointer; text-align: left; }
 .asset-option img { width: 100%; aspect-ratio: 1; display: block; object-fit: cover; }
 .asset-option small { display: block; padding: 4px 6px; overflow: hidden; color: var(--text-2); background: var(--surface); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
-.asset-option-mark, .asset-option-check { position: absolute; top: 5px; right: 5px; min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border-radius: 11px; color: white; background: var(--accent); font-size: 12px; font-weight: 700; box-shadow: 0 1px 3px rgb(16 24 40 / 30%); }
-.asset-option-check { border: 2px solid white; background: rgb(16 24 40 / 30%); cursor: pointer; opacity: .85; }
-.asset-option:hover .asset-option-check, .asset-option-check:focus-visible { opacity: 1; background: rgb(16 24 40 / 50%); }
-.asset-option.selected .asset-option-check { background: var(--accent); opacity: 1; }
+.asset-option-mark { position: absolute; top: 5px; right: 5px; min-width: 22px; height: 22px; padding: 0 6px; display: grid; place-items: center; border-radius: 11px; color: white; background: var(--accent); font-size: 12px; font-weight: 700; box-shadow: 0 1px 3px rgb(16 24 40 / 30%); }
 .asset-picker-more, .load-more { width: 100%; margin-top: 12px; }
 
 /* 任务详情：输入图片条、检测结果表 */
