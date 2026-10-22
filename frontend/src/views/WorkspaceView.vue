@@ -517,7 +517,6 @@ onUnmounted(() => {
               <ResultViewer
                 v-if="viewedTask.status === 'completed' && viewedResult"
                 compact
-                :fit-offset="520"
                 :result="viewedResult"
                 :image-url="assetsApi.contentUrl(viewedTask.asset_id ?? focusedAsset.id)"
               />
