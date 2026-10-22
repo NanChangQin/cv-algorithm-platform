@@ -108,6 +108,7 @@ def test_flat_dataset_is_split_and_bad_lines_are_dropped(client: TestClient) -> 
         entries[f"labels/img{index}.txt"] = "0 0.5 0.5 0.1 0.1\n1 0.2 0.2 0.1 0.1\n"
     entries["labels/img0.txt"] = "0 0.5 0.5 0.1 0.1\n0 1.7 0.5 0.1 0.1\nhello\n"
     entries["labels/orphan.txt"] = "0 0.5 0.5 0.1 0.1\n"
+    entries["README.txt"] = "downloaded from somewhere"
     dataset = upload_dataset(client, entries)
     stats = dataset["stats"]
     assert stats["auto_split"] is True
@@ -116,6 +117,7 @@ def test_flat_dataset_is_split_and_bad_lines_are_dropped(client: TestClient) -> 
     assert 1 <= splits["val"]["images"] < 10
     assert stats["invalid_lines"] == 2
     assert stats["orphan_labels"] == 1
+    assert stats["skipped_files"] == 1
     assert any("第 2 行" in item for item in stats["invalid_examples"])
     assert stats["instances"] == {"car": 30, "truck": 29}
 

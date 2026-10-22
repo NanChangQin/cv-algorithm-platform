@@ -173,7 +173,10 @@ class TrainingDatasetStorage:
         if train_boxes == 0:
             raise _fail("训练集中没有任何标注框，请检查 labels 目录是否与 images 对应")
 
-        orphan_labels = len(labels) - len(used_labels)
+        # labels 目录外没用上的 txt（README 等）不算标注文件
+        unused = [path for path in labels if path not in used_labels]
+        orphan_labels = sum("labels" in (part.lower() for part in path.parts) for path in unused)
+        skipped += len(unused) - orphan_labels
         if orphan_labels:
             warnings.append(f"{orphan_labels} 个标注文件找不到对应图片，已忽略")
         if invalid_lines:

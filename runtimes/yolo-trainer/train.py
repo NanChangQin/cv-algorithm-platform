@@ -55,7 +55,13 @@ def train(config: dict) -> None:
     if not weights.is_file():
         raise FileNotFoundError(f"训练镜像中没有预训练权重 {config['model']}")
 
+    import ultralytics.utils
     from ultralytics import YOLO
+
+    # 默认权重目录是相对当前目录的 weights/：AMP 自检找不到 yolo26n.pt 就会尝试联网下载。
+    # 指向镜像里打包好的权重目录，断网也能完成自检。
+    ultralytics.utils.SETTINGS.update(weights_dir=str(WEIGHTS))
+    ultralytics.utils.WEIGHTS_DIR = WEIGHTS
 
     started_at = time.time()
     state = {"batch": 0, "written_at": 0.0}
