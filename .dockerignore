@@ -8,6 +8,8 @@ data
 storage
 **/*.pth
 **/*.pt
+# 训练镜像离线构建时使用的预训练权重
+!runtimes/yolo-trainer/assets/*.pt
 **/*.onnx
 **/*.engine
 **/*.zip

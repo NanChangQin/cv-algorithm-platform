@@ -53,6 +53,12 @@ from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
 from ..modules.tasks.infrastructure.memory_repository import InMemoryTaskRepository
 from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
 from ..modules.tasks.infrastructure.postgres_repository import PostgresTaskRepository
+from ..modules.training.datasets import TrainingDatasetStorage
+from ..modules.training.orchestrator import LeaderLock, TrainingOrchestrator
+from ..modules.training.repository import (
+    InMemoryTrainingRepository,
+    PostgresTrainingRepository,
+)
 from ..modules.workflows.service import InMemoryWorkflowService
 from .config import get_settings
 from .database import Database
@@ -84,6 +90,10 @@ class ApplicationContainer:
     workflows: InMemoryWorkflowService
     operations: OperationsService
     projects: InMemoryProjectService | PostgresProjectService
+    training: InMemoryTrainingRepository | PostgresTrainingRepository
+    training_storage: TrainingDatasetStorage
+    training_orchestrator: TrainingOrchestrator
+    coordinator_lock: LeaderLock
     database: Database | None
 
 
@@ -109,6 +119,9 @@ def build_container() -> ApplicationContainer:
         evaluations = PostgresEvaluationRepository(database)
         audit_log = PostgresAuditLog(database)
         media_sources = PostgresMediaSourceService(database)
+        training: InMemoryTrainingRepository | PostgresTrainingRepository = (
+            PostgresTrainingRepository(database)
+        )
     else:
         algorithms = InMemoryAlgorithmRepository()
         build_jobs = InMemoryBuildJobRepository()
@@ -124,6 +137,7 @@ def build_container() -> ApplicationContainer:
         projects = InMemoryProjectService(auth.initial_admin_id)
         audit_log = InMemoryAuditLog()
         media_sources = InMemoryMediaSourceService()
+        training = InMemoryTrainingRepository()
     media_worker = MediaWorkerGateway(settings.media_worker_url)
     manager_token = (
         settings.manager_api_token.get_secret_value() if settings.manager_api_token else None
@@ -145,6 +159,12 @@ def build_container() -> ApplicationContainer:
             manager_api_token=manager_token,
         ),
         settings.task_worker_count,
+    )
+    # 与 Algorithm Manager 共用的数据目录里，节点自己使用 training/，主服务器使用 training-store/
+    training_storage = TrainingDatasetStorage(
+        settings.storage_root / "training-store",
+        settings.max_dataset_bytes,
+        settings.max_dataset_files,
     )
     if settings.queue_backend == "postgres":
         if database is None:
@@ -195,5 +215,11 @@ def build_container() -> ApplicationContainer:
         workflows=InMemoryWorkflowService(algorithms, database),
         operations=OperationsService(algorithms, tasks, instances, database),
         projects=projects,
+        training=training,
+        training_storage=training_storage,
+        training_orchestrator=TrainingOrchestrator(
+            training, training_storage, manager, settings.training_image
+        ),
+        coordinator_lock=LeaderLock(database, "cv-platform-coordinator"),
         database=database,
     )

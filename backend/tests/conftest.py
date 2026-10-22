@@ -53,6 +53,14 @@ class RecordingTaskQueue:
         return None
 
 
+class NeverLeader:
+    def held(self) -> bool:
+        return False
+
+    def release(self) -> None:
+        return None
+
+
 @pytest.fixture
 def client() -> TestClient:
     get_container.cache_clear()
@@ -60,6 +68,8 @@ def client() -> TestClient:
     container.task_queue.shutdown()
     container.build_queue.shutdown()
     object.__setattr__(container, "task_queue", RecordingTaskQueue())
+    # 测试里手动推进训练协调，后台循环不参与
+    object.__setattr__(container, "coordinator_lock", NeverLeader())
     with TestClient(create_app()) as test_client:
         login = test_client.post(
             "/api/v1/auth/login",

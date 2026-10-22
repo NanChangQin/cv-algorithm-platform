@@ -118,6 +118,13 @@ export function apiUrl(path: string): string {
   return `${apiBaseUrl}${path}`
 }
 
+/** 浏览器直接打开的链接（下载、图片）带不了请求头，用查询参数带上当前项目。 */
+export function projectUrl(path: string): string {
+  const projectId = projectContext.get()
+  if (!projectId) return apiUrl(path)
+  return apiUrl(`${path}${path.includes('?') ? '&' : '?'}project_id=${encodeURIComponent(projectId)}`)
+}
+
 export const apiBase = apiBaseUrl
 
 export const sessionToken = {

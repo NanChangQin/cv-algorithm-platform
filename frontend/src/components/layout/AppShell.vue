@@ -22,14 +22,16 @@ const navigation = [
   { label: '数据集评测', to: '/evaluations', icon: 'chart', group: '工作' },
   { label: '图片库', to: '/assets', icon: 'image', group: '资源' },
   { label: '算法库', to: '/algorithms', icon: 'layers', group: '资源' },
+  { label: '训练中心', to: '/training', icon: 'training', group: '模型', roles: ['admin', 'developer'] },
   { label: '项目成员', to: '/projects', icon: 'folder', group: '管理' },
   { label: '运行实例', to: '/instances', icon: 'server', group: '管理', roles: ['admin'] },
   { label: '高级编排', to: '/advanced', icon: 'workflow', group: '管理', roles: ['admin'] },
   { label: '用户角色', to: '/users', icon: 'users', group: '管理', roles: ['admin'] },
   { label: '系统管理', to: '/system', icon: 'settings', group: '管理', roles: ['admin'] },
 ]
-const groups = ['工作', '资源', '管理']
+const groups = ['工作', '资源', '模型', '管理']
 const visibleNavigation = computed(() => navigation.filter((item) => !item.roles || item.roles.includes(sessionRole.get() ?? 'user')))
+const visibleGroups = computed(() => groups.filter((group) => visibleNavigation.value.some((item) => item.group === group)))
 const currentPage = computed(() => {
   if (route.name === 'task-detail') return '任务详情'
   // /compare/<id> 等子路径归到对应的导航项；首页只做精确匹配
@@ -83,7 +85,7 @@ async function logout() {
       </div>
 
       <nav aria-label="主导航">
-        <div v-for="group in groups" :key="group" class="nav-group">
+        <div v-for="group in visibleGroups" :key="group" class="nav-group">
           <span class="nav-group-label">{{ group }}</span>
           <RouterLink
             v-for="item in visibleNavigation.filter((entry) => entry.group === group)"

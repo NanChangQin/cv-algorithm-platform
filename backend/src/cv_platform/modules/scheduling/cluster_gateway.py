@@ -7,6 +7,7 @@ from ...core.database import Database
 from ...core.errors import ApplicationError
 from ..instances.domain.models import RuntimeInstance, RuntimeRequest
 from ..instances.infrastructure.http_gateway import HttpAlgorithmManagerGateway
+from .node_client import NodeClient
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +298,17 @@ class ClusterAlgorithmManagerGateway:
         if not node.enabled:
             raise ApplicationError("RUNTIME_NODE_DISABLED", "所选运行服务器已停用", 409)
         return node
+
+    def node_client(self, node_id: str) -> NodeClient:
+        """训练、镜像检查等需要直接访问某个节点的操作。"""
+        node = self.validate_node(node_id)
+        return NodeClient(node.id, node.name, node.manager_url, self._api_token)
+
+    def node_clients(self) -> list[NodeClient]:
+        return [
+            NodeClient(node.id, node.name, node.manager_url, self._api_token)
+            for node in self._enabled_nodes()
+        ]
 
     def _gateway(self, node: RuntimeNode) -> HttpAlgorithmManagerGateway:
         return HttpAlgorithmManagerGateway(

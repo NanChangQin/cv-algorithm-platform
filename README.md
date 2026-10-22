@@ -11,6 +11,7 @@
 - [第二轮开发说明](docs/ROUND-2-DEVELOPMENT.md)
 - [第三至第五轮开发说明](docs/ROUND-3-TO-5-DEVELOPMENT.md)
 - [PRD 功能覆盖矩阵](docs/FEATURE-COVERAGE.md)
+- [训练中心](docs/TRAINING.md)
 - [本地服务器部署说明](docs/SERVER-DEPLOYMENT.md)
 
 ## 目录结构

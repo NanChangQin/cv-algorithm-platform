@@ -15,6 +15,7 @@ from .config import get_settings
 from .infrastructure.docker_runtime import DockerContainerRuntime
 from .infrastructure.image_builder import ControlledImageBuilder
 from .infrastructure.memory_repository import InMemoryInstanceRepository
+from .training import TrainingService, build_training_router
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,23 @@ def get_service() -> InstanceService:
         gpu_access_mode=settings.gpu_access_mode,
     )
     return InstanceService(InMemoryInstanceRepository(), runtime)
+
+
+@lru_cache
+def get_training() -> TrainingService:
+    import docker
+
+    settings = get_settings()
+    return TrainingService(
+        docker.from_env(),
+        settings.data_root,
+        settings.host_data_root,
+        gpu_access_mode=settings.gpu_access_mode,
+        network=settings.training_network,
+        shm_mb=settings.training_shm_mb,
+        max_dataset_bytes=settings.max_dataset_bytes,
+        max_dataset_files=settings.max_dataset_files,
+    )
 
 
 def create_app() -> FastAPI:
@@ -98,6 +116,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(build_router(get_service), prefix="/api/v1")
+    app.include_router(build_training_router(get_training), prefix="/api/v1")
 
     class BuildImageRequest(BaseModel):
         package_path: str
@@ -123,6 +142,29 @@ def create_app() -> FastAPI:
         except Exception as exc:
             raise ManagerError("BUILD_FAILED", "算法镜像构建失败", 502) from exc
         return {"image": payload.image, "digest": digest, "logs": logs}
+
+    @app.get("/api/v1/images/inspect", tags=["images"])
+    def inspect_image(image: str) -> dict[str, object]:
+        import docker
+        from docker.errors import ImageNotFound
+
+        try:
+            validate_algorithm_image(image)
+        except ValueError as exc:
+            raise ManagerError("INPUT_INVALID", str(exc)) from exc
+        try:
+            found = docker.from_env().images.get(image)
+        except ImageNotFound:
+            return {"image": image, "exists": False}
+        except Exception as exc:
+            raise ManagerError("DOCKER_UNAVAILABLE", "无法读取节点镜像列表", 502) from exc
+        return {
+            "image": image,
+            "exists": True,
+            "id": found.id,
+            "size": found.attrs.get("Size"),
+            "created": found.attrs.get("Created"),
+        }
 
     @app.delete("/api/v1/images", status_code=204, tags=["images"])
     def remove_image(image: str) -> Response:

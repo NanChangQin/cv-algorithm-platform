@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     api_token: SecretStr | None = None
     # 只允许运行这些前缀的算法镜像（平台构建与预置的算法镜像都以 cv-platform/ 开头）。
     allowed_image_prefixes: list[str] = Field(default_factory=lambda: ["cv-platform/"])
+    # 训练容器的网络：默认 none 完全断网，预训练权重已打包在训练镜像里
+    training_network: str = "none"
+    training_shm_mb: int = Field(default=2048, ge=64, le=65_536)
+    max_dataset_bytes: int = 20 * 1024**3
+    max_dataset_files: int = 500_000
 
 
 @lru_cache

@@ -38,6 +38,11 @@
   --code-bg: #182230;
   --code-text: #cbd3dd;
   --radius: 12px;
+  /* 图表系列色（固定顺序，浅色/深色分别校验过色盲区分度） */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
 }
 
 /* 深色：跟随系统（除非手动选了浅色），或手动选择深色 */
@@ -77,12 +82,20 @@
     --shadow-lg: 0 18px 48px rgb(0 0 0 / 55%);
     --code-bg: #0b0e13;
     --code-text: #cbd3dd;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
   --code-bg: #0b0e13;
   --code-text: #cbd3dd;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
   --bg: #0f1218;
   --surface: #171b23;
   --surface-2: #1c212b;
@@ -1351,4 +1364,104 @@ button.task-algorithm:hover strong { color: var(--accent); }
 .worst-sample span { position: absolute; right: 6px; bottom: 6px; padding: 2px 6px; border-radius: 6px; color: white; background: rgb(16 24 40 / 72%); font-size: 12px; font-variant-numeric: tabular-nums; }
 @media (max-width: 980px) {
   .evaluation-layout, .evaluation-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 训练中心 */
+.training-form h3 { margin: 22px 0 6px; color: var(--text-strong); font-size: 14px; }
+.training-form .field-label { margin: 8px 0; }
+.training-form .field-label input, .dataset-upload .field-label input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); }
+.training-form .field-label small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.training-form > .primary-button { margin-top: 10px; }
+.training-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; align-items: end; }
+.training-dataset-hint { margin: 8px 0; align-self: center; font-size: 13px; }
+.training-parameter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; cursor: pointer; }
+.checkbox-label input { accent-color: var(--accent); }
+.training-parameter-grid .checkbox-label { align-self: end; min-height: 44px; }
+.model-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.model-option { position: relative; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; }
+.model-option input { position: absolute; opacity: 0; pointer-events: none; }
+.model-option strong { color: var(--text-strong); font-size: 14px; }
+.model-option small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.model-option.selected { border-color: var(--accent); background: var(--accent-softer); box-shadow: inset 0 0 0 1px var(--accent); }
+.model-option:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.training-list, .dataset-list, .artifact-list { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.training-row { display: grid; grid-template-columns: minmax(0, 2fr) auto minmax(0, 1.4fr) 84px 72px; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.training-row:hover { border-color: var(--accent-line); }
+.training-row:hover .training-title strong { color: var(--accent); }
+.training-title { min-width: 0; }
+.training-title strong, .training-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.training-title strong { color: var(--text-strong); }
+.training-title small, .training-progress small, .training-time, .training-best small { color: var(--muted); font-size: 12px; }
+.training-progress { display: grid; gap: 4px; min-width: 0; }
+.training-progress progress, .training-status-panel progress { width: 100%; height: 6px; accent-color: var(--accent); }
+.training-progress small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.training-error { color: var(--danger) !important; }
+.training-best { display: grid; justify-items: end; }
+.training-best strong { color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.training-time { text-align: right; }
+.dataset-upload { display: grid; gap: 8px; margin-bottom: 14px; }
+.dataset-upload .field-label { margin: 0; }
+.dataset-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.dataset-list > li > div { min-width: 0; flex: 1; display: grid; gap: 4px; }
+.dataset-list strong { color: var(--text-strong); }
+.dataset-list small { color: var(--muted); font-size: 12px; }
+.class-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.class-chips span { padding: 1px 8px; border-radius: 999px; color: var(--text-2); background: var(--surface-3); font-size: 12px; }
+.class-chips .text-button { min-height: 0; padding: 1px 4px; font-size: 12px; }
+.class-chips b { color: var(--text-strong); font-weight: 600; font-variant-numeric: tabular-nums; }
+.build-notice ul { margin: 6px 0 0; padding-left: 18px; }
+.training-status-panel { display: grid; gap: 10px; }
+.training-progress-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.training-progress-line strong { color: var(--text-strong); }
+.stat-tiles { margin: 6px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.stat-tiles > div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.stat-tiles dt { color: var(--muted); font-size: 12px; }
+.stat-tiles dd { margin: 2px 0 0; color: var(--text-strong); font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat-tiles small { color: var(--muted); font-size: 12px; }
+.training-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.training-charts .chart-wide { grid-column: 1 / -1; }
+.training-chart { margin: 0; min-width: 0; }
+.training-chart figcaption { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 14px; margin-bottom: 6px; }
+.training-chart figcaption strong { color: var(--text-strong); font-size: 14px; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-2); font-size: 12px; }
+.chart-legend span, .chart-tooltip span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend i, .chart-tooltip i { width: 14px; height: 2px; border-radius: 1px; }
+.chart-canvas { position: relative; }
+.chart-canvas svg { display: block; overflow: visible; }
+.chart-grid line { stroke: var(--line); stroke-width: 1; }
+.chart-axis text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart-dot { stroke: var(--surface); stroke-width: 2; }
+.chart-crosshair { stroke: var(--line-strong); stroke-width: 1; }
+.chart-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--muted); font-size: 13px; pointer-events: none; }
+.chart-tooltip { position: absolute; top: 8px; z-index: 2; display: grid; gap: 3px; min-width: 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--text); background: var(--surface); box-shadow: var(--shadow-lg); font-size: 12px; pointer-events: none; }
+.chart-tooltip strong { color: var(--text-strong); }
+.chart-tooltip b { margin-left: auto; padding-left: 12px; color: var(--text-strong); font-weight: 600; font-variant-numeric: tabular-nums; }
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.data-table th, .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.data-table thead th { position: sticky; top: 0; color: var(--muted); background: var(--surface-2); font-size: 12px; font-weight: 600; }
+.data-table th:first-child, .data-table td:first-child { text-align: left; }
+.data-table tbody tr:last-child > * { border-bottom: 0; }
+.training-detail-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 18px; align-items: start; }
+.training-logs { height: 360px; margin: 0; padding: 12px; overflow: auto; border-radius: 8px; color: var(--code-text); background: var(--code-bg); font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre; }
+.definition-list { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 16px; font-size: 14px; }
+.definition-list dt { color: var(--muted); }
+.definition-list dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.training-detail-grid h3 { margin: 18px 0 8px; color: var(--text-strong); font-size: 14px; }
+.artifact-list li { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.artifact-list a { color: var(--accent); overflow-wrap: anywhere; }
+.artifact-list small { color: var(--muted); white-space: nowrap; }
+.training-figures { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.training-figures figure { margin: 0; }
+.training-figures img { width: 100%; aspect-ratio: 4 / 3; display: block; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.training-figures figcaption { margin-top: 6px; color: var(--text-2); font-size: 13px; }
+@media (max-width: 980px) {
+  .training-parameter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .training-detail-grid, .training-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .training-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .training-row .training-progress { grid-column: 1 / -1; }
+  .training-row .training-time { display: none; }
+  .stat-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

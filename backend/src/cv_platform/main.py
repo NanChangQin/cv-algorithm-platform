@@ -49,13 +49,26 @@ def create_app() -> FastAPI:
                 await asyncio.to_thread(container.operations.reconcile)
                 await asyncio.sleep(settings.autoscaling_reconcile_seconds)
 
-        scaling_task = asyncio.create_task(reconcile_autoscaling())
+        async def coordinate_background_work() -> None:
+            # 多个 Backend 进程时只有持有锁的一个负责推进训练
+            while True:
+                if container.coordinator_lock.held():
+                    await asyncio.to_thread(container.training_orchestrator.tick)
+                await asyncio.sleep(settings.coordinator_interval_seconds)
+
+        background_tasks = [
+            asyncio.create_task(reconcile_autoscaling()),
+            asyncio.create_task(coordinate_background_work()),
+        ]
         try:
             yield
         finally:
-            scaling_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await scaling_task
+            for task in background_tasks:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
+            container.training_orchestrator.shutdown()
+            container.coordinator_lock.release()
             container.task_queue.shutdown()
             container.build_queue.shutdown()
             if container.task_executor is not container.task_queue:
@@ -88,6 +101,8 @@ def create_app() -> FastAPI:
     rate_limited_paths = {
         f"{settings.api_prefix}/assets/upload",
         f"{settings.api_prefix}/algorithms/import",
+        f"{settings.api_prefix}/training/datasets",
+        f"{settings.api_prefix}/training/runs",
         f"{settings.api_prefix}/tasks",
         f"{settings.api_prefix}/comparisons",
         f"{settings.api_prefix}/evaluations/runs",
@@ -101,6 +116,7 @@ def create_app() -> FastAPI:
         f"{settings.api_prefix}/instances",
     )
     developer_prefixes = (
+        f"{settings.api_prefix}/training",
         f"{settings.api_prefix}/algorithms/import",
         f"{settings.api_prefix}/build-jobs",
         f"{settings.api_prefix}/deployment-manifests",
