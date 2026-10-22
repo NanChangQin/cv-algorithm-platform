@@ -24,6 +24,7 @@ const creating = ref(false)
 const name = ref('')
 const taskType = ref<EvaluationTaskType>('object_detection')
 const images = ref<ImageAsset[]>([])
+const assetNames = ref<Record<string, string>>({})
 const uploadProgress = ref<number | null>(null)
 const annotationFile = ref<File | null>(null)
 const saving = ref(false)
@@ -57,12 +58,18 @@ function startCreating() {
   created.value = null
   name.value = ''
   images.value = []
+  assetNames.value = {}
   annotationFile.value = null
 }
 async function handleImages(files: File[]) {
   uploadProgress.value = 0
   try {
-    const outcome = await uploadInBatches(files, { onProgress: (ratio) => { uploadProgress.value = ratio } })
+    const outcome = await uploadInBatches(files, {
+      onProgress: (ratio) => { uploadProgress.value = ratio },
+      onUploaded: (assets, sourceFiles) => {
+        assets.forEach((asset, index) => { assetNames.value[asset.id] = sourceFiles[index]!.name })
+      },
+    })
     const known = new Set(images.value.map((item) => item.id))
     images.value = [...images.value, ...outcome.uploaded.filter((item) => !known.has(item.id))]
     if (outcome.failed.length) toast.error(uploadFailureMessage(outcome.failed))
@@ -81,6 +88,7 @@ async function createDataset() {
       annotations_filename: annotationFile.value.name,
       annotations: await annotationFile.value.text(),
       asset_ids: images.value.map((item) => item.id),
+      asset_names: Object.fromEntries(images.value.map((item) => [item.id, assetNames.value[item.id] ?? item.original_name])),
     })
     toast.success(`已创建评测集，匹配 ${created.value.item_count} 张图片`)
     creating.value = false

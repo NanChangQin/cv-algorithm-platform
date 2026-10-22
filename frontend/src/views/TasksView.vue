@@ -64,6 +64,7 @@ function statusesFor(key: string): TaskStatus[] {
 }
 
 let version = 0
+let disposed = false
 async function load() {
   const current = ++version
   loading.value = true
@@ -78,8 +79,13 @@ async function load() {
       offset: (page.value - 1) * PAGE_SIZE,
     })
     if (current !== version) return
-    tasks.value = result.items
     total.value = result.total
+    const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE))
+    if (page.value > lastPage) {
+      page.value = lastPage
+      return
+    }
+    tasks.value = result.items
     void loadAssets(result.items)
   } catch (reason) {
     if (current === version) error.value = errorMessage(reason, '加载任务失败')
@@ -117,20 +123,30 @@ watch(openTaskId, (id) => {
 })
 
 // 只刷新当前页里还没结束的任务；状态变了再更新各状态的数量
+let polling = false
 const poller = window.setInterval(async () => {
+  if (polling || loading.value || disposed) return
   const active = tasks.value.filter((task) => !TERMINAL_STATUSES.includes(task.status)).map((task) => task.id)
   if (!active.length || document.hidden) return
+  const current = version
+  polling = true
   try {
     const updated = new Map((await tasksApi.byIds(active)).map((task) => [task.id, task]))
+    if (disposed || current !== version) return
     let changed = false
     tasks.value = tasks.value.map((task) => {
       const next = updated.get(task.id)
       if (next && next.status !== task.status) changed = true
       return next ?? task
     })
-    if (changed) void loadSummary()
+    if (changed) {
+      void loadSummary()
+      if (statusesFor(statusFilter.value).length || nodeFilter.value) void load()
+    }
   } catch {
     // 下一轮再试
+  } finally {
+    polling = false
   }
 }, 2500)
 
@@ -139,6 +155,8 @@ onMounted(async () => {
   try { nodes.value = (await systemApi.executionResources()).nodes } catch { /* 筛选仍可用任务记录的节点 ID */ }
 })
 onUnmounted(() => {
+  disposed = true
+  version++
   window.clearInterval(poller)
   window.clearTimeout(searchTimer)
 })
@@ -152,7 +170,10 @@ function clearFilters() {
 function patchTask(updated: InferenceTask) {
   const before = tasks.value.find((task) => task.id === updated.id)
   if (!before) return
-  if (before.status !== updated.status) void loadSummary()
+  if (before.status !== updated.status) {
+    void loadSummary()
+    if (statusesFor(statusFilter.value).length || nodeFilter.value) void load()
+  }
   tasks.value = tasks.value.map((task) => task.id === updated.id ? updated : task)
 }
 function openTask(id: string) {

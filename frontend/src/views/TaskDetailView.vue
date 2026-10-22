@@ -118,9 +118,9 @@ async function act(action: 'cancel' | 'retry') {
   <template v-else>
     <section class="detail-result">
       <ResultViewer
-        v-if="task.status === 'completed' && result && task.asset_id"
+        v-if="task.status === 'completed' && result"
         :result="result"
-        :image-url="assetsApi.contentUrl(task.asset_id)"
+        :image-url="task.asset_id ? assetsApi.contentUrl(task.asset_id) : ''"
       />
       <div v-else-if="task.status === 'completed'" class="empty-state">正在读取推理结果…</div>
       <div v-else class="viewer-pending">

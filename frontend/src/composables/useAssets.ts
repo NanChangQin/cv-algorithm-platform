@@ -14,7 +14,7 @@ export interface UploadOutcome { uploaded: ImageAsset[]; failed: UploadFailure[]
  */
 export async function uploadInBatches(
   files: File[],
-  options: { onProgress?: (ratio: number) => void; onUploaded?: (assets: ImageAsset[]) => void } = {},
+  options: { onProgress?: (ratio: number) => void; onUploaded?: (assets: ImageAsset[], files: File[]) => void } = {},
 ): Promise<UploadOutcome> {
   const outcome: UploadOutcome = { uploaded: [], failed: [] }
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0) || 1
@@ -26,7 +26,7 @@ export async function uploadInBatches(
     })
     finishedBytes += batchBytes
     outcome.uploaded.push(...response.assets)
-    options.onUploaded?.(response.assets)
+    options.onUploaded?.(response.assets, batch)
   }
   for (let start = 0; start < files.length; start += UPLOAD_BATCH_SIZE) {
     const batch = files.slice(start, start + UPLOAD_BATCH_SIZE)
