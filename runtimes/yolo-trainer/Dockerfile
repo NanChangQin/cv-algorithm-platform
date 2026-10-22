@@ -4,8 +4,10 @@ FROM pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 ARG ULTRALYTICS_VERSION=8.4.183
 # 国内网络可传入镜像源，例如 --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ARG PIP_INDEX_URL=https://pypi.org/simple
+# 基础镜像使用 Ubuntu 24.04 的系统 Python（PEP 668），容器内直接安装依赖
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PIP_BREAK_SYSTEM_PACKAGES=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \

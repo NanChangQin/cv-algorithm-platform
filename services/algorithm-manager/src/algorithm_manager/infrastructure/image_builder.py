@@ -62,6 +62,8 @@ class ControlledImageBuilder:
     def _dockerfile(base_image: str) -> str:
         return f"""FROM {base_image}
 WORKDIR /app
+# 新版 PyTorch 基础镜像使用系统 Python（PEP 668），允许在容器内直接 pip 安装
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 COPY . /app
 RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
 RUN pip install --no-cache-dir fastapi uvicorn pydantic PyYAML
