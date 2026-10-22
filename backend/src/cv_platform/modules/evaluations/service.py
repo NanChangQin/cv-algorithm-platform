@@ -54,12 +54,13 @@ class EvaluationService:
         annotations_filename: str,
         annotations: str,
         asset_ids: list[UUID],
+        asset_names: dict[UUID, str] | None = None,
     ) -> tuple[EvaluationDataset, list[str], list[str]]:
         assets = self._assets.query(AssetQuery(self._project_id, ids=tuple(asset_ids)))
         if not assets:
             raise ApplicationError("DATASET_EMPTY", "没有找到上传的图片", 400)
         items, unmatched, unlabeled = parse_annotations(
-            task_type, annotations_filename, annotations, assets
+            task_type, annotations_filename, annotations, assets, asset_names
         )
         if not items:
             raise ApplicationError(

@@ -44,7 +44,7 @@ export interface EvaluationReport {
 export const evaluationsApi = {
   datasets: () => request<EvaluationDataset[]>('/evaluations/datasets'),
   createDataset: (payload: {
-    name: string; task_type: EvaluationTaskType; annotations_filename: string; annotations: string; asset_ids: string[]
+    name: string; task_type: EvaluationTaskType; annotations_filename: string; annotations: string; asset_ids: string[]; asset_names?: Record<string, string>
   }) => request<CreatedDataset>('/evaluations/datasets', { method: 'POST', body: JSON.stringify(payload) }),
   deleteDataset: (id: string) => request<void>(`/evaluations/datasets/${id}`, { method: 'DELETE' }),
   runs: () => request<EvaluationRun[]>('/evaluations/runs'),

@@ -62,6 +62,7 @@ class CreateDatasetRequest(BaseModel):
     annotations_filename: str = Field(min_length=1, max_length=255)
     annotations: str = Field(min_length=1, max_length=20_000_000)
     asset_ids: list[UUID] = Field(min_length=1, max_length=5000)
+    asset_names: dict[UUID, str] = Field(default_factory=dict, max_length=5000)
 
 
 class StartRunRequest(BaseModel):
@@ -113,7 +114,7 @@ def create_dataset(
 ) -> DatasetCreatedResponse:
     dataset, unmatched, unlabeled = service.create_dataset(
         payload.name, payload.task_type.value, payload.annotations_filename,
-        payload.annotations, payload.asset_ids,
+        payload.annotations, payload.asset_ids, payload.asset_names,
     )
     return DatasetCreatedResponse(
         **DatasetResponse.of(dataset).model_dump(),

@@ -36,7 +36,12 @@ describe('dataset evaluation', () => {
   })
 
   it('uploads images, sends the annotation file and reports unmatched names', async () => {
-    calls.upload.mockResolvedValue({ uploaded: [{ id: 'img-1', original_name: 'a.png' }, { id: 'img-2', original_name: 'b.png' }], failed: [] })
+    calls.upload.mockImplementation(async (files, options) => {
+      // 内容去重后服务端保留首次上传时的名称；标注应匹配此次上传的文件名。
+      const uploaded = [{ id: 'img-1', original_name: 'old-a.png' }, { id: 'img-2', original_name: 'old-b.png' }]
+      options.onUploaded(uploaded, files)
+      return { uploaded, failed: [] }
+    })
     calls.createDataset.mockResolvedValue({ ...dataset, item_count: 1, unmatched_files: ['c.png'], unlabeled_images: ['b.png'] })
     const wrapper = mount(EvaluationsView, { global: { stubs } })
     await flushPromises()
@@ -55,6 +60,7 @@ describe('dataset evaluation', () => {
     expect(calls.createDataset).toHaveBeenCalledWith({
       name: '夜间行人', task_type: 'object_detection', annotations_filename: 'coco.json',
       annotations: '{"images": [], "annotations": []}', asset_ids: ['img-1', 'img-2'],
+      asset_names: { 'img-1': 'a.png', 'img-2': 'b.png' },
     })
     expect(wrapper.text()).toContain('c.png')
     expect(wrapper.text()).toContain('1 张图片没有标注')

@@ -35,14 +35,19 @@ def evaluate_result(result: AlgorithmResult, ground_truth: dict[str, Any]) -> di
         predicted = result.data.instances[0].keypoints if result.data.instances else []
         longest_side = max(result.input.width, result.input.height)
         threshold = float(ground_truth.get("threshold", 0.05)) * longest_side
-        expected_by_name = {str(item["name"]): item for item in expected}
-        correct = 0
-        compared = 0
+        predicted_by_name = {}
         for keypoint in predicted:
-            target = expected_by_name.get(keypoint.name)
-            if target is None:
+            if (
+                keypoint.name not in predicted_by_name
+                or keypoint.score > predicted_by_name[keypoint.name].score
+            ):
+                predicted_by_name[keypoint.name] = keypoint
+        correct = 0
+        compared = len(expected)
+        for target in expected:
+            keypoint = predicted_by_name.get(str(target["name"]))
+            if keypoint is None:
                 continue
-            compared += 1
             distance = math.hypot(keypoint.x - float(target["x"]), keypoint.y - float(target["y"]))
             correct += distance <= threshold
         return {
