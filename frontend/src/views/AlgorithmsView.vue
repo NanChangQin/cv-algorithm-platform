@@ -284,7 +284,7 @@ weights/</pre>
         <dl class="lineage-list">
           <div><dt>训练</dt><dd><RouterLink class="text-link" :to="`/training/${selected.lineage.training_run_id}`">{{ selected.lineage.training_name }}</RouterLink></dd></div>
           <div><dt>数据集</dt><dd>{{ selected.lineage.dataset_name ?? '已删除' }} · {{ selected.lineage.class_names.length }} 类</dd></div>
-          <div><dt>权重</dt><dd>{{ selected.lineage.base_model.replace('.pt', '') }} 微调 · {{ selected.lineage.checkpoint }}.pt<template v-if="selected.lineage.epoch">（第 {{ selected.lineage.epoch }}/{{ selected.lineage.epochs_trained }} 轮）</template></dd></div>
+          <div class="wide"><dt>权重</dt><dd>{{ selected.lineage.base_model.replace('.pt', '') }} 微调 · {{ selected.lineage.checkpoint }}.pt<template v-if="selected.lineage.epoch">（第 {{ selected.lineage.epoch }}/{{ selected.lineage.epochs_trained }} 轮）</template></dd></div>
           <div class="wide"><dt>训练参数</dt><dd>{{ selected.lineage.parameters.epochs }} 轮 · batch {{ selected.lineage.parameters.batch === -1 ? '自动' : selected.lineage.parameters.batch }} · 图片 {{ selected.lineage.parameters.imgsz }} · lr0 {{ selected.lineage.parameters.lr0 }}</dd></div>
           <div class="wide"><dt>验证集指标</dt><dd>mAP50-95 {{ formatMetric(selected.lineage.metrics.map50_95) }} · mAP50 {{ formatMetric(selected.lineage.metrics.map50) }} · 精确率 {{ formatMetric(selected.lineage.metrics.precision) }} · 召回率 {{ formatMetric(selected.lineage.metrics.recall) }}</dd></div>
         </dl>
