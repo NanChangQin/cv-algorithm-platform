@@ -24,6 +24,10 @@ from ..modules.comparisons.infrastructure.memory_repository import (
 from ..modules.comparisons.infrastructure.postgres_repository import (
     PostgresComparisonRepository,
 )
+from ..modules.evaluations.repository import (
+    InMemoryEvaluationRepository,
+    PostgresEvaluationRepository,
+)
 from ..modules.instances.application.service import RuntimeInstanceService
 from ..modules.media.postgres_service import PostgresMediaSourceService
 from ..modules.media.runs import MediaRunService
@@ -69,6 +73,7 @@ class ApplicationContainer:
     task_queue: TaskQueue
     task_executor: LocalTaskQueue
     comparisons: InMemoryComparisonRepository | PostgresComparisonRepository
+    evaluations: InMemoryEvaluationRepository | PostgresEvaluationRepository
     auth: LocalAuthService | PostgresAuthService
     audit_log: InMemoryAuditLog | PostgresAuditLog
     rate_limiter: SlidingWindowRateLimiter
@@ -101,6 +106,7 @@ def build_container() -> ApplicationContainer:
         assets = PostgresAssetRepository(database)
         tasks = PostgresTaskRepository(database)
         comparisons = PostgresComparisonRepository(database)
+        evaluations = PostgresEvaluationRepository(database)
         audit_log = PostgresAuditLog(database)
         media_sources = PostgresMediaSourceService(database)
     else:
@@ -109,6 +115,7 @@ def build_container() -> ApplicationContainer:
         assets = InMemoryAssetRepository()
         tasks = InMemoryTaskRepository()
         comparisons = InMemoryComparisonRepository()
+        evaluations = InMemoryEvaluationRepository()
         auth = LocalAuthService(
             settings.admin_username,
             settings.admin_password,
@@ -171,6 +178,7 @@ def build_container() -> ApplicationContainer:
         task_queue=task_queue,
         task_executor=task_executor,
         comparisons=comparisons,
+        evaluations=evaluations,
         auth=auth,
         audit_log=audit_log,
         rate_limiter=SlidingWindowRateLimiter(

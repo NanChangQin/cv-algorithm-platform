@@ -35,14 +35,19 @@ def evaluate_result(result: AlgorithmResult, ground_truth: dict[str, Any]) -> di
         predicted = result.data.instances[0].keypoints if result.data.instances else []
         longest_side = max(result.input.width, result.input.height)
         threshold = float(ground_truth.get("threshold", 0.05)) * longest_side
-        expected_by_name = {str(item["name"]): item for item in expected}
-        correct = 0
-        compared = 0
+        predicted_by_name = {}
         for keypoint in predicted:
-            target = expected_by_name.get(keypoint.name)
-            if target is None:
+            if (
+                keypoint.name not in predicted_by_name
+                or keypoint.score > predicted_by_name[keypoint.name].score
+            ):
+                predicted_by_name[keypoint.name] = keypoint
+        correct = 0
+        compared = len(expected)
+        for target in expected:
+            keypoint = predicted_by_name.get(str(target["name"]))
+            if keypoint is None:
                 continue
-            compared += 1
             distance = math.hypot(keypoint.x - float(target["x"]), keypoint.y - float(target["y"]))
             correct += distance <= threshold
         return {
@@ -120,3 +125,35 @@ def _edit_distance(left: str, right: str) -> int:
             current.append(min(current[-1] + 1, previous[right_index] + 1, substitution))
         previous = current
     return previous[-1]
+
+
+# 每类任务用来排序“最差样本”和在列表里突出显示的主指标
+PRIMARY_METRIC = {
+    "object_detection": "f1_iou50",
+    "classification": "top1_accuracy",
+    "segmentation": "label_f1",
+    "ocr": "character_accuracy",
+    "pose_estimation": "pck",
+}
+
+
+def summarize(task_type: str, samples: Sequence[dict[str, float]]) -> dict[str, float]:
+    """数据集层面的指标。检测按所有图片累计的 TP/FP/FN 计算（不是逐图平均），其余取逐图平均。"""
+    if not samples:
+        return {}
+    summary = aggregate_metrics(samples)
+    if task_type == "object_detection":
+        true_positive = sum(sample.get("true_positive", 0.0) for sample in samples)
+        false_positive = sum(sample.get("false_positive", 0.0) for sample in samples)
+        false_negative = sum(sample.get("false_negative", 0.0) for sample in samples)
+        precision = true_positive / max(1.0, true_positive + false_positive)
+        recall = true_positive / max(1.0, true_positive + false_negative)
+        summary.update(
+            precision_iou50=round(precision, 6),
+            recall_iou50=round(recall, 6),
+            f1_iou50=round(2 * precision * recall / max(1e-12, precision + recall), 6),
+            true_positive=true_positive,
+            false_positive=false_positive,
+            false_negative=false_negative,
+        )
+    return summary

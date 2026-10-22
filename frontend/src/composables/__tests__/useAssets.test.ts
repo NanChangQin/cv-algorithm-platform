@@ -6,7 +6,7 @@ const api = vi.hoisted(() => ({ list: vi.fn(), upload: vi.fn() }))
 vi.mock('@/api/assets', () => ({ assetsApi: api }))
 
 import { ApiError } from '@/api/http'
-import { useAssets } from '../useAssets'
+import { uploadInBatches, useAssets } from '../useAssets'
 
 function asset(name: string) {
   return { id: `id-${name}`, original_name: name, created_at: `2026-10-21T00:00:0${name.length % 10}Z` }
@@ -54,5 +54,18 @@ describe('chunked image upload', () => {
     const outcome = await state.upload([file('a.png'), file('b.png')])
     expect(api.upload).toHaveBeenCalledTimes(1)
     expect(outcome.failed).toHaveLength(2)
+  })
+
+  it('associates successful assets with source filenames after single-file retries', async () => {
+    api.upload.mockImplementation(async (files: File[]) => {
+      if (files.some((item) => item.name === 'bad.gif')) throw new ApiError('invalid', 400, 'INPUT_INVALID')
+      return { assets: files.map(() => asset('original.png')) }
+    })
+    const onUploaded = vi.fn()
+    const files = [file('renamed.png'), file('bad.gif'), file('another.png')]
+    await uploadInBatches(files, { onUploaded })
+    expect(onUploaded).toHaveBeenCalledTimes(2)
+    expect(onUploaded.mock.calls[0]![1]).toEqual([files[0]])
+    expect(onUploaded.mock.calls[1]![1]).toEqual([files[2]])
   })
 })

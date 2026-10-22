@@ -19,6 +19,7 @@ const navigation = [
   { label: '工作台', to: '/', icon: 'play', group: '工作' },
   { label: '任务中心', to: '/tasks', icon: 'tasks', group: '工作' },
   { label: '结果对比', to: '/compare', icon: 'compare', group: '工作' },
+  { label: '数据集评测', to: '/evaluations', icon: 'chart', group: '工作' },
   { label: '图片库', to: '/assets', icon: 'image', group: '资源' },
   { label: '算法库', to: '/algorithms', icon: 'layers', group: '资源' },
   { label: '项目成员', to: '/projects', icon: 'folder', group: '管理' },

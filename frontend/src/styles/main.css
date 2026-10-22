@@ -1317,3 +1317,41 @@ button.task-algorithm:hover strong { color: var(--accent); }
   .history-select { flex: 1 1 100%; max-width: none; }
   .filmstrip-actions { margin-left: 0; }
 }
+
+/* 数据集评测 */
+.evaluation-layout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.evaluation-form h3 { margin: 18px 0 8px; color: var(--text-strong); font-size: 14px; }
+.evaluation-form-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; }
+.evaluation-form .field-label input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); }
+.evaluation-form .primary-button { margin-top: 6px; }
+.annotation-example { margin: 8px 0 14px; padding: 10px 12px; overflow: auto; border-radius: 8px; color: var(--code-text); background: var(--code-bg); font: 12px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.evaluation-list { margin: 0; padding: 0; display: grid; gap: 8px; list-style: none; }
+.evaluation-list > li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.evaluation-list > li.selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.evaluation-list > li > div:first-child, .evaluation-list > li > a { min-width: 0; flex: 1; }
+.evaluation-list strong, .evaluation-list small { display: block; }
+.evaluation-list strong { color: var(--text-strong); }
+.evaluation-list small { color: var(--muted); font-size: 12px; }
+.evaluation-list a:hover strong { color: var(--accent); }
+.evaluation-run-form { flex: 1 1 100%; display: grid; gap: 8px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.evaluation-algorithm { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.evaluation-algorithm input { accent-color: var(--accent); }
+.evaluation-algorithm small { color: var(--muted); }
+.evaluation-progress { margin: 16px 0 0; }
+.evaluation-table { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.evaluation-table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.evaluation-table th, .evaluation-table td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.evaluation-table thead th { color: var(--muted); background: var(--surface-2); font-size: 12px; font-weight: 600; }
+.evaluation-table th:first-child { text-align: left; }
+.evaluation-table tbody th { color: var(--text-strong); font-weight: 600; }
+.evaluation-table tbody tr:last-child > * { border-bottom: 0; }
+.evaluation-table td.best { color: var(--success); font-weight: 700; }
+.evaluation-note { margin: 10px 0 0; font-size: 13px; }
+.worst-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.worst-sample { position: relative; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.worst-sample:hover { border-color: var(--accent); }
+.worst-sample img { width: 100%; height: 100px; display: block; object-fit: cover; }
+.worst-sample span { position: absolute; right: 6px; bottom: 6px; padding: 2px 6px; border-radius: 6px; color: white; background: rgb(16 24 40 / 72%); font-size: 12px; font-variant-numeric: tabular-nums; }
+@media (max-width: 980px) {
+  .evaluation-layout, .evaluation-form-grid { grid-template-columns: minmax(0, 1fr); }
+}
