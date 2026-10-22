@@ -376,3 +376,21 @@ def test_coordinator_requeues_preparation_interrupted_by_a_restart(
     orchestrator.tick()
     orchestrator.shutdown(wait=True)
     assert get_run(client, run["id"])["status"] == "running"
+
+
+def test_a_start_that_fails_midway_does_not_leave_training_on_the_node(
+    client: TestClient, node
+) -> None:
+    dataset = upload_dataset(client, ultralytics_layout())
+    run = create_run(client, dataset["id"])
+    original = node.request
+
+    def timeout_on_start(method, path, **kwargs):
+        if method == "POST" and path == "/trainings":
+            raise ApplicationError("RUNTIME_NODE_UNAVAILABLE", "无法连接服务器：测试服务器", 503)
+        return original(method, path, **kwargs)
+
+    node.request = timeout_on_start
+    get_container().training_orchestrator.prepare(UUID(run["id"]))
+    assert get_run(client, run["id"])["status"] == "failed"
+    assert node.deleted == [f"/trainings/{run['id']}"]

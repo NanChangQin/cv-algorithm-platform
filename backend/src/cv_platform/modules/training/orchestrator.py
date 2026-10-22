@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import ExitStack
+from contextlib import ExitStack, suppress
 from datetime import UTC, datetime
 from threading import Lock
 from typing import Any
@@ -111,6 +111,8 @@ class TrainingOrchestrator:
         ):
             return
         run = self._repository.get_run(run_id)
+        client: NodeClient | None = None
+        start_sent = False
         try:
             client = self._cluster.node_client(run.node_id)
             self._check_gpus(client, run)
@@ -126,6 +128,7 @@ class TrainingOrchestrator:
             if self._finish_unstarted(run_id):
                 return
             self._stage(run_id, "启动训练容器")
+            start_sent = True
             client.request(
                 "POST",
                 "/trainings",
@@ -148,9 +151,18 @@ class TrainingOrchestrator:
             )
         except ApplicationError as exc:
             self._fail(run_id, exc.message)
+            self._discard_started(client, run_id, start_sent)
         except Exception:
             logger.exception("training preparation failed", extra={"training_id": str(run_id)})
             self._fail(run_id, "训练准备失败，请查看平台日志")
+            self._discard_started(client, run_id, start_sent)
+
+    @staticmethod
+    def _discard_started(client: NodeClient | None, run_id: UUID, start_sent: bool) -> None:
+        """启动请求超时等情况下容器可能已在节点上运行，标记失败后不能让它继续占用 GPU。"""
+        if client is not None and start_sent:
+            with suppress(ApplicationError):
+                client.request("DELETE", f"/trainings/{run_id}", timeout=60)
 
     def _check_gpus(self, client: NodeClient, run: TrainingRun) -> None:
         available = {str(gpu["index"]) for gpu in client.gpus()}
