@@ -34,6 +34,8 @@ def test_remote_input_is_readable_and_removed(monkeypatch, tmp_path, timeout):
         assert json["parameters"] == {"confidence": 0.3}
         local = tmp_path / json["input"]["asset_uri"].removeprefix("file:///data/")
         assert local.read_bytes() == b"image-content"
+        # 推理框架按扩展名识别图片
+        assert local.suffix == ".png"
         assert local.stat().st_mode & 0o444 == 0o444
         if test_timeout:
             raise httpx.ReadTimeout("timeout")
@@ -48,6 +50,6 @@ def test_remote_input_is_readable_and_removed(monkeypatch, tmp_path, timeout):
     client = TestClient(app)
     response = client.post("/instances/container-1/predict", data={
         "request_id": "request-1", "parameters": json.dumps({"confidence": 0.3}),
-    }, files={"file": ("image.jpg", b"image-content")})
+    }, files={"file": ("3f2a.png", b"image-content")})
     assert response.status_code == (504 if timeout else 200)
     assert list((tmp_path / "remote-inputs").iterdir()) == []

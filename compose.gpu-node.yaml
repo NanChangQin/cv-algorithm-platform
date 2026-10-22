@@ -20,6 +20,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${CV_NODE_ROOT:-/srv/cv-platform-node}/data:/data
       - ${CV_NODE_ROOT:-/srv/cv-platform-node}/packages:/packages
+      - ${CV_NODE_ROOT:-/srv/cv-platform-node}/models:/models
     networks:
       - default
       - algorithm-runtime

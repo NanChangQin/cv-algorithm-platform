@@ -18,6 +18,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ${CV_PLATFORM_PACKAGE_ROOT:-/srv/cv-platform/packages}:/packages
       - ${CV_PLATFORM_DATA_ROOT:-/srv/cv-platform/data}:/data
+      # 部署时在节点之间传输权重
+      - ${CV_PLATFORM_MODEL_ROOT:-/srv/cv-platform/models}:/models
     networks:
       - default
       - algorithm-runtime

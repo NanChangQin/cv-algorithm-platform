@@ -243,6 +243,7 @@ weights/</pre>
       <div class="runtime-actions">
         <RouterLink v-if="selected.status === 'available'" class="primary-button compact-button" :to="{ path: '/', query: { algorithm: selected.id } }">使用此算法 →</RouterLink>
         <RouterLink v-if="selected.status === 'available' && availableAlgorithms.length > 1" class="secondary-button" :to="{ path: '/compare', query: { algorithms: selected.id } }">与其他算法对比</RouterLink>
+        <RouterLink v-if="canBuild && selected.status === 'available'" class="secondary-button" :to="{ path: '/deployments', query: { algorithm: selected.id } }">部署到服务器</RouterLink>
         <button v-if="canBuild && ['uploaded', 'failed'].includes(selected.status)" class="primary-button compact-button" :disabled="acting" @click="buildAlgorithm">{{ selected.status === 'failed' ? '重新构建' : '构建并发布' }}</button>
         <button v-if="isAdmin && ['available', 'disabled'].includes(selected.status)" class="secondary-button" :disabled="acting" @click="toggleEnabled">{{ selected.status === 'disabled' ? '启用版本' : '停用版本' }}</button>
         <button v-if="isAdmin && siblings.length && ['available', 'disabled'].includes(selected.status)" class="secondary-button" :disabled="acting" @click="rollbackVersion">回滚到此版本</button>

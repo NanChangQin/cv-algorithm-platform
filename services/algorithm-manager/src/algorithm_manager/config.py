@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     host_data_root: Path = Path("/srv/cv-platform/data")
     host_model_root: Path = Path("/srv/cv-platform/models")
     package_root: Path = Path("/packages")
+    # 本节点模型权重目录在 Manager 容器内的挂载点（与 host_model_root 是同一个目录）
+    model_root: Path = Path("/models")
+    max_transfer_bytes: int = 64 * 1024**3
     build_network: str = "bridge"
     health_timeout_seconds: float = 60
     idle_timeout_seconds: int = 1800

@@ -21,6 +21,7 @@ export const router = createRouter({
     { path: '/evaluations/:id', name: 'evaluation-report', component: () => import('@/views/EvaluationReportView.vue') },
     { path: '/training', name: 'training', component: () => import('@/views/TrainingView.vue'), meta: { roles: ['admin', 'developer'] } },
     { path: '/training/:id', name: 'training-run', component: () => import('@/views/TrainingRunView.vue'), meta: { roles: ['admin', 'developer'] } },
+    { path: '/deployments', name: 'deployments', component: () => import('@/views/DeploymentsView.vue'), meta: { roles: ['admin', 'developer'] } },
     { path: '/system', name: 'system', component: () => import('@/views/SystemView.vue'), meta: { roles: ['admin'] } },
     { path: '/advanced', name: 'advanced', component: () => import('@/views/AdvancedView.vue'), meta: { roles: ['admin'] } },
     { path: '/projects', name: 'projects', component: () => import('@/views/ProjectsView.vue') },

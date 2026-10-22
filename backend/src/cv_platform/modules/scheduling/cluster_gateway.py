@@ -302,11 +302,11 @@ class ClusterAlgorithmManagerGateway:
     def node_client(self, node_id: str) -> NodeClient:
         """训练、镜像检查等需要直接访问某个节点的操作。"""
         node = self.validate_node(node_id)
-        return NodeClient(node.id, node.name, node.manager_url, self._api_token)
+        return NodeClient(node.id, display_name(node), node.manager_url, self._api_token)
 
     def node_clients(self) -> list[NodeClient]:
         return [
-            NodeClient(node.id, node.name, node.manager_url, self._api_token)
+            NodeClient(node.id, display_name(node), node.manager_url, self._api_token)
             for node in self._enabled_nodes()
         ]
 
@@ -327,6 +327,11 @@ class ClusterAlgorithmManagerGateway:
         if node is None:
             raise ApplicationError("INSTANCE_NOT_FOUND", "算法实例不存在", 404)
         return self._gateway(node)
+
+
+def display_name(node: RuntimeNode) -> str:
+    """提示信息里的服务器名称，与前端一致：本机节点叫“主服务器”。"""
+    return "主服务器" if node.id == "local" else node.name
 
 
 def free_memory_score(free_memory_mb: int, assigned: int, replica_memory_mb: int) -> int:
