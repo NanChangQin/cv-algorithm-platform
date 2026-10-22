@@ -1368,16 +1368,16 @@ button.task-algorithm:hover strong { color: var(--accent); }
 
 /* 训练中心 */
 .training-form h3 { margin: 22px 0 6px; color: var(--text-strong); font-size: 14px; }
-.training-form .field-label { margin: 8px 0; }
+.training-form .field-label { margin: 8px 0; align-content: start; }
 .training-form .field-label input, .dataset-upload .field-label input { width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); background: var(--surface); }
 .training-form .field-label small { color: var(--muted); font-size: 12px; font-weight: 400; }
 .training-form > .primary-button { margin-top: 10px; }
-.training-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; align-items: end; }
+.training-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; align-items: start; }
 .training-dataset-hint { margin: 8px 0; align-self: center; font-size: 13px; }
-.training-parameter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; }
+.training-parameter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; align-items: start; }
 .checkbox-label { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 14px; cursor: pointer; }
 .checkbox-label input { accent-color: var(--accent); }
-.training-parameter-grid .checkbox-label { align-self: end; min-height: 44px; }
+.training-parameter-grid .checkbox-label { align-self: start; min-height: 44px; margin-top: 38px; }
 .model-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
 .model-option { position: relative; display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; }
 .model-option input { position: absolute; opacity: 0; pointer-events: none; }

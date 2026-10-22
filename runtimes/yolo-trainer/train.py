@@ -69,7 +69,8 @@ def train(config: dict) -> None:
     def report(trainer, phase: str, **extra) -> None:
         write_json(WORKSPACE / "progress.json", {
             "phase": phase,
-            "epoch": trainer.epoch + 1,
+            # 训练结束后的最终验证也会触发回调，此时 epoch 已等于总轮数
+            "epoch": min(trainer.epoch + 1, trainer.epochs),
             "epochs": trainer.epochs,
             "started_at": started_at,
             "updated_at": time.time(),

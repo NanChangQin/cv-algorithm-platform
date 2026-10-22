@@ -37,6 +37,8 @@ IDENTIFIER = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 # 训练产物里可以下载的文件类型
 ARTIFACT_SUFFIXES = {".pt", ".csv", ".yaml", ".png", ".jpg"}
 ALGORITHM_UID = 10001
+# 进度条输出的终端控制序列（清行、颜色等），网页里显示为乱码
+ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
 
 class TrainingParameters(BaseModel):
@@ -289,7 +291,7 @@ class TrainingService:
         lines = raw.decode("utf-8", "replace").split("\n")
         if lines and not lines[-1]:
             lines.pop()
-        return [line.rstrip("\r").rsplit("\r", 1)[-1] for line in lines]
+        return [ANSI.sub("", line.rstrip("\r").rsplit("\r", 1)[-1]) for line in lines]
 
     def stop(self, training_id: str) -> dict[str, object]:
         container = self._container(training_id)

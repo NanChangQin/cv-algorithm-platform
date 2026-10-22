@@ -51,7 +51,7 @@ const metricSeries = computed<ChartSeries[]>(() => [
   ['metrics/recall(B)', '召回率'],
 ].map(([key, label], index) => ({ label: label!, slot: index + 1, points: points(key!) })))
 
-const lossLabels: Record<string, string> = { box: '定位损失 box', cls: '分类损失 cls', dfl: '分布损失 dfl' }
+const lossLabels: Record<string, string> = { box: '定位损失 box', cls: '分类损失 cls', dfl: '分布损失 dfl', l1: '回归损失 l1' }
 const lossCharts = computed(() => {
   const kinds = new Set<string>()
   for (const row of rows.value) {
@@ -60,7 +60,7 @@ const lossCharts = computed(() => {
       if (match) kinds.add(match[1]!)
     }
   }
-  const order = ['box', 'cls', 'dfl']
+  const order = ['box', 'cls', 'dfl', 'l1']
   return [...kinds].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99)).map((kind) => ({
     title: lossLabels[kind] ?? `${kind} 损失`,
     series: [
@@ -75,13 +75,14 @@ const tableColumns = computed(() => {
   keys.delete('epoch')
   return ['epoch', ...[...keys].filter((key) => !key.startsWith('lr/'))]
 })
-const images = computed(() => Object.keys(run.value?.artifacts ?? {}).filter((name) => /\.(png|jpe?g)$/i.test(name)))
-const files = computed(() => Object.entries(run.value?.artifacts ?? {}).filter(([name]) => !images.value.includes(name)))
 const imageTitles: Record<string, string> = {
   'results.png': '训练曲线总览', 'confusion_matrix_normalized.png': '归一化混淆矩阵', 'confusion_matrix.png': '混淆矩阵',
   'BoxPR_curve.png': 'PR 曲线', 'BoxF1_curve.png': 'F1 曲线', 'BoxP_curve.png': '精确率曲线', 'BoxR_curve.png': '召回率曲线',
   'labels.jpg': '标注分布', 'val_batch0_pred.jpg': '验证集预测样例', 'val_batch0_labels.jpg': '验证集标注样例',
 }
+// 只展示认识的评估图表；训练批次样例等其余图片放在下载列表里
+const images = computed(() => Object.keys(run.value?.artifacts ?? {}).filter((name) => name in imageTitles))
+const files = computed(() => Object.entries(run.value?.artifacts ?? {}).filter(([name]) => !images.value.includes(name)))
 const orderedImages = computed(() => {
   const order = Object.keys(imageTitles)
   return [...images.value].sort((a, b) => (order.indexOf(a) + 1 || 99) - (order.indexOf(b) + 1 || 99))

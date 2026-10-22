@@ -262,7 +262,9 @@ def test_crash_and_stop_are_told_apart(client, docker, tmp_path):
 def test_logs_keep_the_last_progress_refresh(client, docker):
     upload(client, dataset_zip())
     client.post("/trainings", json=start_payload())
-    docker.containers.items[0].log_bytes = b"start\n  1/3 10%\r  1/3 50%\r  1/3 100%\ndone\n"
+    docker.containers.items[0].log_bytes = (
+        b"start\n  1/3 10%\r  1/3 50%\r\x1b[K  1/3 100%\n\x1b[34mdone\x1b[0m\n"
+    )
     assert client.get(f"/trainings/{RUN_ID}/logs").json() == ["start", "  1/3 100%", "done"]
 
 
