@@ -44,8 +44,10 @@ function add(assets: ImageAsset[]) {
   const known = new Set([...pinned.value, ...items.value].map((asset) => asset.id))
   const added = assets.filter((asset) => !known.has(asset.id))
   pinned.value = [...added, ...pinned.value]
-  total.value += added.length
-  query.value = ''
+  // 去重上传可能返回库中已有的图片，不能把所有不在当前页的图都当作新增。
+  // 重新读取第一页，既校准总数，也避免新图片插入后下一页 offset 错位。
+  if (query.value) query.value = ''
+  else void library.refresh()
 }
 defineExpose({ add })
 </script>

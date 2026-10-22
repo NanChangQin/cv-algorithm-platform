@@ -118,6 +118,37 @@ describe('AssetPicker', () => {
     expect(names(wrapper).slice(0, 3)).toEqual(['upload.png', 'frame_027.jpg', 'frame_000.jpg'])
     expect(wrapper.find('.asset-option.selected').text()).toContain('upload.png')
   })
+
+  it('does not count a deduplicated upload from a later page as a new image', async () => {
+    const wrapper = mount(AssetPicker, { props: { modelValue: null } })
+    await flushPromises()
+    wrapper.vm.add([library[27]!])
+    await wrapper.setProps({ modelValue: library[27]! })
+    await flushPromises()
+    expect(wrapper.find('.asset-picker-more').text()).toBe('显示更多（还有 5 张）')
+    expect(api.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }))
+  })
+
+  it('refreshes the first page after an upload so the next server offset is correct', async () => {
+    const serverLibrary = [...library]
+    api.page.mockImplementation(async ({ limit, offset = 0 }) => ({
+      items: serverLibrary.slice(offset, offset + limit), total: serverLibrary.length,
+    }))
+    const wrapper = mount(AssetPicker, { props: { modelValue: null } })
+    await flushPromises()
+    const uploaded = asset(100, 'upload.png')
+    serverLibrary.unshift(uploaded)
+    wrapper.vm.add([uploaded])
+    await wrapper.setProps({ modelValue: uploaded })
+    await flushPromises()
+    expect(api.page).toHaveBeenCalledTimes(2)
+    expect(names(wrapper)).toHaveLength(24)
+    expect(wrapper.find('.asset-picker-more').text()).toBe('显示更多（还有 7 张）')
+    await wrapper.find('.asset-picker-more').trigger('click')
+    await flushPromises()
+    expect(names(wrapper)).toHaveLength(31)
+    expect(wrapper.find('.asset-picker-more').exists()).toBe(false)
+  })
 })
 
 describe('UploadDropzone', () => {
