@@ -15,6 +15,7 @@ from .core.errors import install_exception_handlers
 from .core.metrics import METRICS
 from .core.seed import seed_demo_data
 from .dependencies import get_container
+from .modules.algorithms.application.manifest_order import restore_manifest_order
 from .modules.tasks.domain.repositories import TaskQuery
 
 
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
         container.media_runs.recover_incomplete()
         container.workflows.recover_incomplete()
         seed_demo_data(container)
+        restore_manifest_order(container.algorithms)
         async def reconcile_autoscaling() -> None:
             while True:
                 await asyncio.to_thread(container.operations.reconcile)
