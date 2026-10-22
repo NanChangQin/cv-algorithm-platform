@@ -1,30 +1,26 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import ClassificationRenderer from './ClassificationRenderer.vue'
 import DetectionCanvas from './DetectionCanvas.vue'
 import OcrRenderer from './OcrRenderer.vue'
 import PoseRenderer from './PoseRenderer.vue'
 import SegmentationRenderer from './SegmentationRenderer.vue'
+import { useFitHeight } from '@/composables/useFitHeight'
 import type { AlgorithmResult, Detection } from '@/types/task'
 import { formatMs } from '@/utils/presentation'
 
 const props = withDefaults(defineProps<{
   result: AlgorithmResult
   imageUrl: string
-  /** 工作台、抽屉：图片按窗口高度缩放，整张留在一屏内 */
+  /** 工作台、抽屉：图片按剩余高度缩放，整张留在一屏内 */
   compact?: boolean
-  /** compact 时画布上方和下方其他内容大约占的高度（像素） */
-  fitOffset?: number
-}>(), { compact: false, fitOffset: 340 })
+}>(), { compact: false })
 
 const confidence = ref(0)
-const viewportHeight = ref(window.innerHeight)
-/** 工作台、抽屉里让整张图留在一屏内 */
-const canvasMaxHeight = computed(() => props.compact ? Math.max(280, viewportHeight.value - props.fitOffset) : undefined)
-function onResize() { viewportHeight.value = window.innerHeight }
-onMounted(() => window.addEventListener('resize', onResize))
-onUnmounted(() => window.removeEventListener('resize', onResize))
+const root = ref<HTMLElement | null>(null)
+const fit = useFitHeight(() => root.value?.querySelector<HTMLElement>('.canvas-stage canvas, .mask-stage img'), root)
+const canvasMaxHeight = computed(() => (props.compact ? fit.height.value : undefined))
 const showAnnotations = ref(true)
 const hiddenLabels = ref<string[]>([])
 const highlighted = ref<Detection | null>(null)
@@ -73,7 +69,7 @@ function boxSize(detection: Detection) {
 </script>
 
 <template>
-  <section class="result-viewer" :class="{ compact }" :style="canvasMaxHeight ? { '--result-max-height': `${canvasMaxHeight}px` } : undefined">
+  <section ref="root" class="result-viewer" :class="{ compact }" :style="canvasMaxHeight ? { '--result-max-height': `${canvasMaxHeight}px` } : undefined">
     <div class="result-toolbar">
       <label class="confidence-control">
         <span>最低置信度</span>

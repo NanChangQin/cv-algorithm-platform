@@ -1155,7 +1155,7 @@ kbd { margin: 0 2px; padding: 1px 5px; border: 1px solid var(--line-strong); bor
 .viewer-empty strong { color: var(--text-strong); }
 .viewer-empty p { margin: 0; }
 .viewer-preview, .viewer-pending { position: relative; display: grid; justify-items: center; gap: 12px; }
-.viewer-preview img, .viewer-pending img { max-width: 100%; max-height: max(260px, calc(100vh - 380px)); border-radius: 8px; background: var(--surface-3); object-fit: contain; }
+.viewer-preview img, .viewer-pending img { max-width: 100%; max-height: max(260px, calc(100vh - 410px)); border-radius: 8px; background: var(--surface-3); object-fit: contain; }
 .viewer-pending img { opacity: .45; filter: grayscale(.4); }
 .viewer-pending .task-progress-panel, .viewer-pending .task-failure { width: min(560px, 100%); margin: 0; }
 .viewer-hint { margin: 0; color: var(--muted); font-size: 14px; text-align: center; }

@@ -123,6 +123,8 @@ watch(
   () => { void render() },
   { deep: true },
 )
+// 可用高度变了（窗口变高变矮、上方内容换行）就重新适应，除非用户手动缩放过
+watch(() => props.maxHeight, () => { if (autoFit.value) fitToStage() })
 
 onMounted(() => {
   fitToStage()
