@@ -8,7 +8,6 @@ function withProject(path: string) {
 }
 
 export const assetsApi = {
-  list: () => request<ImageAsset[]>('/assets'),
   /** 服务端分页，可按文件名搜索。 */
   page: (params: { q?: string; limit: number; offset?: number; sort?: 'newest' | 'name' }) =>
     requestPage<ImageAsset>(`/assets${queryString(params)}`),
