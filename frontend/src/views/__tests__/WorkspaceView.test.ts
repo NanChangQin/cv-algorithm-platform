@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const calls = vi.hoisted(() => ({
   create: vi.fn(), resources: vi.fn(), getTask: vi.fn(), result: vi.fn(), page: vi.fn(), byIds: vi.fn(),
   query: {} as Record<string, string>, parameters: {} as Record<string, unknown>,
+  libraryItems: null as null | { value: Array<{ id: string; original_name: string; width: number; height: number }> },
 }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: calls.query }) }))
 vi.mock('@/api/tasks', () => ({ tasksApi: {
@@ -16,14 +17,18 @@ vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
   const algorithms = ref([{ id: 'algorithm-1', name: 'Detector', device: 'gpu', parameters: calls.parameters, status: 'available' }])
   return { algorithms, availableAlgorithms: algorithms, loading: ref(false), error: ref('') }
 } }))
-vi.mock('@/composables/useAssetPages', () => ({ useAssetPages: () => ({
-  items: ref([
+vi.mock('@/composables/useAssetPages', () => ({ useAssetPages: () => {
+  const items = ref([
     { id: 'asset-1', original_name: 'image.jpg', width: 10, height: 10 },
     { id: 'asset-2', original_name: 'second.jpg', width: 10, height: 10 },
-  ]),
-  total: ref(2), query: ref(''), loading: ref(false), error: ref(''), hasMore: ref(false),
-  refresh: vi.fn(), loadMore: vi.fn(), prepend: vi.fn(), remove: vi.fn(),
-}) }))
+  ])
+  calls.libraryItems = items
+  return {
+    items,
+    total: ref(2), query: ref(''), loading: ref(false), error: ref(''), hasMore: ref(false),
+    refresh: vi.fn(), loadMore: vi.fn(), prepend: vi.fn(), remove: vi.fn(),
+  }
+} }))
 
 import { ApiError } from '@/api/http'
 import ResultViewer from '@/components/results/ResultViewer.vue'
@@ -60,6 +65,19 @@ describe('workbench', () => {
     expect(calls.create).toHaveBeenCalledWith({ algorithm_version_id: 'algorithm-1', asset_id: 'asset-1', parameters: {}, node_id: 'dell', gpu_device_ids: ['0'] })
     expect(calls.getTask).toHaveBeenCalledWith('task-1')
     expect(wrapper.text()).toContain('image.jpg')
+  })
+
+  it('keeps the selected input runnable when a search replaces the visible image page', async () => {
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('image.jpg')
+    calls.libraryItems!.value = [{ id: 'asset-2', original_name: 'second.jpg', width: 10, height: 10 }]
+    await flushPromises()
+    expect(wrapper.text()).toContain('image.jpg')
+    expect(wrapper.find('button.run-button').attributes('disabled')).toBeUndefined()
+    await wrapper.find('button.run-button').trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ asset_id: 'asset-1' }))
+    wrapper.unmount()
   })
 
   it('clears a card when switching back to automatic scheduling', async () => {

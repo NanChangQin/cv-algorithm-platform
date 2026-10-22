@@ -79,6 +79,60 @@ describe('task center', () => {
     wrapper.unmount()
   })
 
+  it('removes finished tasks from the active tab and reloads the filtered total', async () => {
+    vi.useFakeTimers()
+    calls.page.mockResolvedValue({ items: [tasks[1]], total: 1 })
+    calls.byIds.mockResolvedValue([{ ...tasks[1], status: 'completed' }])
+    const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    await wrapper.findAll('.status-tabs button')[1]!.trigger('click')
+    await flushPromises()
+    calls.page.mockResolvedValue({ items: [], total: 0 })
+    await vi.advanceTimersByTimeAsync(2500)
+    await flushPromises()
+    expect(calls.page).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: ['queued', 'preparing', 'starting', 'running'],
+    }))
+    expect(wrapper.findComponent(TaskTable).exists()).toBe(false)
+    expect(wrapper.find('.toolbar').text()).toContain('0 个任务')
+    wrapper.unmount()
+  })
+
+  it('returns to the preceding page when cancelling the last matching task', async () => {
+    calls.page.mockResolvedValue({ items: [tasks[1]], total: 21 })
+    const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    await wrapper.findAll('.status-tabs button')[1]!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('.pagination button')[1]!.trigger('click')
+    await flushPromises()
+    expect(calls.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 20 }))
+    wrapper.findComponent(TaskTable).vm.$emit('open', 'task-2')
+    await flushPromises()
+    calls.page.mockResolvedValue({ items: [tasks[1]], total: 20 })
+    wrapper.findComponent(TaskDrawer).vm.$emit('updated', { ...tasks[1], status: 'cancelled' })
+    await flushPromises()
+    expect(calls.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }))
+    expect(wrapper.find('.toolbar').text()).toContain('20 个任务')
+    wrapper.unmount()
+  })
+
+  it('does not overwrite a refreshed page with an older polling response', async () => {
+    vi.useFakeTimers()
+    let finishPoll!: (value: unknown[]) => void
+    calls.byIds.mockReturnValue(new Promise((resolve) => { finishPoll = resolve }))
+    const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(2500)
+    calls.page.mockResolvedValue({ items: [{ ...tasks[1], status: 'completed' }], total: 1 })
+    await wrapper.findAll('button').find((button) => button.text() === '刷新')!.trigger('click')
+    await flushPromises()
+    finishPoll([{ ...tasks[1], status: 'running' }])
+    await flushPromises()
+    expect(wrapper.findComponent(TaskTable).props('tasks')[0].status).toBe('completed')
+    wrapper.unmount()
+  })
+
   it('reports archive failures and preserves the selected results', async () => {
     calls.archive.mockRejectedValue(new Error('下载服务暂不可用'))
     const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
