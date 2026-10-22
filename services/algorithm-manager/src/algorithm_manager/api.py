@@ -16,6 +16,7 @@ from .domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 IMAGE_REFERENCE = re.compile(
     r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)*(?::[A-Za-z0-9_][A-Za-z0-9_.-]{0,127})?$"
 )
+IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 # 平台自身的服务镜像同样以 cv-platform/ 开头，但不能当作算法容器启动。
 PLATFORM_SERVICE_IMAGES = {
     "cv-platform/algorithm-manager",
@@ -162,7 +163,10 @@ def build_router(get_service: object) -> APIRouter:
         input_root.chmod(0o755)
         input_path: Path | None = None
         try:
-            with NamedTemporaryFile(dir=input_root, suffix=".input", delete=False) as target:
+            # 保留图片扩展名：Ultralytics 等按扩展名判断输入类型，不认识的后缀会直接报错
+            suffix = Path(file.filename or "").suffix.lower()
+            suffix = suffix if suffix in IMAGE_SUFFIXES else ".jpg"
+            with NamedTemporaryFile(dir=input_root, suffix=suffix, delete=False) as target:
                 input_path = Path(target.name)
                 size = 0
                 while chunk := file.file.read(1024 * 1024):

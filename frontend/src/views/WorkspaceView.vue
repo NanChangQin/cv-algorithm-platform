@@ -112,10 +112,11 @@ const waitingForPlacement = computed(() => runtimeLoading.value && Boolean(selec
 watch(selectedNodeId, () => { selectedGpuId.value = '' })
 
 // 换算法时恢复默认参数；“复用配置”打开时套用原任务的参数
-watch(activeSelection, (algorithm) => {
+watch(activeSelection, (algorithm, previous) => {
   resetParameters()
   selectedGpuId.value = ''
-  if (!deployments.value.some((item) => item.id === selectedDeploymentId.value && item.algorithm_version_id === algorithm?.id)) selectedDeploymentId.value = ''
+  // 只在用户换算法时清掉部署实例；首次加载时算法列表可能比部署列表先到
+  if (previous && algorithm?.id !== previous.id) selectedDeploymentId.value = ''
   if (preset.value && algorithm && preset.value.algorithm_version_id === algorithm.id) {
     parameterValues.value = mergeParameters(algorithm.parameters, preset.value.parameters)
     selectedGpuId.value = preset.value.gpu_device_ids.length === 1 ? preset.value.gpu_device_ids[0]! : ''

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const calls = vi.hoisted(() => ({
   create: vi.fn(), resources: vi.fn(), deployments: vi.fn(), getTask: vi.fn(), result: vi.fn(), page: vi.fn(), byIds: vi.fn(),
   query: {} as Record<string, string>, parameters: {} as Record<string, unknown>,
+  algorithmsLoaded: true, algorithmList: null as null | { value: unknown[] },
   libraryItems: null as null | { value: Array<{ id: string; original_name: string; width: number; height: number }> },
 }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: calls.query }) }))
@@ -15,7 +16,8 @@ vi.mock('@/api/assets', () => ({ assetsApi: { thumbnailUrl: () => '', contentUrl
 vi.mock('@/api/system', () => ({ systemApi: { executionResources: calls.resources } }))
 vi.mock('@/api/deployments', () => ({ deploymentsApi: { list: calls.deployments } }))
 vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
-  const algorithms = ref([{ id: 'algorithm-1', name: 'Detector', device: 'gpu', parameters: calls.parameters, status: 'available' }])
+  const algorithms = ref(calls.algorithmsLoaded === false ? [] : [{ id: 'algorithm-1', name: 'Detector', device: 'gpu', parameters: calls.parameters, status: 'available' }])
+  calls.algorithmList = algorithms
   return { algorithms, availableAlgorithms: algorithms, loading: ref(false), error: ref('') }
 } }))
 vi.mock('@/composables/useAssetPages', () => ({ useAssetPages: () => {
@@ -44,6 +46,7 @@ describe('workbench', () => {
     vi.clearAllMocks()
     calls.query = {}
     calls.parameters = {}
+    calls.algorithmsLoaded = true
     calls.create.mockResolvedValue({ id: 'task-1', status: 'queued' })
     calls.getTask.mockResolvedValue({ id: 'task-1', status: 'queued', algorithm_version_id: 'algorithm-1', asset_id: 'asset-1', parameters: {}, gpu_device_ids: [], created_at: '2026-10-22T00:00:00Z' })
     calls.page.mockResolvedValue({ items: [], total: 0 })
@@ -87,6 +90,20 @@ describe('workbench', () => {
     expect(calls.create).toHaveBeenCalledWith({
       algorithm_version_id: 'algorithm-1', asset_id: 'asset-1', parameters: {}, node_id: undefined, gpu_device_ids: [], deployment_id: 'deploy-1',
     })
+  })
+
+  it('keeps the linked deployment when the algorithm list arrives before the deployments', async () => {
+    calls.query = { algorithm: 'algorithm-1', deployment: 'deploy-1' }
+    calls.algorithmsLoaded = false
+    let release: (value: unknown) => void = () => {}
+    calls.deployments.mockReturnValue(new Promise((resolve) => { release = resolve }))
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs } })
+    await flushPromises()
+    calls.algorithmList!.value = [{ id: 'algorithm-1', name: 'Detector', device: 'gpu', parameters: {}, status: 'available' }]
+    await flushPromises()
+    release([{ id: 'deploy-1', algorithm_version_id: 'algorithm-1', node_id: 'dell', gpu_device_ids: ['0'], status: 'running' }])
+    await flushPromises()
+    expect(wrapper.find('.placement-section summary').text()).toContain('部署实例 · Dell GPU · GPU 0')
   })
 
   it('refuses to run on a deployment that stopped', async () => {
