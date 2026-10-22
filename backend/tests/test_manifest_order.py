@@ -62,7 +62,13 @@ def test_changed_or_missing_packages_are_left_alone(client: TestClient) -> None:
     scramble(algorithm_id)
     package = Path(get_container().algorithms.get(algorithm_id).package_path)
     manifest = package / "manifest.yaml"
-    manifest.write_text(manifest.read_text().replace("default: 0.5", "default: 0.6"))
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace("default: 0.5", "default: 0.6"),
+        encoding="utf-8",
+    )
+    assert restore_manifest_order(get_container().algorithms) == 0
+
+    manifest.write_text("invalid: [", encoding="utf-8")
     assert restore_manifest_order(get_container().algorithms) == 0
 
     shutil.rmtree(package)
