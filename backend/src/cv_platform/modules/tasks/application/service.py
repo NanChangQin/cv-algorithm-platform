@@ -24,6 +24,7 @@ class TaskService:
         queue: TaskQueue,
         project_id: UUID = DEFAULT_PROJECT_ID,
         actor: str = "local-admin",
+        deployments=None,
     ) -> None:
         self._tasks = tasks
         self._algorithms = algorithms
@@ -31,6 +32,7 @@ class TaskService:
         self._queue = queue
         self._project_id = project_id
         self._actor = actor
+        self._deployments = deployments
 
     def create_task(
         self,
@@ -42,7 +44,16 @@ class TaskService:
         retry_of: UUID | None = None,
         node_id: str | None = None,
         gpu_device_ids: tuple[str, ...] = (),
+        deployment_id: UUID | None = None,
     ) -> InferenceTask:
+        if deployment_id is not None:
+            from ...deployments.policy import bound_deployment, resolve_parameters
+
+            deployment = bound_deployment(self._deployments, deployment_id,
+                                          self._project_id, algorithm_version_id)
+            node_id, gpu_device_ids = deployment.node_id, deployment.gpu_device_ids
+            parameters = resolve_parameters(deployment, self._algorithms.get(algorithm_version_id),
+                                            parameters)
         normalized_parameters, asset = self.validate_task(
             algorithm_version_id,
             parameters,
@@ -59,6 +70,7 @@ class TaskService:
             retry_of=retry_of,
             project_id=self._project_id,
             owner_id=self._actor,
+            deployment_id=deployment_id,
             node_id=node_id,
             gpu_device_ids=gpu_device_ids,
         )
@@ -176,6 +188,7 @@ class TaskService:
             asset_id=original.asset_id,
             asset_uri=original.asset_uri,
             retry_of=original.id,
+            deployment_id=original.deployment_id,
             node_id=original.node_id,
             gpu_device_ids=original.gpu_device_ids,
         )

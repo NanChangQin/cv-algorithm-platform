@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({
-  create: vi.fn(), resources: vi.fn(), deployments: vi.fn(), getTask: vi.fn(), result: vi.fn(), page: vi.fn(), byIds: vi.fn(),
+  create: vi.fn(), resources: vi.fn(), deployments: vi.fn(), routes: vi.fn(), getTask: vi.fn(), result: vi.fn(), page: vi.fn(), byIds: vi.fn(),
   query: {} as Record<string, string>, parameters: {} as Record<string, unknown>,
   algorithmsLoaded: true, algorithmList: null as null | { value: unknown[] },
   libraryItems: null as null | { value: Array<{ id: string; original_name: string; width: number; height: number }> },
@@ -14,7 +14,7 @@ vi.mock('@/api/tasks', () => ({ tasksApi: {
 } }))
 vi.mock('@/api/assets', () => ({ assetsApi: { thumbnailUrl: () => '', contentUrl: () => '', byIds: vi.fn().mockResolvedValue([]) } }))
 vi.mock('@/api/system', () => ({ systemApi: { executionResources: calls.resources } }))
-vi.mock('@/api/deployments', () => ({ deploymentsApi: { list: calls.deployments } }))
+vi.mock('@/api/deployments', () => ({ deploymentsApi: { list: calls.deployments, listRoutes: calls.routes } }))
 vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
   const algorithms = ref(calls.algorithmsLoaded === false ? [] : [{ id: 'algorithm-1', name: 'Detector', device: 'gpu', parameters: calls.parameters, status: 'available' }])
   calls.algorithmList = algorithms
@@ -51,6 +51,7 @@ describe('workbench', () => {
     calls.getTask.mockResolvedValue({ id: 'task-1', status: 'queued', algorithm_version_id: 'algorithm-1', asset_id: 'asset-1', parameters: {}, gpu_device_ids: [], created_at: '2026-10-22T00:00:00Z' })
     calls.page.mockResolvedValue({ items: [], total: 0 })
     calls.deployments.mockResolvedValue([])
+    calls.routes.mockResolvedValue([])
     calls.byIds.mockResolvedValue([])
     calls.result.mockResolvedValue({ result: detection })
     calls.resources.mockResolvedValue({
@@ -151,6 +152,44 @@ describe('workbench', () => {
     expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ asset_id: 'asset-1', node_id: 'dell', gpu_device_ids: ['0'] }))
   })
 
+  it('reuses the exact deployment with its defaults and the original task overrides', async () => {
+    calls.query = { from_task: 'original-task' }
+    calls.parameters = {
+      confidence: { type: 'number', default: 0.5, minimum: 0, maximum: 1 },
+      iou_threshold: { type: 'number', default: 0.45, minimum: 0, maximum: 1 },
+    }
+    calls.deployments.mockResolvedValue([{
+      id: 'deploy-1', algorithm_version_id: 'algorithm-1', node_id: 'dell', gpu_device_ids: ['0'], status: 'running',
+      runtime_profile: { defaults: { confidence: 0.6, iou_threshold: 0.7 }, allowed_overrides: ['confidence'] },
+    }])
+    calls.getTask.mockResolvedValue({ algorithm_version_id: 'algorithm-1', asset_id: 'asset-1', parameters: { confidence: 0.8 }, deployment_id: 'deploy-1', node_id: 'dell', gpu_device_ids: ['0'] })
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('button.run-button').trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({
+      deployment_id: 'deploy-1', parameters: { confidence: 0.8, iou_threshold: 0.7 }, node_id: undefined, gpu_device_ids: [],
+    }))
+    wrapper.unmount()
+  })
+
+  it('resets parameters to the selected service defaults', async () => {
+    calls.query = { algorithm: 'algorithm-1', deployment: 'deploy-1' }
+    calls.parameters = { confidence: { type: 'number', default: 0.5, minimum: 0, maximum: 1 } }
+    calls.deployments.mockResolvedValue([{
+      id: 'deploy-1', algorithm_version_id: 'algorithm-1', node_id: 'local', gpu_device_ids: [], status: 'running',
+      runtime_profile: { defaults: { confidence: 0.6 }, allowed_overrides: [] },
+    }])
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { ...stubs, ParameterForm: false } } })
+    await flushPromises()
+    await wrapper.find('input[type="number"]').setValue('0.9')
+    await wrapper.findAll('button').find((button) => button.text() === '恢复默认')!.trigger('click')
+    await wrapper.find('button.run-button').trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({
+      deployment_id: 'deploy-1', parameters: { confidence: 0.6 },
+    }))
+    wrapper.unmount()
+  })
+
   it('blocks invalid numeric parameters before submitting', async () => {
     calls.parameters = { confidence: { type: 'number', title: '置信度', default: 0.5, minimum: 0, maximum: 1 } }
     const wrapper = shallowMount(WorkspaceView, { global: { stubs: { ...stubs, ParameterForm: false } } })
@@ -159,6 +198,19 @@ describe('workbench', () => {
     expect(wrapper.text()).toContain('置信度不能大于 1')
     expect(wrapper.find('button.run-button').attributes('disabled')).toBeDefined()
     expect(calls.create).not.toHaveBeenCalled()
+  })
+
+  it('blocks dirty expert configuration and resets the draft with defaults', async () => {
+    calls.parameters = { confidence: { type: 'number', default: 0.5, minimum: 0, maximum: 1 } }
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs: { ...stubs, ParameterForm: false } } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === 'YAML / JSON')!.trigger('click')
+    await wrapper.find('textarea[aria-label="专家参数配置"]').setValue('confidence: 0.8')
+    expect(wrapper.find('button.run-button').attributes('disabled')).toBeDefined()
+    await wrapper.findAll('button').find((button) => button.text() === '恢复默认')!.trigger('click')
+    expect(wrapper.find('button.run-button').attributes('disabled')).toBeUndefined()
+    await wrapper.find('button.run-button').trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ parameters: { confidence: 0.5 } }))
   })
 
   it('keeps input and placement when submission fails', async () => {
@@ -225,5 +277,29 @@ describe('workbench', () => {
     expect(calls.page).toHaveBeenCalledWith({ asset_id: 'asset-1', limit: 20 })
     expect(calls.getTask).toHaveBeenCalledWith('done-task')
     expect(wrapper.findComponent(ResultViewer).props('result')).toEqual(detection)
+  })
+
+  it('submits service_key when a service route is selected', async () => {
+    calls.query = { algorithm: 'algorithm-1', service: 'helmet-prod' }
+    calls.deployments.mockResolvedValue([
+      { id: 'deploy-1', algorithm_version_id: 'algorithm-1', node_id: 'dell', gpu_device_ids: ['0'], status: 'running', runtime_profile: { defaults: { confidence: 0.65 }, allowed_overrides: ['confidence'], cpu_count: 1, memory_mb: null, shm_mb: 64, prediction_timeout_seconds: 120, threads: 1, warmup_runs: 1 } },
+    ])
+    calls.routes.mockResolvedValue([
+      { id: 'r1', key: 'helmet-prod', name: '安全帽线上服务', active_deployment_id: 'deploy-1', active_algorithm_version_id: 'algorithm-1', previous_deployment_id: null, previous_algorithm_version_id: null, candidate_deployment_id: null, candidate_algorithm_version_id: null, rollout_status: 'active', drain_timeout_seconds: 120, last_error: null, updated_by: 'admin', created_at: '2026-10-23T00:00:00Z', updated_at: '2026-10-23T00:00:00Z' },
+    ])
+    calls.parameters = { confidence: { type: 'number', default: 0.25, minimum: 0, maximum: 1 } }
+    const wrapper = shallowMount(WorkspaceView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.find('.placement-section summary').text()).toContain('服务入口 · 安全帽线上服务（helmet-prod）')
+    await wrapper.find('button.run-button').trigger('click')
+    await flushPromises()
+    expect(calls.create).toHaveBeenCalledWith({
+      algorithm_version_id: 'algorithm-1',
+      asset_id: 'asset-1',
+      parameters: { confidence: 0.65 },
+      node_id: undefined,
+      gpu_device_ids: [],
+      service_key: 'helmet-prod',
+    })
   })
 })

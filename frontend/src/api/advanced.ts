@@ -42,7 +42,12 @@ export const advancedApi = {
   runtimeNodes: () => request<RuntimeNode[]>('/runtime-nodes'),
   registerNode: (payload: RuntimeNode) =>
     request<RuntimeNode>('/runtime-nodes', { method: 'POST', body: JSON.stringify(payload) }),
-  metrics: () => request<Record<string, unknown>>('/operations/metrics'),
+  metrics: (params?: { deployment_id?: string; window_seconds?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.deployment_id) q.set('deployment_id', params.deployment_id)
+    if (params?.window_seconds) q.set('window_seconds', String(params.window_seconds))
+    return request<Record<string, unknown>>(`/operations/metrics${q.toString() ? `?${q.toString()}` : ''}`)
+  },
   scalingPolicies: () => request<ScalingPolicy[]>('/operations/autoscaling'),
   setScalingPolicy: (algorithmId: string, payload: Omit<ScalingPolicy, 'algorithm_version_id'>) =>
     request<ScalingPolicy>(`/operations/autoscaling/${algorithmId}`, { method: 'PUT', body: JSON.stringify(payload) }),

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { systemApi } from '@/api/system'
 import {
   activeTrainingStatuses, formatMetric, progressRatio, progressText, trainingApi, trainingStatusLabel,
   trainingStatusTone, type TrainingDataset, type TrainingRun,
+  type EvaluationReport,
 } from '@/api/training'
 import TrainingChart, { type ChartSeries } from '@/components/training/TrainingChart.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
@@ -15,7 +16,9 @@ import { formatBytes, formatDateTime, formatDuration, nodeLabel } from '@/utils/
 
 const route = useRoute()
 const router = useRouter()
-const run = ref<TrainingRun | null>(null)
+const run = shallowRef<TrainingRun | null>(null)
+const evaluation = shallowRef<EvaluationReport | null>(null)
+const isValidation = computed(() => run.value?.progress?.operation === 'val')
 const dataset = ref<TrainingDataset | null>(null)
 const nodes = ref<Array<{ id: string; name: string }>>([])
 const logs = ref<string[]>([])
@@ -68,6 +71,7 @@ async function publish() {
   } finally { publishBusy.value = false }
 }
 const active = computed(() => Boolean(run.value && activeTrainingStatuses.includes(run.value.status)))
+const configuration = computed(() => run.value?.progress?.configuration ?? { normalized: run.value?.parameters })
 const epochs = computed(() => run.value?.parameters.epochs ?? 1)
 const rows = computed(() => run.value?.metrics ?? [])
 const percent = computed(() => {
@@ -144,6 +148,7 @@ const columnLabel = (key: string) => key === 'epoch' ? '轮次' : key === 'time'
 async function load() {
   try {
     run.value = await trainingApi.run(runId.value)
+    if (run.value.progress?.operation === 'val' && run.value.artifacts['evaluation.json'] !== undefined) evaluation.value = await trainingApi.evaluation(runId.value)
     error.value = ''
   } catch (reason) {
     error.value = errorMessage(reason, '加载训练失败')
@@ -218,12 +223,26 @@ const percentFormat = (value: number) => `${Math.round(value * 100)}%`
       <span class="toolbar-actions">
         <button v-if="active" type="button" class="secondary-button danger-button" :disabled="busy || run.status === 'stopping'" @click="stop">{{ run.status === 'stopping' ? '正在停止…' : '停止训练' }}</button>
         <button v-if="canPublish && !publishing" type="button" class="primary-button compact-button" @click="startPublishing">发布为推理模型</button>
+        <RouterLink v-if="!active && checkpoints.length" class="secondary-button" :to="{ path: '/exports', query: { run: run.id, checkpoint: checkpoints[0] } }">导出 ONNX</RouterLink>
         <a v-if="Object.keys(run.artifacts).length" class="secondary-button" :href="trainingApi.archiveUrl(run.id)" download>下载全部结果</a>
         <button v-if="!active" type="button" class="text-button" :disabled="busy" @click="remove">删除</button>
       </span>
     </header>
 
     <div v-if="run.status === 'failed'" class="alert" role="alert"><strong>训练失败</strong><p>{{ run.error }}</p></div>
+    <section class="section-block" aria-label="模型来源与恢复状态">
+      <h2>模型来源与恢复状态</h2>
+      <p>{{ run.progress?.source?.mode === 'resume' ? '断点续训' : '权重初始化' }} · {{ run.progress?.source?.label ?? run.model }}</p>
+      <p v-if="run.progress?.source?.sha256" class="muted-copy mono" style="overflow-wrap: anywhere">输入 SHA256 {{ run.progress.source.sha256 }}</p>
+      <p v-if="isValidation" class="muted-copy">独立模型评估 · 数据划分 {{ run.parameters.split ?? 'val' }}</p>
+      <p v-else-if="run.progress?.checkpoint">已保存第 {{ run.progress.checkpoint.epoch }}/{{ run.progress.checkpoint.epochs }} 轮的完整恢复状态。{{ run.progress.checkpoint.resumable ? '可以从下一轮继续原计划。' : run.progress.checkpoint.reason }}</p>
+      <p v-else class="muted-copy">{{ active ? '完成第一轮且启用保存后生成恢复 checkpoint。' : '没有完整恢复 checkpoint；历史权重可用于微调。' }}</p>
+      <div v-if="!active" class="toolbar-actions">
+        <RouterLink v-if="run.progress?.checkpoint?.resumable && run.artifacts[run.progress.checkpoint.file] !== undefined" class="primary-button compact-button" :to="{ path: '/training', query: { resume: run.id } }">断点续训</RouterLink>
+        <RouterLink v-for="name in checkpoints" :key="name" class="secondary-button compact-button" :to="{ path: '/training', query: { finetune: run.id, checkpoint: name } }">用 {{ name }} 权重微调</RouterLink>
+        <RouterLink v-for="name in checkpoints" :key="`val-${name}`" class="secondary-button compact-button" :to="{ path: '/training', query: { validate: run.id, checkpoint: name } }">验证 {{ name }} 权重</RouterLink>
+      </div>
+    </section>
 
     <section v-if="publishing" class="section-block training-form publish-panel" aria-labelledby="publish-title">
       <header class="section-heading"><div><h2 id="publish-title">发布为推理模型</h2></div><button type="button" class="text-button" @click="publishing = false">取消</button></header>
@@ -282,7 +301,18 @@ const percentFormat = (value: number) => `${Math.round(value * 100)}%`
       </dl>
     </section>
 
-    <section class="section-block">
+    <section v-if="evaluation" class="section-block" aria-label="独立验证报告">
+      <header class="section-heading"><div><h2>独立验证报告 · {{ evaluation.split }}</h2></div><a :href="trainingApi.artifactUrl(run.id, 'evaluation.json')" download>下载 JSON 报告</a></header>
+      <p class="muted-copy mono" style="overflow-wrap: anywhere">模型 SHA256 {{ evaluation.weight_sha256 }}</p>
+      <p class="muted-copy">每张图耗时：<span v-for="(value, key) in evaluation.speed" :key="key">{{ key }} {{ value.toFixed(3) }} ms · </span></p>
+      <div class="table-scroll"><table class="data-table">
+        <thead><tr><th>类别</th><th>实例数</th><th>Precision</th><th>Recall</th><th>F1</th><th>mAP50</th><th>mAP50-95</th></tr></thead>
+        <tbody><tr v-for="item in evaluation.per_class" :key="item.class_id"><td>{{ item.class_id }} · {{ item.name }}</td><td>{{ item.instances }}</td><td>{{ formatMetric(item.precision) }}</td><td>{{ formatMetric(item.recall) }}</td><td>{{ formatMetric(item.f1) }}</td><td>{{ formatMetric(item.map50) }}</td><td>{{ formatMetric(item.map50_95) }}</td></tr></tbody>
+      </table></div>
+      <details v-if="evaluation.confusion_matrix" class="inline-details"><summary>混淆矩阵原始数值（最后一类为背景）</summary><pre class="annotation-example">{{ JSON.stringify(evaluation.confusion_matrix, null, 2) }}</pre></details>
+    </section>
+
+    <section v-if="!isValidation" class="section-block">
       <header class="section-heading">
         <div><h2>训练曲线</h2></div>
         <button type="button" class="text-button" :aria-pressed="showTable" @click="showTable = !showTable">{{ showTable ? '查看曲线' : '查看数据表' }}</button>
@@ -314,15 +344,20 @@ const percentFormat = (value: number) => `${Math.round(value * 100)}%`
       <section class="section-block">
         <header class="section-heading"><div><h2>训练配置</h2></div></header>
         <dl class="definition-list">
-          <dt>数据集</dt><dd>{{ dataset ? `${dataset.name}（${dataset.class_names.length} 类）` : '—' }}</dd>
+          <dt>数据集</dt><dd><RouterLink :to="`/training/datasets/${run.dataset_id}`">{{ dataset ? `${dataset.name} · v${dataset.version ?? 1}（${dataset.class_names.length} 类）` : run.progress?.dataset?.name ?? '查看版本' }}</RouterLink></dd>
+          <template v-if="run.progress?.dataset"><dt>数据版本 / 内容哈希</dt><dd class="mono">v{{ run.progress.dataset.version }} · {{ run.progress.dataset.sha256 }}</dd><dt>数据划分快照</dt><dd>{{ JSON.stringify(run.progress.dataset.split_config) }}</dd></template>
           <dt>预训练模型</dt><dd>{{ run.model }}</dd>
-          <dt>轮数 / batch</dt><dd>{{ run.parameters.epochs }} / {{ run.parameters.batch === -1 ? '自动' : run.parameters.batch }}</dd>
+          <dt>{{ isValidation ? '数据划分 / batch' : '轮数 / batch' }}</dt><dd>{{ isValidation ? run.parameters.split ?? 'val' : run.parameters.epochs }} / {{ run.parameters.batch === -1 ? '自动' : run.parameters.batch }}</dd>
           <dt>图片尺寸</dt><dd>{{ run.parameters.imgsz }}</dd>
-          <dt>学习率</dt><dd>{{ run.parameters.lr0 }}{{ run.parameters.cos_lr ? '（余弦衰减）' : '' }} · {{ run.parameters.optimizer === 'auto' ? '自动选择优化器' : run.parameters.optimizer }}</dd>
-          <dt>提前停止</dt><dd>{{ run.parameters.patience ? `${run.parameters.patience} 轮无提升` : '关闭' }}</dd>
+          <template v-if="!isValidation"><dt>学习率</dt><dd>{{ run.parameters.lr0 }}{{ run.parameters.cos_lr ? '（余弦衰减）' : '' }} · {{ run.parameters.optimizer === 'auto' ? '自动选择优化器' : run.parameters.optimizer }}</dd>
+            <dt>提前停止</dt><dd>{{ run.parameters.patience ? `${run.parameters.patience} 轮无提升` : '关闭' }}</dd></template>
           <dt>提交</dt><dd>{{ run.created_by }} · {{ formatDateTime(run.created_at) }}</dd>
           <dt>结束</dt><dd>{{ formatDateTime(run.finished_at) }}</dd>
         </dl>
+        <details class="inline-details"><summary>提交参数与实际生效配置</summary>
+          <p class="muted-copy">运行器启动后回传 effective；自动批大小、优化器和学习率以该快照为准。快照也包含在训练产物 parameter-resolution.json 中。</p>
+          <pre class="annotation-example">{{ JSON.stringify(configuration, null, 2) }}</pre>
+        </details>
         <template v-if="files.length">
           <h3>下载</h3>
           <ul class="artifact-list">
@@ -333,7 +368,7 @@ const percentFormat = (value: number) => `${Math.round(value * 100)}%`
     </div>
 
     <section v-if="orderedImages.length" class="section-block">
-      <header class="section-heading"><div><h2>评估图表</h2></div><small class="muted-copy">训练结束时用最佳权重在验证集上生成</small></header>
+      <header class="section-heading"><div><h2>评估图表</h2></div><small class="muted-copy">{{ isValidation ? '使用选定模型与数据划分生成' : '训练结束时用最佳权重在验证集上生成' }}</small></header>
       <div class="training-figures">
         <figure v-for="name in orderedImages" :key="name">
           <a :href="trainingApi.artifactUrl(run.id, name)" target="_blank" rel="noopener"><img :src="trainingApi.artifactUrl(run.id, name)" :alt="imageTitles[name] ?? name" loading="lazy" /></a>

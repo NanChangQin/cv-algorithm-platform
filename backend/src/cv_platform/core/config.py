@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     training_image: str = "cv-platform/yolo-trainer:dev"
     # 训练结果发布为推理版本时使用的通用 YOLO 推理镜像（examples/yolo）
     yolo_inference_image: str = "cv-platform/yolo:dev"
+    onnx_inference_image: str = "cv-platform/yolo-onnx:dev"
     max_dataset_bytes: int = 10 * 1024 * 1024 * 1024
     max_dataset_files: int = 200_000
     # 后台协调（训练准备、进度同步）的轮询间隔

@@ -2,8 +2,10 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({
-  runs: vi.fn(), run: vi.fn(), datasets: vi.fn(), models: vi.fn(), create: vi.fn(), uploadDataset: vi.fn(),
+  contract: vi.fn(), runs: vi.fn(), run: vi.fn(), datasets: vi.fn(), models: vi.fn(), create: vi.fn(), uploadDataset: vi.fn(),
   stop: vi.fn(), logs: vi.fn(), resources: vi.fn(), push: vi.fn(), publish: vi.fn(),
+  sources: vi.fn(), uploadWeight: vi.fn(), deleteWeight: vi.fn(),
+  evaluation: vi.fn(),
   algorithms: [] as Array<Record<string, unknown>>, refreshAlgorithms: vi.fn(), route: { params: { id: 'run-1' }, query: {} as Record<string, string> },
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: calls.push }), useRoute: () => calls.route }))
@@ -11,9 +13,11 @@ vi.mock('@/api/system', () => ({ systemApi: { executionResources: calls.resource
 vi.mock('@/api/training', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api/training')>()),
   trainingApi: {
-    runs: calls.runs, run: calls.run, datasets: calls.datasets, models: calls.models, create: calls.create,
+    parameterContract: calls.contract, runs: calls.runs, run: calls.run, datasets: calls.datasets, models: calls.models, create: calls.create,
     uploadDataset: calls.uploadDataset, stop: calls.stop, logs: calls.logs, remove: vi.fn(), deleteDataset: vi.fn(),
     publish: calls.publish,
+    sources: calls.sources, uploadWeight: calls.uploadWeight, deleteWeight: calls.deleteWeight,
+    evaluation: calls.evaluation,
     artifactUrl: (id: string, name: string) => `/files/${id}/${name}`, archiveUrl: (id: string) => `/files/${id}.zip`,
   },
 }))
@@ -25,6 +29,8 @@ vi.mock('@/composables/useAlgorithms', async () => {
   return { useAlgorithms: () => ({ algorithms, refresh: calls.refreshAlgorithms }) }
 })
 
+import contractFixture from '../../../../docs/research/training-parameter-contract.json'
+import validationContract from '../../../../docs/research/validation-parameter-contract.json'
 import { defaultParameters, progressRatio, progressText, type TrainingRun } from '@/api/training'
 import UploadDropzone from '@/components/assets/UploadDropzone.vue'
 import TrainingChart from '@/components/training/TrainingChart.vue'
@@ -62,7 +68,9 @@ describe('training center', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     calls.route.query = {}
+    calls.contract.mockResolvedValue(contractFixture)
     calls.runs.mockResolvedValue([])
+    calls.sources.mockResolvedValue([])
     calls.datasets.mockResolvedValue([dataset])
     calls.models.mockResolvedValue([
       { key: 'yolo26n.pt', label: 'YOLO26n', description: '最快' },
@@ -94,6 +102,59 @@ describe('training center', () => {
     expect(calls.push).toHaveBeenCalledWith('/training/run-9')
   })
 
+  it('submits a managed initialization source and uploads without claiming compatibility', async () => {
+    calls.sources.mockResolvedValue([{ source: { kind: 'upload', reference: 'weight-1' }, label: 'custom.pt', sha256: 'abc' }])
+    calls.uploadWeight.mockResolvedValue({ id: 'weight-1' })
+    calls.create.mockResolvedValue({ id: 'custom-run' })
+    const wrapper = mount(TrainingView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '新建训练')!.trigger('click')
+    await flushPromises()
+    await wrapper.find('input[name="source-kind"][value="managed"]').setValue(true)
+    const upload = wrapper.findAllComponents(UploadDropzone).find((item) => item.props('accept') === '.pt')!
+    upload.vm.$emit('files', [new File(['opaque'], 'custom.pt')])
+    await flushPromises()
+    expect(wrapper.find('select[aria-label="初始化权重"]').element.value).toBe('upload:weight-1:best')
+    await wrapper.findAll('button').find((button) => button.text() === '开始训练')!.trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ source: { kind: 'upload', reference: 'weight-1' } }))
+  })
+
+  it('locks the original resume plan and exposes only resource overrides', async () => {
+    calls.route.query = { resume: 'run-1' }
+    calls.run.mockResolvedValue({ ...baseRun, status: 'stopped', progress: {
+      checkpoint: { resumable: true, epoch: 2, epochs: 10, file: 'weights/resume-000002.pt' },
+    } })
+    calls.create.mockResolvedValue({ id: 'resumed-run' })
+    const wrapper = mount(TrainingView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.find('.training-form').text()).toContain('继续原 10 轮计划')
+    expect(wrapper.find('.training-form select').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('input[value="yolo26n.pt"]').exists()).toBe(false)
+    expect(wrapper.find('.parameter-fields').text()).not.toContain('lr0')
+    await wrapper.findAll('button').find((button) => button.text() === '开始训练')!.trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({
+      source: { kind: 'run', reference: 'run-1', checkpoint: 'resume', mode: 'resume' },
+      parameters: baseRun.parameters,
+    }))
+  })
+
+  it('submits independent test validation without training schedule parameters', async () => {
+    calls.contract.mockResolvedValue(validationContract)
+    calls.datasets.mockResolvedValue([{ ...dataset, stats: { ...dataset.stats, splits: { ...dataset.stats.splits, test: split } } }])
+    calls.create.mockResolvedValue({ id: 'validation-1' })
+    const wrapper = mount(TrainingView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '独立验证')!.trigger('click')
+    await flushPromises()
+    const splitSelect = wrapper.find('select[aria-label="验证划分"]')
+    await splitSelect.setValue(JSON.stringify('test'))
+    await wrapper.findAll('button').find((button) => button.text() === '开始验证')!.trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ operation: 'val', parameters: {
+      batch: 16, imgsz: 640, split: 'test', conf: 0.001, iou: 0.7, plots: true, workers: 4,
+    } }))
+    expect(calls.contract).toHaveBeenCalledWith('val')
+  })
+
   it('blocks image sizes that are not a multiple of 32', async () => {
     const wrapper = mount(TrainingView, { global: { stubs } })
     await flushPromises()
@@ -104,6 +165,24 @@ describe('training center', () => {
     expect(wrapper.findAll('button').find((button) => button.text() === '开始训练')!.attributes('disabled')).toBeDefined()
   })
 
+  it('blocks unapplied expert drafts and submits complex YAML after applying', async () => {
+    calls.create.mockResolvedValue({ id: 'run-9' })
+    const wrapper = mount(TrainingView, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '新建训练')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === 'YAML / JSON')!.trigger('click')
+    await wrapper.find('textarea[aria-label="专家参数配置"]').setValue('epochs: 3\nbatch: 0.7\nclasses: [0]\nfreeze: [0, model.1]\ntime: null')
+    const submit = () => wrapper.findAll('button').find((button) => button.text() === '开始训练')!
+    expect(submit().attributes('disabled')).toBeDefined()
+    await wrapper.findAll('button').find((button) => button.text() === '应用配置')!.trigger('click')
+    expect(submit().attributes('disabled')).toBeUndefined()
+    await submit().trigger('click')
+    expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ parameters: {
+      epochs: 3, batch: 0.7, classes: [0], freeze: [0, 'model.1'], time: null,
+    } }))
+  })
+
   it('uploads a dataset zip and lists what the import fixed', async () => {
     calls.uploadDataset.mockResolvedValue({ ...dataset, id: 'ds-2', name: 'coco8', stats: { ...dataset.stats, warnings: ['没有验证集，已自动抽取 1 张图片作为验证集'], invalid_examples: ['labels/a.txt 第 2 行：坐标须为 0~1 之间的归一化数值'] } })
     const wrapper = mount(TrainingView, { global: { stubs } })
@@ -111,7 +190,9 @@ describe('training center', () => {
     await wrapper.find('.dataset-upload input').setValue('coco8')
     wrapper.findComponent(UploadDropzone).vm.$emit('files', [new File(['zip'], 'export.zip')])
     await flushPromises()
-    expect(calls.uploadDataset).toHaveBeenCalledWith(expect.any(File), 'coco8', expect.any(Function))
+    expect(calls.uploadDataset).toHaveBeenCalledWith(expect.any(File), 'coco8', expect.any(Function), {
+      mode: 'preserve', train: 0.8, val: 0.2, test: 0, seed: 0, validation: 'repair',
+    }, undefined)
     expect(wrapper.text()).toContain('已自动抽取 1 张图片作为验证集')
     expect(wrapper.text()).toContain('第 2 行')
   })
@@ -206,6 +287,24 @@ describe('training run page', () => {
     const wrapper = mount(TrainingRunView, { global: { stubs } })
     await flushPromises()
     expect(wrapper.find('.alert').text()).toContain('显存不足')
+  })
+
+  it('renders a standalone evaluation report without training loss charts', async () => {
+    calls.run.mockResolvedValue({ ...baseRun, status: 'completed', parameters: { batch: 2, split: 'test', imgsz: 640 },
+      progress: { operation: 'val', phase: 'epoch_end', epoch: 1, epochs: 1 }, artifacts: { 'evaluation.json': 100 },
+    })
+    calls.evaluation.mockResolvedValue({ split: 'test', weight_sha256: 'abc', speed: { inference: 2.5 },
+      metrics: {}, confusion_matrix: [[2, 0], [1, 0]],
+      per_class: [{ class_id: 0, name: 'helmet', instances: 3, precision: .8, recall: .7, f1: .75, map50: .6, map50_95: .4 }],
+    })
+    const wrapper = mount(TrainingRunView, { global: { stubs } })
+    await flushPromises()
+    const report = wrapper.find('[aria-label="独立验证报告"]')
+    expect(report.text()).toContain('独立验证报告 · test')
+    expect(report.text()).toContain('helmet')
+    expect(report.text()).toContain('40.0')
+    expect(wrapper.findAllComponents(TrainingChart)).toHaveLength(0)
+    expect(wrapper.text()).not.toContain('没有完整恢复 checkpoint')
   })
 })
 

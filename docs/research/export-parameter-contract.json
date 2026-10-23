@@ -1,0 +1,455 @@
+{
+  "id": "ultralytics:8.4.183:parameters-v1",
+  "framework": "ultralytics",
+  "framework_version": "8.4.183",
+  "mode": "export",
+  "task": "detect",
+  "parameters": {
+    "format": {
+      "type": "json",
+      "default": "onnx",
+      "json_schema": {
+        "enum": [
+          "onnx"
+        ]
+      },
+      "title": "导出格式",
+      "description": "导出格式；适用版本 8.4.183。",
+      "group": "导出配置",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "imgsz": {
+      "type": "json",
+      "default": 640,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 32,
+            "multipleOf": 32
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 32,
+              "multipleOf": 32
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        ]
+      },
+      "title": "输入尺寸",
+      "description": "整数或 [高度, 宽度]，均为 32 的倍数；静态导出要求正方形，矩形请选择动态导出。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "batch": {
+      "type": "json",
+      "default": 1,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 64
+      },
+      "title": "批大小",
+      "description": "固定整数 1～64；静态图的验证图片数须整除 batch，动态导出允许末尾不足一个 batch。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "dynamic": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "动态尺寸",
+      "description": "导出动态 batch 和空间尺寸；实际兼容形状由模型及目标运行时共同决定。",
+      "group": "导出配置",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "simplify": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "图简化",
+      "description": "图简化；适用版本 8.4.183。",
+      "group": "导出配置",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "opset": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer",
+            "minimum": 13,
+            "maximum": 20
+          }
+        ]
+      },
+      "title": "算子集",
+      "description": "算子集；适用版本 8.4.183。",
+      "group": "导出配置",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "quantize": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "enum": [
+          null,
+          32,
+          "fp32",
+          "w32a32"
+        ]
+      },
+      "title": "量化精度",
+      "description": "当前 ONNX 转换与验证仅支持 FP32；null、32、fp32 和 w32a32 等价。",
+      "group": "运行与精度",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "task": {
+      "type": "json",
+      "default": "detect",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "任务",
+      "description": "任务；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "任务类型由算法适配器确定"
+    },
+    "mode": {
+      "type": "json",
+      "default": "train",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "模式",
+      "description": "模式；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "运行模式由任务入口确定"
+    },
+    "data": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "数据集",
+      "description": "数据集；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过数据集选择器配置"
+    },
+    "device": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ]
+      },
+      "title": "计算设备",
+      "description": "计算设备；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过服务器和 GPU 选择器配置"
+    },
+    "name": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "运行名称",
+      "description": "运行名称；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "平台映射到本次任务名称/目录"
+    },
+    "verbose": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "详细日志",
+      "description": "详细日志；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "fraction": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "integer",
+                "minimum": 2
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 2
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 2
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": 2
+                      }
+                    ]
+                  },
+                  {
+                    "const": 0
+                  }
+                ]
+              }
+            ],
+            "items": false
+          }
+        ]
+      },
+      "title": "数据子集",
+      "description": "支持数据比例、图片数量或 [train, val, test] 设置；test 条目允许 0。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "split": {
+      "type": "json",
+      "default": "val",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "train",
+          "val",
+          "test"
+        ]
+      },
+      "title": "验证划分",
+      "description": "验证划分；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "conf": {
+      "type": "json",
+      "default": 0.001,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "置信度阈值",
+      "description": "置信度阈值；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "iou": {
+      "type": "json",
+      "default": 0.7,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "NMS交并比",
+      "description": "NMS交并比；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "max_det": {
+      "type": "json",
+      "default": 300,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "最大目标数",
+      "description": "最大目标数；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "nms": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "title": "NMS模式",
+      "description": "null 使用默认检测头；true 使用常规 NMS；false 在模型支持时使用无 NMS 头。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "agnostic_nms": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "类别无关NMS",
+      "description": "类别无关NMS；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "optimize": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "编译优化",
+      "description": "编译优化；适用版本 8.4.183。",
+      "group": "导出配置",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "workspace": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "exclusiveMinimum": 0
+      },
+      "title": "工作空间",
+      "description": "工作空间；适用版本 8.4.183。",
+      "group": "导出配置",
+      "common": false,
+      "status": "unavailable",
+      "reason": "首版导出为 FP32 ONNX、外置后处理；验证参数在验证面板配置"
+    },
+    "cfg": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "配置文件",
+      "description": "配置文件；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "请导入专家配置内容，容器内配置文件路径由平台管理"
+    }
+  },
+  "default_key_count": 113,
+  "sha256": "2872512f826f15a77818e5db7edd63c91a15ec306cf8c6b7892242674558e4d3"
+}

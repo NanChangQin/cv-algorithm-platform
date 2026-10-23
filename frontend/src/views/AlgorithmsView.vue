@@ -43,7 +43,7 @@ const family = computed(() => selected.value
   ? algorithms.value.filter((item) => item.key === selected.value!.key).sort((a, b) => b.created_at.localeCompare(a.created_at))
   : [])
 const trainedFamily = computed(() => family.value.some((item) => item.lineage))
-const bestInFamily = computed(() => Math.max(...family.value.map((item) => item.lineage?.metrics.map50_95 ?? -1)))
+const bestInFamily = computed(() => Math.max(...family.value.map((item) => item.lineage?.metrics?.map50_95 ?? -1)))
 const canBuild = computed(() => ['admin', 'developer'].includes(sessionRole.get() ?? 'user'))
 const isAdmin = computed(() => sessionRole.get() === 'admin')
 let buildPollTimer: number | undefined
@@ -279,11 +279,20 @@ weights/</pre>
         </div>
       </div>
 
-      <template v-if="selected.lineage">
+      <template v-if="selected.lineage?.export_job_id">
+        <h3 class="detail-subheading">ONNX 导出来源</h3>
+        <RouterLink :to="`/exports/${selected.lineage.export_job_id}`">{{ selected.lineage.export_name }} · 转换与精度报告</RouterLink>
+        <p class="muted-copy">FP32 · ORT CPU · 单图推理。参数能力和输入尺寸由导出产物固定。</p>
+      </template>
+      <template v-else-if="selected.lineage">
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/training', query: { model: selected.id } }">用此模型微调</RouterLink>
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/training', query: { model: selected.id, operation: 'val' } }">独立验证此模型</RouterLink>
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/exports', query: { model: selected.id } }">导出 ONNX</RouterLink>
         <h3 class="detail-subheading">训练来源</h3>
         <dl class="lineage-list">
           <div><dt>训练</dt><dd><RouterLink class="text-link" :to="`/training/${selected.lineage.training_run_id}`">{{ selected.lineage.training_name }}</RouterLink></dd></div>
-          <div><dt>数据集</dt><dd>{{ selected.lineage.dataset_name ?? '已删除' }} · {{ selected.lineage.class_names.length }} 类</dd></div>
+          <div><dt>数据集</dt><dd>{{ selected.lineage.dataset_name ?? '已删除' }}<template v-if="selected.lineage.dataset"> · v{{ selected.lineage.dataset.version }}</template> · {{ selected.lineage.class_names.length }} 类</dd></div>
+          <div v-if="selected.lineage.dataset" class="wide"><dt>数据内容 SHA256</dt><dd class="mono" style="overflow-wrap: anywhere">{{ selected.lineage.dataset.sha256 }}</dd></div>
           <div class="wide"><dt>权重</dt><dd>{{ selected.lineage.base_model.replace('.pt', '') }} 微调 · {{ selected.lineage.checkpoint }}.pt<template v-if="selected.lineage.epoch">（第 {{ selected.lineage.epoch }}/{{ selected.lineage.epochs_trained }} 轮）</template></dd></div>
           <div class="wide"><dt>训练参数</dt><dd>{{ selected.lineage.parameters.epochs }} 轮 · batch {{ selected.lineage.parameters.batch === -1 ? '自动' : selected.lineage.parameters.batch }} · 图片 {{ selected.lineage.parameters.imgsz }} · lr0 {{ selected.lineage.parameters.lr0 }}</dd></div>
           <div class="wide"><dt>验证集指标</dt><dd>mAP50-95 {{ formatMetric(selected.lineage.metrics.map50_95) }} · mAP50 {{ formatMetric(selected.lineage.metrics.map50) }} · 精确率 {{ formatMetric(selected.lineage.metrics.precision) }} · 召回率 {{ formatMetric(selected.lineage.metrics.recall) }}</dd></div>
@@ -299,12 +308,12 @@ weights/</pre>
               <tr v-for="item in family" :key="item.id" :class="{ current: item.id === selected.id }" @click="select(item)">
                 <td><button type="button" class="text-button" @click.stop="select(item)">v{{ item.version }}</button></td>
                 <td>{{ algorithmStatusLabel[item.status] ?? item.status }}</td>
-                <td>{{ item.lineage?.dataset_name ?? '—' }}</td>
-                <td>{{ item.lineage ? `${item.lineage.base_model.replace('.pt', '')} · ${item.lineage.checkpoint}` : '—' }}</td>
-                <td :class="{ best: item.lineage?.metrics.map50_95 === bestInFamily }">{{ formatMetric(item.lineage?.metrics.map50_95) }}</td>
-                <td>{{ formatMetric(item.lineage?.metrics.map50) }}</td>
-                <td>{{ formatMetric(item.lineage?.metrics.precision) }}</td>
-                <td>{{ formatMetric(item.lineage?.metrics.recall) }}</td>
+                <td>{{ item.lineage?.dataset_name ?? '—' }}<template v-if="item.lineage?.dataset"> · v{{ item.lineage.dataset.version }}</template></td>
+                <td>{{ item.lineage?.export_job_id ? 'ONNX FP32' : item.lineage ? `${item.lineage.base_model.replace('.pt', '')} · ${item.lineage.checkpoint}` : '—' }}</td>
+                <td :class="{ best: item.lineage?.metrics?.map50_95 === bestInFamily }">{{ formatMetric(item.lineage?.metrics?.map50_95) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics?.map50) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics?.precision) }}</td>
+                <td>{{ formatMetric(item.lineage?.metrics?.recall) }}</td>
               </tr>
             </tbody>
           </table>

@@ -23,6 +23,7 @@ const navigation = [
   { label: '图片库', to: '/assets', icon: 'image', group: '资源' },
   { label: '算法库', to: '/algorithms', icon: 'layers', group: '资源' },
   { label: '训练中心', to: '/training', icon: 'training', group: '模型', roles: ['admin', 'developer'] },
+  { label: '模型导出', to: '/exports', icon: 'deploy', group: '模型', roles: ['admin', 'developer'] },
   { label: '模型部署', to: '/deployments', icon: 'deploy', group: '模型', roles: ['admin', 'developer'] },
   { label: '项目成员', to: '/projects', icon: 'folder', group: '管理' },
   { label: '运行实例', to: '/instances', icon: 'server', group: '管理', roles: ['admin'] },

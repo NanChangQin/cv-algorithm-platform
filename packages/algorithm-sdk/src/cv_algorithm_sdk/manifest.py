@@ -2,9 +2,11 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import yaml
+from jsonschema import Draft202012Validator, SchemaError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .enums import DeviceType, ResultType
+from .parameters import json_value, resolve_parameters
 
 
 class StrictModel(BaseModel):
@@ -80,14 +82,45 @@ class StringParameter(StrictModel):
     description: str | None = Field(default=None, max_length=256)
 
 
+class JsonParameter(StrictModel):
+    """Manifest 1.1: arrays, objects, null and unions described by JSON Schema."""
+
+    type: Literal["json"]
+    default: Any
+    json_schema: dict[str, Any]
+    title: str | None = Field(default=None, max_length=64)
+    description: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def validate_schema(self) -> "JsonParameter":
+        json_value(self.json_schema)
+
+        def check_refs(value: Any) -> None:
+            if isinstance(value, dict):
+                if "$ref" in value or "$dynamicRef" in value:
+                    raise ValueError("parameter schemas must be self-contained without references")
+                for item in value.values():
+                    check_refs(item)
+            elif isinstance(value, list):
+                for item in value:
+                    check_refs(item)
+
+        check_refs(self.json_schema)
+        try:
+            Draft202012Validator.check_schema(self.json_schema)
+        except SchemaError as exc:
+            raise ValueError(f"invalid parameter JSON Schema: {exc.message}") from exc
+        return self
+
+
 ParameterSpec = Annotated[
-    NumberParameter | IntegerParameter | BooleanParameter | StringParameter,
+    NumberParameter | IntegerParameter | BooleanParameter | StringParameter | JsonParameter,
     Field(discriminator="type"),
 ]
 
 
 class AlgorithmManifest(StrictModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.0"
     id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{2,63}$")
     name: str = Field(min_length=1, max_length=128)
     version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$")
@@ -102,41 +135,18 @@ class AlgorithmManifest(StrictModel):
     def validate_result_type(self) -> "AlgorithmManifest":
         if self.task_type != self.output.type:
             raise ValueError("task_type must match output.type")
+        if self.schema_version == "1.0" and any(
+            spec.type == "json" for spec in self.parameters.values()
+        ):
+            raise ValueError("JSON parameters require schema_version 1.1")
+        self.resolve_parameters({})
         return self
 
     def resolve_parameters(self, supplied: dict[str, Any]) -> dict[str, Any]:
         """Apply defaults and validate runtime values against the declared contract."""
-        unknown = set(supplied) - set(self.parameters)
-        if unknown:
-            raise ValueError(f"unknown parameters: {', '.join(sorted(unknown))}")
-
-        resolved: dict[str, Any] = {}
-        for name, spec in self.parameters.items():
-            value = supplied.get(name, spec.default)
-            if spec.type == "number":
-                if isinstance(value, bool) or not isinstance(value, (int, float)):
-                    raise ValueError(f"{name} must be a number")
-                value = float(value)
-                if spec.minimum is not None and value < spec.minimum:
-                    raise ValueError(f"{name} cannot be below {spec.minimum}")
-                if spec.maximum is not None and value > spec.maximum:
-                    raise ValueError(f"{name} cannot exceed {spec.maximum}")
-            elif spec.type == "integer":
-                if isinstance(value, bool) or not isinstance(value, int):
-                    raise ValueError(f"{name} must be an integer")
-                if spec.minimum is not None and value < spec.minimum:
-                    raise ValueError(f"{name} cannot be below {spec.minimum}")
-                if spec.maximum is not None and value > spec.maximum:
-                    raise ValueError(f"{name} cannot exceed {spec.maximum}")
-            elif spec.type == "boolean" and not isinstance(value, bool):
-                raise ValueError(f"{name} must be a boolean")
-            elif spec.type == "string":
-                if not isinstance(value, str):
-                    raise ValueError(f"{name} must be a string")
-                if spec.options is not None and value not in spec.options:
-                    raise ValueError(f"{name} must be one of: {', '.join(spec.options)}")
-            resolved[name] = value
-        return resolved
+        return resolve_parameters(
+            {name: spec.model_dump() for name, spec in self.parameters.items()}, supplied
+        )
 
 
 def load_manifest(path: str | Path) -> AlgorithmManifest:

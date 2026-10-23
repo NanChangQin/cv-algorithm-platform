@@ -1,6 +1,8 @@
 from dataclasses import replace
 from uuid import UUID
 
+from cv_algorithm_sdk.runtime_profile import RuntimeProfile
+
 from ....core.errors import ApplicationError
 from ....core.project_context import DEFAULT_PROJECT_ID
 from ...algorithms.domain.repositories import AlgorithmRepository
@@ -41,8 +43,24 @@ class RuntimeInstanceService:
         *,
         node_id: str | None = None,
         gpu_device_ids: tuple[str, ...] = (),
+        runtime_scope: str = "",
+        runtime_profile: dict | None = None,
     ) -> RuntimeInstance:
         request = self._runtime_request(algorithm_id, project_id)
+        profile = RuntimeProfile.model_validate(runtime_profile or {})
+        request = replace(
+            request, runtime_scope=runtime_scope,
+            container_name=(f"{request.container_name}-d{runtime_scope}" if runtime_scope
+                            else request.container_name),
+            memory_mb=profile.memory_mb or request.memory_mb,
+            cpu_count=profile.cpu_count, shm_mb=profile.shm_mb,
+            prediction_timeout_seconds=(profile.prediction_timeout_seconds
+                                        if runtime_scope else None),
+            runtime_config=(profile.model_dump(mode="json")
+                            if request.model_directory and
+                            (self._algorithms.get(algorithm_id).lineage or {}).get("export_job_id")
+                            else None),
+        )
         if gpu_device_ids and request.device == "cpu":
             raise ApplicationError("PLACEMENT_INVALID", "该算法仅支持 CPU，不能指定 GPU")
         return self._manager.ensure_running(
@@ -109,14 +127,24 @@ class RuntimeInstanceService:
         self._required_instance(instance_id, project_id)
         return self._manager.touch(instance_id)
 
+    def get_running(
+        self, instance_id: str, project_id: UUID, node_id: str | None = None
+    ) -> RuntimeInstance:
+        instance = self._required_instance(instance_id, project_id, node_id=node_id)
+        if instance.status != "healthy":
+            raise ApplicationError("DEPLOYMENT_NOT_RUNNING", "部署实例没有在运行", 409)
+        return instance
+
     def _required_instance(
         self,
         instance_id: str,
         project_id: UUID | None = None,
+        *,
+        node_id: str | None = None,
     ) -> RuntimeInstance:
         expected_project_id = project_id or self._project_id
         for instance in self._manager.list_instances():
-            if instance.id != instance_id:
+            if instance.id != instance_id or (node_id and instance.node_id != node_id):
                 continue
             try:
                 algorithm_id = UUID(instance.algorithm_version_id)

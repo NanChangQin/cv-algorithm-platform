@@ -28,6 +28,8 @@ class RuntimeInstance:
     last_used_at: datetime | None = None
     node_id: str = "local"
     gpu_device_ids: tuple[str, ...] = ()
+    runtime_scope: str = ""
+    prediction_timeout_seconds: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,8 +43,12 @@ class RuntimeRequest:
     memory_mb: int
     cpu_count: float = 1
     gpu_device_ids: tuple[str, ...] = ()
+    runtime_scope: str = ""
+    prediction_timeout_seconds: int | None = None
     node_id: str | None = None
     # 挂载给容器的模型子目录，为空时节点使用 algorithm_key
     model_directory: str | None = None
     # 启动前要确保节点上已有的模型文件（训练发布的版本）
     model_files: tuple[ModelFile, ...] = ()
+    shm_mb: int = 64
+    runtime_config: dict | None = None

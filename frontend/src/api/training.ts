@@ -1,11 +1,41 @@
 import { projectUrl, request, uploadRequest } from './http'
-import type { Algorithm } from '@/types/algorithm'
+import type { Algorithm, ParameterContract } from '@/types/algorithm'
+import type { ParameterValues } from '@/utils/parameters'
 
 export interface TrainingModel { key: string; label: string; description: string }
+export interface TrainingSource {
+  kind: 'builtin' | 'upload' | 'algorithm' | 'run'
+  reference?: string
+  checkpoint?: 'best' | 'last' | 'resume'
+  mode?: 'finetune' | 'resume'
+}
+export interface TrainingSourceOption { source: TrainingSource; label: string; sha256?: string; validation?: string }
+export interface TrainingWeight { id: string; name: string; sha256: string; size_bytes: number; validation: string }
+export interface TrainingCheckpoint { resumable: boolean; reason: string | null; epoch: number; epochs: number; sha256: string; file: string }
+export interface EvaluationReport {
+  split: string; dataset_sha256: string; weight_sha256: string
+  metrics: Record<string, number>; speed: Record<string, number>
+  per_class: Array<{ class_id: number; name: string; instances: number; precision: number; recall: number; f1: number; map50: number; map50_95: number }>
+  confusion_matrix: number[][] | null
+}
 
 export interface SplitStats { images: number; labeled: number; backgrounds: number; boxes: number }
+export interface DatasetSplitConfig {
+  mode: 'preserve' | 'reshuffle'
+  train: number; val: number; test: number; seed: number
+  validation: 'repair' | 'strict'
+}
+export const defaultSplitConfig: DatasetSplitConfig = { mode: 'preserve', train: 0.8, val: 0.2, test: 0, seed: 0, validation: 'repair' }
+export interface DatasetImage {
+  id: number; path: string; source_path: string; split: string; width: number; height: number; sha256: string | null
+  boxes: Array<{ class_id: number; cx: number; cy: number; width: number; height: number }>
+}
 export interface DatasetStats {
-  splits: { train: SplitStats; val: SplitStats }
+  splits: { train: SplitStats; val: SplitStats; test?: SplitStats }
+  split_instances?: Record<string, Record<string, number>>
+  duplicate_groups?: number
+  duplicate_images?: number
+  leakage_groups?: number
   instances: Record<string, number>
   warnings: string[]
   invalid_lines: number
@@ -23,22 +53,33 @@ export interface TrainingDataset {
   size_bytes: number
   created_by: string
   created_at: string
+  family_id: string
+  version: number
+  parent_id: string | null
+  sha256: string
+  source_sha256: string | null
+  split_config: Partial<DatasetSplitConfig>
 }
 
 export type TrainingStatus = 'queued' | 'preparing' | 'running' | 'stopping' | 'completed' | 'stopped' | 'failed'
 
-export interface TrainingParameters {
+export interface TrainingParameters extends ParameterValues {
   epochs: number
   batch: number
   imgsz: number
   lr0: number
-  optimizer: 'auto' | 'SGD' | 'Adam' | 'AdamW'
+  optimizer: string
   patience: number
   workers: number
   seed: number
   cos_lr: boolean
 }
 export interface TrainingProgress {
+  operation?: 'train' | 'val'
+  source?: TrainingSource & { label: string; sha256?: string; checkpoint_state?: TrainingCheckpoint }
+  checkpoint?: TrainingCheckpoint
+  dataset?: { id: string; name: string; version: number; sha256: string; source_sha256: string | null; split_config: Partial<DatasetSplitConfig> }
+  configuration?: Record<string, unknown>
   phase: 'preparing' | 'train' | 'val' | 'epoch_end'
   epoch: number
   epochs: number
@@ -78,20 +119,45 @@ export const defaultParameters: TrainingParameters = {
 }
 
 export const trainingApi = {
+  parameterContract: (mode: 'train' | 'val' | 'export' = 'train') => request<ParameterContract>(`/training/parameter-contract?mode=${mode}`),
   models: () => request<TrainingModel[]>('/training/models'),
+  sources: () => request<TrainingSourceOption[]>('/training/sources'),
+  uploadWeight: (file: File, onProgress?: (ratio: number) => void) => {
+    const body = new FormData(); body.append('file', file)
+    return uploadRequest<TrainingWeight>('/training/weights', body, onProgress)
+  },
+  deleteWeight: (id: string) => request<void>(`/training/weights/${id}`, { method: 'DELETE' }),
   datasets: () => request<TrainingDataset[]>('/training/datasets'),
-  uploadDataset: (file: File, name: string, onProgress?: (ratio: number) => void) => {
+  uploadDataset: (file: File, name: string, onProgress?: (ratio: number) => void, config?: DatasetSplitConfig, parentId?: string) => {
     const body = new FormData()
     body.append('file', file)
     body.append('name', name)
+    if (config) body.append('split_config', JSON.stringify(config))
+    if (parentId) body.append('parent_id', parentId)
     return uploadRequest<TrainingDataset>('/training/datasets', body, onProgress)
   },
+  dataset: (id: string) => request<TrainingDataset>(`/training/datasets/${id}`),
+  datasetImages: (id: string, split = '', offset = 0) => request<{ total: number; items: DatasetImage[] }>(`/training/datasets/${id}/images?offset=${offset}&limit=12${split ? `&split=${encodeURIComponent(split)}` : ''}`),
+  newDatasetVersion: (id: string, config: DatasetSplitConfig) => request<TrainingDataset>(`/training/datasets/${id}/versions`, { method: 'POST', body: JSON.stringify(config) }),
+  datasetFeedback: (
+    id: string,
+    payload: {
+      samples: Array<{ task_id: string; boxes?: Array<{ label: string; bbox: [number, number, number, number] }> | null }>
+      target_split?: 'train' | 'val' | 'test'
+      min_confidence?: number
+      split_config?: DatasetSplitConfig
+    },
+  ) => request<TrainingDataset>(`/training/datasets/${id}/feedback`, { method: 'POST', body: JSON.stringify(payload) }),
+  datasetPreviewUrl: (id: string, image: number) => projectUrl(`/training/datasets/${id}/images/${image}/preview`),
+  datasetArchiveUrl: (id: string, source = false) => projectUrl(`/training/datasets/${id}/archive?source=${source}`),
+  datasetReportUrl: (id: string) => projectUrl(`/training/datasets/${id}/report`),
   deleteDataset: (id: string) => request<void>(`/training/datasets/${id}`, { method: 'DELETE' }),
   runs: () => request<TrainingRunSummary[]>('/training/runs'),
   run: (id: string) => request<TrainingRun>(`/training/runs/${id}`),
-  create: (payload: { name: string; dataset_id: string; model: string; node_id: string; gpu_device_ids: string[]; parameters: TrainingParameters }) =>
+  create: (payload: { name: string; dataset_id: string; model: string; node_id: string; gpu_device_ids: string[]; parameters: ParameterValues; source?: TrainingSource; operation?: 'train' | 'val' }) =>
     request<TrainingRun>('/training/runs', { method: 'POST', body: JSON.stringify(payload) }),
   stop: (id: string) => request<TrainingRun>(`/training/runs/${id}/stop`, { method: 'POST' }),
+  evaluation: (id: string) => request<EvaluationReport>(`/training/runs/${id}/evaluation`),
   remove: (id: string) => request<void>(`/training/runs/${id}`, { method: 'DELETE' }),
   logs: (id: string, tail = 300) => request<string[]>(`/training/runs/${id}/logs?tail=${tail}`),
   publish: (id: string, payload: { checkpoint: 'best' | 'last'; key: string; name: string; version: string; description: string }) =>

@@ -1,3 +1,5 @@
+import hashlib
+import json
 import re
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -25,8 +27,20 @@ class ContainerSpec:
     memory_mb: int = 1024
     cpu_count: float = 1
     gpu_device_ids: tuple[str, ...] = ()
+    runtime_scope: str = ""
+    prediction_timeout_seconds: int | None = None
     # 挂载到 /models 的模型子目录；为空时使用 algorithm_key（训练发布的版本各有自己的目录）
     model_directory: str | None = None
+    shm_mb: int = 64
+    runtime_config: dict | None = None
+
+    @property
+    def configuration_sha256(self) -> str:
+        payload = {"memory_mb": self.memory_mb, "cpu_count": self.cpu_count,
+                   "shm_mb": self.shm_mb, "runtime_config": self.runtime_config,
+                   "prediction_timeout_seconds": self.prediction_timeout_seconds,
+                   "model_directory": self.model_directory}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
     def __post_init__(self) -> None:
         if not self.algorithm_version_id.strip():
@@ -72,6 +86,10 @@ class AlgorithmInstance:
     error: str | None = None
     last_used_at: datetime | None = None
     gpu_device_ids: tuple[str, ...] = ()
+    runtime_scope: str = ""
+    prediction_timeout_seconds: int | None = None
+
+    configuration_sha256: str = ""
 
     @classmethod
     def created(cls, instance_id: str, spec: ContainerSpec, endpoint: str) -> "AlgorithmInstance":
@@ -88,6 +106,9 @@ class AlgorithmInstance:
             updated_at=now,
             last_used_at=now,
             gpu_device_ids=spec.gpu_device_ids,
+            runtime_scope=spec.runtime_scope,
+            configuration_sha256=spec.configuration_sha256,
+            prediction_timeout_seconds=spec.prediction_timeout_seconds,
         )
 
     def transition(self, status: InstanceStatus, error: str | None = None) -> "AlgorithmInstance":

@@ -89,6 +89,7 @@ class FakeNode:
 
     def __init__(self) -> None:
         self.datasets: dict[str, str] = {}
+        self.weights: dict[str, str] = {}
         self.uploads = 0
         self.started: list[dict] = []
         self.state: dict = {"state": "running", "progress": None, "metrics": [], "files": {}}
@@ -106,7 +107,12 @@ class FakeNode:
     def image_exists(self, image):
         return self.has_image
 
-    def upload(self, path, source: Path, *, headers, progress=None):
+    def upload(self, path, source: Path, *, headers=None, progress=None):
+        if path.startswith("/training/weights/"):
+            import hashlib
+
+            self.weights[path.rsplit("/", 1)[-1]] = hashlib.sha256(source.read_bytes()).hexdigest()
+            return
         self.uploads += 1
         self.datasets[path.rsplit("/", 1)[-1]] = headers["X-Content-SHA256"]
         if progress:
@@ -120,6 +126,19 @@ class FakeNode:
 
     def request(self, method, path, *, json=None, params=None, timeout=None,
                 allow_missing=False):
+        if method == "GET" and path == "/training/parameter-contract":
+            from cv_algorithm_sdk.exports import EXPORT_PROTOCOL
+            from cv_algorithm_sdk.runtime_contract import get_contract
+            from cv_algorithm_sdk.training_sources import TRAINING_PROTOCOL
+
+            return {
+                **get_contract((params or {}).get("mode", "train")),
+                "training_protocol": TRAINING_PROTOCOL,
+                "export_protocol": EXPORT_PROTOCOL,
+            }
+        if method == "GET" and path.startswith("/training/weights/"):
+            digest = self.weights.get(path.rsplit("/", 1)[-1])
+            return {"sha256": digest} if digest else None
         if method == "GET" and path.startswith("/datasets/"):
             sha = self.datasets.get(path.rsplit("/", 1)[-1])
             return {"sha256": sha} if sha else None

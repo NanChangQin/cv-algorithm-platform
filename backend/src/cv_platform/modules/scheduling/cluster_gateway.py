@@ -135,6 +135,7 @@ class ClusterAlgorithmManagerGateway:
                 if (
                     instance.algorithm_version_id == request.algorithm_version_id
                     and instance.image == request.image
+                    and instance.runtime_scope == request.runtime_scope
                     and instance.status == "healthy"
                     and (request.device == "auto" or instance.device == request.device)
                     and (
@@ -161,7 +162,8 @@ class ClusterAlgorithmManagerGateway:
                 key=lambda item: item[0].last_used_at or item[0].updated_at,
             )
             instance = gateway.ensure_running(
-                replace(request, device=selected.device, gpu_device_ids=selected.gpu_device_ids)
+                replace(request, device=selected.device, gpu_device_ids=selected.gpu_device_ids,
+                        container_name=selected.container_name)
             )
             with self._lock:
                 self._instance_routes[instance.id] = node.id
@@ -226,6 +228,7 @@ class ClusterAlgorithmManagerGateway:
             )
             current_count = sum(
                 item.algorithm_version_id == request.algorithm_version_id
+                and item.runtime_scope == request.runtime_scope
                 and item.status == "healthy"
                 for item in node_instances
             )

@@ -88,7 +88,7 @@ def cluster(monkeypatch):
     )
     started: list[dict] = []
 
-    def start_algorithm(algorithm_id, project_id=None, *, node_id=None, gpu_device_ids=()):
+    def start_algorithm(algorithm_id, project_id=None, *, node_id=None, gpu_device_ids=(), **settings):
         started.append({"node_id": node_id, "gpu_device_ids": gpu_device_ids})
         now = datetime.now(UTC)
         instance = RuntimeInstance(
@@ -138,13 +138,14 @@ def test_missing_image_and_weights_are_copied_from_another_server(client, cluste
     deployment = deploy(client, detector_id(client))
     # 未指定 GPU：选空闲显存最多的一张
     assert deployment["gpu_device_ids"] == ["1"]
-    assert [step["status"] for step in deployment["steps"]] == ["pending"] * 4
+    assert [step["status"] for step in deployment["steps"]] == ["pending"] * 5
     run(cluster, deployment)
     result = current(client, deployment["id"])
     assert result["status"] == "running"
     assert result["instance_id"] == "container-1"
     steps = {step["key"]: step for step in result["steps"]}
-    assert all(step["status"] == "done" for step in steps.values())
+    assert all(step["status"] == "done" for key, step in steps.items() if key != "verify")
+    assert steps["verify"]["status"] == "skipped"
     assert "从「主服务器」传输镜像" in steps["image"]["detail"]
     assert "复制 1 个权重文件" in steps["weights"]["detail"]
     assert "空闲显存 15000 MB" in steps["node"]["detail"]
@@ -217,7 +218,7 @@ def test_failure_is_shown_on_the_step_that_failed(client, cluster) -> None:
     assert result["status"] == "failed"
     assert "所有服务器上都没有镜像" in result["error"]
     statuses = [step["status"] for step in result["steps"]]
-    assert statuses == ["done", "failed", "pending", "pending"]
+    assert statuses == ["done", "failed", "pending", "pending", "pending"]
 
 
 def test_stop_start_redeploy_and_delete(client, cluster) -> None:

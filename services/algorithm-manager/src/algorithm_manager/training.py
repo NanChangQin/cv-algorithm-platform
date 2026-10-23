@@ -24,9 +24,19 @@ from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
 from typing import Any, Literal
 
+from cv_algorithm_sdk.export_artifacts import registered_artifacts
+from cv_algorithm_sdk.exports import EXPORT_PROTOCOL, ExportVerification, verification_parameters
+from cv_algorithm_sdk.runtime_contract import (
+    CONTRACT_ID,
+    get_contract,
+    normalize_parameters,
+    validate_placement,
+)
+from cv_algorithm_sdk.training_sources import TRAINING_PROTOCOL, TrainingInput
+from docker.types import Mount
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from starlette.concurrency import run_in_threadpool
 
 from .application.errors import ManagerError
@@ -36,39 +46,64 @@ TRAINING_ID_LABEL = "cv.platform.training-id"
 MANAGED_TRAINING_LABEL = "cv.platform.managed-training"
 IDENTIFIER = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 # 训练产物里可以下载的文件类型
-ARTIFACT_SUFFIXES = {".pt", ".csv", ".yaml", ".png", ".jpg"}
+ARTIFACT_SUFFIXES = {".pt", ".csv", ".yaml", ".json", ".png", ".jpg", ".txt"}
 ALGORITHM_UID = 10001
 # 进度条输出的终端控制序列（清行、颜色等），网页里显示为乱码
 ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
 
-class TrainingParameters(BaseModel):
-    model: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}\.pt$")
-    epochs: int = Field(ge=1, le=1000)
-    batch: int = Field(ge=-1, le=512)
-    imgsz: int = Field(ge=32, le=2048, multiple_of=32)
-    lr0: float = Field(gt=0, le=1)
-    optimizer: Literal["auto", "SGD", "Adam", "AdamW"] = "auto"
-    patience: int = Field(default=50, ge=0, le=1000)
-    workers: int = Field(default=4, ge=0, le=32)
-    seed: int = Field(default=0, ge=0, le=2**31 - 1)
-    cos_lr: bool = False
-
-    @field_validator("batch")
-    @classmethod
-    def check_batch(cls, value: int) -> int:
-        if value == 0:
-            raise ValueError("batch 为 -1（自动）或正整数")
-        return value
-
-
 class StartTrainingRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation: Literal["train", "val", "export"] = "train"
+    export_verification: ExportVerification | None = None
+
     training_id: str = Field(pattern=IDENTIFIER)
     dataset_id: str = Field(pattern=IDENTIFIER)
     image: str
-    parameters: TrainingParameters
+    parameters: dict[str, Any]
+    training_input: TrainingInput | None = None
+    parameter_contract_id: str = CONTRACT_ID
+    submitted_parameters: dict[str, Any] | None = None
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=8)
     memory_mb: int | None = Field(default=None, ge=1024, le=1_048_576)
+
+    @field_validator("parameters")
+    @classmethod
+    def check_parameters(cls, value: dict[str, Any], info) -> dict[str, Any]:
+        model = value.get("model")
+        if not isinstance(model, str) or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}\.pt", model):
+            raise ValueError("model 必须是预置权重文件名")
+        return {
+            "model": model,
+            **normalize_parameters(
+                info.data.get("operation", "train"),
+                {key: item for key, item in value.items() if key != "model"},
+            ),
+        }
+
+    @model_validator(mode="after")
+    def check_contract(self) -> StartTrainingRequest:
+        if self.operation == "export":
+            if self.gpu_device_ids or (self.training_input and self.training_input.resume):
+                raise ValueError("ONNX 导出使用 CPU，不支持 GPU 或 resume")
+            self.export_verification = self.export_verification or ExportVerification()
+            verification_parameters(self.parameters, self.export_verification)
+        elif self.export_verification is not None:
+            raise ValueError("只有导出任务可指定验证策略")
+        if self.parameter_contract_id != CONTRACT_ID:
+            raise ValueError("训练参数契约不匹配，请更新平台和节点")
+        validate_placement(self.parameters, len(self.gpu_device_ids))
+        if self.operation == "val" and (
+            len(self.gpu_device_ids) != 1 or (self.training_input and self.training_input.resume)
+        ):
+            raise ValueError("独立验证需要一张 GPU，不能使用 resume")
+        if self.operation != "export" and self.training_input and len(self.gpu_device_ids) != 1:
+            raise ValueError("自定义权重与断点续训当前需要选择一张 GPU")
+        if self.submitted_parameters is not None:
+            expected = {key: value for key, value in self.parameters.items() if key != "model"}
+            if normalize_parameters(self.operation, self.submitted_parameters) != expected:
+                raise ValueError("submitted_parameters 与规范化配置不一致")
+        return self
 
     @field_validator("image")
     @classmethod
@@ -80,8 +115,10 @@ class StartTrainingRequest(BaseModel):
     @field_validator("gpu_device_ids")
     @classmethod
     def check_gpus(cls, value: list[str]) -> list[str]:
-        if any(not item.isdigit() for item in value):
-            raise ValueError("GPU 编号必须是数字")
+        if any(not re.fullmatch(r"[0-9]+", item) for item in value) or len(set(value)) != len(
+            value
+        ):
+            raise ValueError("GPU 编号必须是唯一的非负整数")
         return value
 
 
@@ -179,6 +216,24 @@ class TrainingService:
 
     # 训练 -----------------------------------------------------------------
 
+    def weight_path(self, digest: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ManagerError("WEIGHT_INVALID", "权重校验值格式不正确")
+        return self._root / "weights" / f"{digest}.pt"
+
+    def weight_info(self, digest: str):
+        path = self.weight_path(digest)
+        if not path.is_file() or _sha256(path) != digest:
+            return None
+        return {"sha256": digest, "size_bytes": path.stat().st_size}
+
+    def store_weight(self, digest: str, temporary: Path):
+        target = self.weight_path(digest)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary.chmod(0o644)
+        temporary.replace(target)
+        return {"sha256": digest, "size_bytes": target.stat().st_size}
+
     def start(self, request: StartTrainingRequest) -> dict[str, object]:
         training_id = request.training_id
         if self._container(training_id) is not None:
@@ -186,19 +241,60 @@ class TrainingService:
         if self.dataset_info(request.dataset_id) is None:
             raise ManagerError("DATASET_MISSING", "节点上没有该训练数据集，请重新提交", 409)
         try:
-            self._client.images.get(request.image)
+            image = self._client.images.get(request.image)
         except Exception as exc:
             raise ManagerError("IMAGE_MISSING", f"节点上没有训练镜像 {request.image}", 409) from exc
+        if (image.labels or {}).get("cv.platform.parameter-contract") != CONTRACT_ID:
+            raise ManagerError(
+                "PARAMETER_CONTRACT_MISMATCH", "训练镜像未声明当前参数契约，请重建训练镜像", 409
+            )
+        if (request.training_input or request.operation == "val") and (
+            (image.labels or {}).get("cv.platform.training-protocol") != TRAINING_PROTOCOL
+        ):
+            raise ManagerError(
+                "TRAINING_PROTOCOL_MISMATCH", "训练镜像不支持受管权重与验证，请更新镜像", 409
+            )
+        if request.operation == "export" and (
+            (image.labels or {}).get("cv.platform.export-protocol") != EXPORT_PROTOCOL
+        ):
+            raise ManagerError("EXPORT_PROTOCOL_MISMATCH", "镜像不支持 ONNX 导出，请重建镜像", 409)
+        if request.training_input:
+            if self.weight_info(request.training_input.sha256) is None:
+                raise ManagerError("WEIGHT_MISSING", "节点权重缺失或损坏，请重新同步", 409)
+            if (
+                request.training_input.best_sha256
+                and self.weight_info(request.training_input.best_sha256) is None
+            ):
+                raise ManagerError("WEIGHT_MISSING", "原最佳权重缺失或损坏，请重新同步", 409)
+            if (
+                self.dataset_info(request.dataset_id)["sha256"]
+                != request.training_input.dataset_sha256
+            ):
+                raise ManagerError("DATASET_INVALID", "数据集版本校验不一致", 409)
         run = self._run_dir(training_id)
         shutil.rmtree(run, ignore_errors=True)
         run.mkdir(parents=True)
         gpu_ids = tuple(request.gpu_device_ids)
         config = {
-            **request.parameters.model_dump(),
+            **request.parameters,
+            "operation": request.operation,
+            **(
+                {"export_verification": request.export_verification.model_dump()}
+                if request.operation == "export"
+                else {}
+            ),
+            "parameter_contract_id": request.parameter_contract_id,
+            "submitted_parameters": request.submitted_parameters,
             # 容器只看得到分配给它的 GPU，编号从 0 开始
-            "device": ",".join(str(index) for index in range(len(gpu_ids))) if gpu_ids else "0",
+            "device": "cpu"
+            if request.operation == "export"
+            else (",".join(str(index) for index in range(len(gpu_ids))) if gpu_ids else "0"),
             "dataset": "/dataset",
+            "dataset_sha256": self.dataset_info(request.dataset_id)["sha256"],
             "output": "/workspace",
+            "training_input": request.training_input.model_dump()
+            if request.training_input
+            else None,
         }
         (run / "config.json").write_text(
             json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -209,15 +305,37 @@ class TrainingService:
             run.chmod(0o777)
         (run / "config.json").chmod(0o644)
 
-        options = gpu_options(self._gpu_access_mode, gpu_ids)
+        options = (
+            {} if request.operation == "export" else gpu_options(self._gpu_access_mode, gpu_ids)
+        )
         environment = {
             "PYTHONUNBUFFERED": "1",
             "HOME": "/workspace",
             "YOLO_CONFIG_DIR": "/workspace/.config",
             "MPLCONFIGDIR": "/workspace/.config/matplotlib",
+            "YOLO_AUTOINSTALL": "false",
             **options.pop("environment", {}),
         }
         limits = {"mem_limit": f"{request.memory_mb}m"} if request.memory_mb else {}
+        inputs = []
+        if request.training_input:
+            inputs.append(
+                Mount(
+                    "/input/model.pt",
+                    str(self._host_root / "weights" / f"{request.training_input.sha256}.pt"),
+                    type="bind",
+                    read_only=True,
+                )
+            )
+        if request.training_input and request.training_input.best_sha256:
+            inputs.append(
+                Mount(
+                    "/input/best.pt",
+                    str(self._host_root / "weights" / f"{request.training_input.best_sha256}.pt"),
+                    type="bind",
+                    read_only=True,
+                )
+            )
         try:
             self._client.containers.run(
                 request.image,
@@ -225,12 +343,15 @@ class TrainingService:
                 detach=True,
                 labels={MANAGED_TRAINING_LABEL: "true", TRAINING_ID_LABEL: training_id},
                 environment=environment,
+                mounts=inputs,
                 volumes={
                     str(self._host_root / "datasets" / request.dataset_id): {
-                        "bind": "/dataset", "mode": "ro",
+                        "bind": "/dataset",
+                        "mode": "ro",
                     },
                     str(self._host_root / "runs" / training_id): {
-                        "bind": "/workspace", "mode": "rw",
+                        "bind": "/workspace",
+                        "mode": "rw",
                     },
                 },
                 network_mode=self._network,
@@ -273,14 +394,22 @@ class TrainingService:
             state = "failed"
             error = final.get("error") or (
                 f"训练进程异常退出（退出码 {exit_code}）"
-                if exit_code is not None else "训练容器已不存在"
+                if exit_code is not None
+                else "训练容器已不存在"
             )
+        progress = _read_json(run / "progress.json")
+        configuration = _read_json(run / "parameter-resolution.json")
+        if configuration is not None:
+            progress = {**(progress or {}), "configuration": configuration}
+        checkpoint = _read_json(run / "train" / "checkpoint.json")
+        if checkpoint is not None:
+            progress = {**(progress or {}), "checkpoint": checkpoint}
         return {
             "training_id": training_id,
             "state": state,
             "exit_code": exit_code,
             "error": error,
-            "progress": _read_json(run / "progress.json"),
+            "progress": progress,
             "metrics": _read_results(run / "train" / "results.csv"),
             "files": self._artifacts(training_id),
         }
@@ -323,7 +452,27 @@ class TrainingService:
         output = self._run_dir(training_id) / "train"
         if not output.is_dir():
             return {}
+        if (_read_json(self._run_dir(training_id) / "config.json") or {}).get(
+            "operation"
+        ) == "export":
+            try:
+                entries = registered_artifacts(output)
+                return {
+                    **{name: item["size_bytes"] for name, item in entries.items()},
+                    **(
+                        {
+                            "artifact-manifest.json": (output / "artifact-manifest.json")
+                            .stat()
+                            .st_size
+                        }
+                        if entries
+                        else {}
+                    ),
+                }
+            except (ValueError, OSError, TypeError) as exc:
+                raise ManagerError("EXPORT_ARTIFACT_INVALID", str(exc), 409) from exc
         files = {}
+        checkpoint = _read_json(output / "checkpoint.json") or {}
         for path in sorted(output.rglob("*")):
             relative = path.relative_to(output)
             if (
@@ -331,6 +480,11 @@ class TrainingService:
                 and not path.is_symlink()
                 and len(relative.parts) <= 2
                 and path.suffix.lower() in ARTIFACT_SUFFIXES
+                and (path.suffix.lower() != ".txt" or relative.parts[0] == "labels")
+                and (
+                    not path.name.startswith("resume-")
+                    or relative.as_posix() == checkpoint.get("file")
+                )
             ):
                 files[relative.as_posix()] = path.stat().st_size
         return files
@@ -341,9 +495,12 @@ class TrainingService:
     def _container(self, training_id: str) -> Any | None:
         found = self._client.containers.list(
             all=True,
-            filters={"label": [
-                f"{MANAGED_TRAINING_LABEL}=true", f"{TRAINING_ID_LABEL}={training_id}",
-            ]},
+            filters={
+                "label": [
+                    f"{MANAGED_TRAINING_LABEL}=true",
+                    f"{TRAINING_ID_LABEL}={training_id}",
+                ]
+            },
         )
         return found[0] if found else None
 
@@ -378,6 +535,47 @@ def _read_results(path: Path) -> list[dict[str, float]]:
 
 def build_training_router(get_training: object) -> APIRouter:
     router = APIRouter(tags=["training"])
+
+    @router.get("/training/parameter-contract")
+    def parameter_contract(mode: Literal["train", "val", "export"] = "train"):
+        return {
+            **get_contract(mode),
+            "training_protocol": TRAINING_PROTOCOL,
+            "export_protocol": EXPORT_PROTOCOL,
+        }
+
+    @router.get("/training/weights/{digest}")
+    def weight_info(digest: str, service: TrainingService = Depends(get_training)):
+        info = service.weight_info(digest)
+        if info is None:
+            raise ManagerError("WEIGHT_MISSING", "节点上没有该权重", 404)
+        return info
+
+    @router.put("/training/weights/{digest}")
+    async def upload_weight(
+        digest: str, request: Request, service: TrainingService = Depends(get_training)
+    ):
+        service.weight_path(digest)
+        size = 0
+        actual = hashlib.sha256()
+        temporary = None
+        try:
+            with NamedTemporaryFile(
+                dir=service.upload_directory(), suffix=".pt", delete=False
+            ) as output:
+                temporary = Path(output.name)
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > 2 * 1024**3:
+                        raise ManagerError("WEIGHT_TOO_LARGE", "权重超过 2 GiB", 413)
+                    actual.update(chunk)
+                    output.write(chunk)
+            if not size or actual.hexdigest() != digest:
+                raise ManagerError("WEIGHT_INVALID", "权重传输校验失败")
+            return await run_in_threadpool(service.store_weight, digest, temporary)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     @router.get("/datasets/{dataset_id}")
     def dataset_info(dataset_id: str, service: TrainingService = Depends(get_training)):
@@ -470,3 +668,11 @@ def build_training_router(get_training: object) -> APIRouter:
 def _check_identifier(value: str) -> None:
     if not re.fullmatch(IDENTIFIER, value):
         raise ManagerError("INPUT_INVALID", "ID 格式不正确")
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()

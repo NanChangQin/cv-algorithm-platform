@@ -25,6 +25,7 @@ class TaskQuery:
     # None 表示所有项目，只用于平台内部的统计和恢复
     project_id: UUID | None = None
     algorithm_version_id: UUID | None = None
+    deployment_id: UUID | None = None
     asset_id: UUID | None = None
     statuses: tuple[TaskStatus, ...] = ()
     # 按实际运行节点匹配，尚未调度的任务按指定节点匹配

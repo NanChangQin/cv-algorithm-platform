@@ -47,6 +47,7 @@ const sourceUri = ref('')
 const mediaSourceId = ref('')
 const mediaAlgorithmId = ref('')
 const mediaParameters = ref<ParameterValues>({})
+const mediaEditorIssue = ref('')
 const mediaInterval = ref(1)
 const mediaMaxFrames = ref(100)
 // 工作流
@@ -80,7 +81,10 @@ const nodeUrlValid = computed(() => /^https?:\/\/.+/.test(node.value.manager_url
 const tasksByStatus = computed(() => Object.entries((metrics.value.tasks_by_status ?? {}) as Record<string, number>))
 const hasActiveRuns = computed(() => mediaRuns.value.some((run) => ['queued', 'extracting', 'running'].includes(run.status)) || workflowRuns.value.some((run) => ['queued', 'running'].includes(run.status)))
 
-watch(mediaAlgorithm, (algorithm) => { mediaParameters.value = defaultParameters(algorithm?.parameters) })
+watch(mediaAlgorithm, (algorithm) => {
+  mediaParameters.value = defaultParameters(algorithm?.parameters)
+  mediaEditorIssue.value = ''
+})
 watch(exportFiles, (files) => { exportFile.value = Object.keys(files)[0] ?? '' })
 
 function algorithmName(id: string) {
@@ -135,7 +139,7 @@ function removeSource(source: MediaSource) {
   void act(() => advancedApi.deleteMediaSource(source.id), '已删除媒体源', '删除媒体源失败')
 }
 function startMediaRun() {
-  const issue = parameterIssue(mediaAlgorithm.value?.parameters, mediaParameters.value)
+  const issue = mediaEditorIssue.value || parameterIssue(mediaAlgorithm.value?.parameters, mediaParameters.value)
   if (issue) { toast.error(issue); return }
   void act(() => advancedApi.startMediaRun(mediaSourceId.value, {
     algorithm_version_id: mediaAlgorithmId.value, parameters: mediaParameters.value,
@@ -232,7 +236,7 @@ onUnmounted(() => window.clearInterval(polling))
           <label>抽帧间隔（秒）<input v-model.number="mediaInterval" type="number" min="0.1" max="60" step="0.1" /></label>
           <label>最多处理帧数<input v-model.number="mediaMaxFrames" type="number" min="1" max="10000" /></label>
         </div>
-        <details v-if="mediaAlgorithm && Object.keys(mediaAlgorithm.parameters).length" class="inline-details"><summary>算法参数</summary><ParameterForm v-model="mediaParameters" :parameters="mediaAlgorithm.parameters" /></details>
+        <details v-if="mediaAlgorithm && Object.keys(mediaAlgorithm.parameters).length" class="inline-details"><summary>算法参数</summary><ParameterForm v-model="mediaParameters" :parameters="mediaAlgorithm.parameters" @validity="mediaEditorIssue = $event" /></details>
         <button class="primary-button" :disabled="busy || !mediaSourceId || !mediaAlgorithmId">开始媒体推理</button>
       </form>
     </section>

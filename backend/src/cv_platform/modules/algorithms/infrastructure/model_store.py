@@ -33,6 +33,27 @@ class ModelStore:
             for name in ("model.pt", "manifest.yaml")
         }
 
+    def publish_export(self, version_id, root, entries, manifest_yaml):
+        target = self.directory(version_id)
+        target.mkdir(parents=True, exist_ok=False)
+        result = {}
+        for name, item in entries.items():
+            source = root / name
+            output = target / name
+            output.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, output)
+            if _sha256(output) != item["sha256"]:
+                raise ValueError("导出产物复制期间发生变化")
+            result[name] = {"size": output.stat().st_size, "sha256": item["sha256"]}
+        shutil.copyfile(root / "artifact-manifest.json", target / "artifact-manifest.json")
+        result["artifact-manifest.json"] = {
+            "size": (target / "artifact-manifest.json").stat().st_size,
+            "sha256": _sha256(target / "artifact-manifest.json")}
+        (target / "manifest.yaml").write_text(manifest_yaml, encoding="utf-8")
+        result["manifest.yaml"] = {"size": (target / "manifest.yaml").stat().st_size,
+                                   "sha256": _sha256(target / "manifest.yaml")}
+        return result
+
     def files(self, algorithm: AlgorithmVersion) -> tuple[ModelFile, ...]:
         recorded = (algorithm.lineage or {}).get("files") or {}
         return tuple(

@@ -1,4 +1,4 @@
-schema_version: "1.0"
+schema_version: '1.1'
 id: yolo-detector
 name: YOLO Detector
 version: 1.0.0
@@ -9,44 +9,131 @@ runtime:
   device: gpu
   min_memory_mb: 2048
 input:
-  media_types: [image/jpeg, image/png]
+  media_types:
+  - image/jpeg
+  - image/png
 output:
   type: object_detection
 parameters:
   confidence:
-    type: number
+    type: json
     default: 0.4
-    minimum: 0
-    maximum: 1
-    step: 0.01
+    json_schema:
+      type: number
+      minimum: 0
+      maximum: 1
     title: 置信度阈值
-    description: 仅保留得分不低于该值的检测框
+    description: 置信度阈值；适用版本 8.4.183。
   iou_threshold:
-    type: number
+    type: json
     default: 0.45
-    minimum: 0
-    maximum: 1
-    step: 0.01
-    title: NMS IoU 阈值
-    description: 控制重叠检测框的合并强度
+    json_schema:
+      type: number
+      minimum: 0
+      maximum: 1
+    title: NMS交并比
+    description: NMS交并比；适用版本 8.4.183。
   max_detections:
-    type: integer
+    type: json
     default: 300
-    minimum: 1
-    maximum: 1000
-    step: 1
-    title: 最大检测数量
-    description: 单张图片最多返回的目标框数量
+    json_schema:
+      type: integer
+      minimum: 1
+      maximum: 10000
+    title: 最大目标数
+    description: 最大目标数；适用版本 8.4.183。
   image_size:
-    type: integer
+    type: json
     default: 640
-    minimum: 320
-    maximum: 1280
-    step: 32
-    title: 推理输入尺寸
-    description: 较大尺寸有利于小目标，但会增加显存和推理时间
+    json_schema:
+      anyOf:
+      - &id001
+        type: integer
+        minimum: 32
+        multipleOf: 32
+      - type: array
+        items: *id001
+        minItems: 2
+        maxItems: 2
+    title: 输入尺寸
+    description: 训练使用单个尺寸；预测可使用整数或 [高度, 宽度]，尺寸为 32 的倍数。
+  classes:
+    type: json
+    default: null
+    json_schema:
+      anyOf:
+      - type: 'null'
+      - type: array
+        items:
+          type: integer
+          minimum: 0
+        minItems: 1
+        uniqueItems: true
+    title: 类别筛选
+    description: 类别编号数组，如 [0, 2]；null 表示全部类别。
   agnostic_nms:
-    type: boolean
+    type: json
     default: false
-    title: 类别无关 NMS
-    description: 开启后，不同类别的重叠框也会互相抑制
+    json_schema:
+      type: boolean
+    title: 类别无关NMS
+    description: 类别无关NMS；适用版本 8.4.183。
+  rect:
+    type: json
+    default: false
+    json_schema:
+      type: boolean
+    title: 矩形输入
+    description: 矩形输入；适用版本 8.4.183。
+  compile:
+    type: json
+    default: false
+    json_schema:
+      enum:
+      - false
+      - true
+      - default
+      - reduce-overhead
+      - max-autotune
+      - max-autotune-no-cudagraphs
+    title: 图编译
+    description: false 禁用；true 使用默认编译；也可指定受支持的 torch.compile 模式。
+  channels_last:
+    type: json
+    default: null
+    json_schema:
+      type:
+      - boolean
+      - 'null'
+    title: 内存布局
+    description: 内存布局；适用版本 8.4.183。
+  quantize:
+    type: json
+    default: null
+    json_schema:
+      enum:
+      - null
+      - 16
+      - 32
+      - fp16
+      - fp32
+      - w16a16
+      - w32a32
+    title: 量化精度
+    description: 统一精度选项；推理支持 FP16/FP32，INT8 需要已量化产物，不能临时转换 .pt。
+  nms:
+    type: json
+    default: null
+    json_schema:
+      type:
+      - boolean
+      - 'null'
+    title: NMS模式
+    description: null 使用默认检测头；true 使用常规 NMS；false 在模型支持时使用无 NMS 头。
+  augment:
+    type: json
+    default: false
+    json_schema:
+      type: boolean
+    title: 测试时增强
+    description: 测试时增强；适用版本 8.4.183。

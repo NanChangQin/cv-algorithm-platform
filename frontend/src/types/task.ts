@@ -14,6 +14,7 @@ export interface Detection {
 }
 
 export interface ObjectDetectionResult {
+  configuration?: Record<string, unknown> | null
   schema_version: '1.0'
   request_id: string
   type: 'object_detection'
@@ -54,6 +55,7 @@ export interface Keypoint { name: string; x: number; y: number; score: number }
 export type AlgorithmResult = ObjectDetectionResult | ClassificationResult | SegmentationResult | OcrResult | PoseResult
 
 export interface InferenceTask {
+  deployment_id?: string | null
   id: string
   algorithm_version_id: string
   asset_id: string | null
@@ -84,6 +86,8 @@ export interface CreateTaskPayload {
   gpu_device_ids?: string[]
   /** 在指定的部署实例上运行（使用其服务器和 GPU） */
   deployment_id?: string
+  /** 通过稳定的服务路由入口运行 */
+  service_key?: string
 }
 
 export interface TaskResultResponse {
@@ -95,3 +99,4 @@ export interface TaskSummary {
   total: number
   by_status: Record<TaskStatus, number>
 }
+

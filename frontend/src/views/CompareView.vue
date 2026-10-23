@@ -40,6 +40,7 @@ const knownAssets = ref<Record<string, ImageAsset>>({})
 const requestedAssets = new Set<string>()
 const selectedAlgorithms = ref<string[]>([])
 const parameterValues = ref<Record<string, ParameterValues>>({})
+const editorIssues = ref<Record<string, string>>({})
 const expanded = ref<string[]>([])
 const comparison = ref<AlgorithmComparison | null>(null)
 const results = ref<Record<string, AlgorithmResult>>({})
@@ -55,7 +56,7 @@ const builderIssue = computed(() => {
   if (!selectedAsset.value) return '请选择一张图片'
   if (chosen.value.length < 2) return '至少选择两个算法'
   for (const algorithm of chosen.value) {
-    const issue = parameterIssue(algorithm.parameters, parameterValues.value[algorithm.id] ?? {})
+    const issue = editorIssues.value[algorithm.id] || parameterIssue(algorithm.parameters, parameterValues.value[algorithm.id] ?? {})
     if (issue) return `${algorithm.name}：${issue}`
   }
   return ''
@@ -256,7 +257,7 @@ onUnmounted(() => window.clearInterval(polling))
             </button>
             <template v-if="selectedAlgorithms.includes(algorithm.id) && Object.keys(algorithm.parameters).length">
               <button type="button" class="text-button" :aria-expanded="expanded.includes(algorithm.id)" @click="toggleExpanded(algorithm.id)">{{ expanded.includes(algorithm.id) ? '收起参数' : '调整参数' }}</button>
-              <ParameterForm v-if="expanded.includes(algorithm.id)" class="compare-parameters" :parameters="algorithm.parameters" :model-value="parameterValues[algorithm.id] ?? {}" @update:model-value="parameterValues[algorithm.id] = $event" />
+              <ParameterForm v-show="expanded.includes(algorithm.id)" class="compare-parameters" :parameters="algorithm.parameters" :model-value="parameterValues[algorithm.id] ?? {}" @update:model-value="parameterValues[algorithm.id] = $event" @validity="editorIssues[algorithm.id] = $event" />
             </template>
           </article>
         </div>

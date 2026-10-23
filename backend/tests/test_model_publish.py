@@ -52,6 +52,9 @@ def test_best_checkpoint_becomes_an_available_model_with_lineage(client: TestCli
     assert lineage["training_run_id"] == run["id"]
     assert lineage["dataset_name"] == "猫狗"
     assert lineage["class_names"] == ["cat", "dog"]
+    assert lineage["dataset"] == run["progress"]["dataset"]
+    assert lineage["dataset"]["version"] == 1
+    assert len(lineage["dataset"]["sha256"]) == 64
     assert lineage["checkpoint"] == "best"
     # best.pt 对应 mAP50-95 最高的第 2 轮
     assert lineage["epoch"] == 2

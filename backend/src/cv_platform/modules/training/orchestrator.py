@@ -14,6 +14,11 @@ from threading import Lock
 from typing import Any
 from uuid import UUID
 
+from cv_algorithm_sdk.export_artifacts import registered_artifacts
+from cv_algorithm_sdk.exports import EXPORT_PROTOCOL
+from cv_algorithm_sdk.runtime_contract import CONTRACT_ID, get_contract
+from cv_algorithm_sdk.training_sources import TRAINING_PROTOCOL
+
 from ...core.database import Database
 from ...core.errors import ApplicationError
 from ..scheduling.cluster_gateway import ClusterAlgorithmManagerGateway
@@ -21,6 +26,7 @@ from ..scheduling.node_client import NodeClient
 from .datasets import TrainingDatasetStorage
 from .domain import TrainingRun, TrainingStatus
 from .repository import InMemoryTrainingRepository, PostgresTrainingRepository
+from .weights import sha256
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +97,9 @@ class TrainingOrchestrator:
                 # 进程在准备中途重启：重新排队，准备步骤可以重复执行
                 if not self._is_busy(run.id):
                     self._repository.update(
-                        run.id, {TrainingStatus.PREPARING}, status=TrainingStatus.QUEUED,
+                        run.id,
+                        {TrainingStatus.PREPARING},
+                        status=TrainingStatus.QUEUED,
                     )
             elif run.status is TrainingStatus.STOPPING and run.started_at is None:
                 if not self._is_busy(run.id):
@@ -106,8 +114,11 @@ class TrainingOrchestrator:
 
     def prepare(self, run_id: UUID) -> None:
         if not self._repository.update(
-            run_id, {TrainingStatus.QUEUED},
-            status=TrainingStatus.PREPARING, stage="检查训练服务器", error=None,
+            run_id,
+            {TrainingStatus.QUEUED},
+            status=TrainingStatus.PREPARING,
+            stage="检查训练服务器",
+            error=None,
         ):
             return
         run = self._repository.get_run(run_id)
@@ -115,7 +126,25 @@ class TrainingOrchestrator:
         start_sent = False
         try:
             client = self._cluster.node_client(run.node_id)
-            self._check_gpus(client, run)
+            operation = (run.progress or {}).get("operation", "train")
+            contract = client.request(
+                "GET", "/training/parameter-contract", params={"mode": operation}
+            )
+            if contract.get("sha256") != get_contract(operation)["sha256"]:
+                raise ApplicationError(
+                    "PARAMETER_CONTRACT_MISMATCH", "训练节点参数契约不匹配，请更新节点 Manager", 409
+                )
+            if operation == "val" and contract.get("training_protocol") != TRAINING_PROTOCOL:
+                raise ApplicationError(
+                    "TRAINING_PROTOCOL_MISMATCH", "节点不支持独立验证，请更新节点", 409
+                )
+            if operation == "export":
+                if contract.get("export_protocol") != EXPORT_PROTOCOL:
+                    raise ApplicationError(
+                        "EXPORT_PROTOCOL_MISMATCH", "节点不支持 ONNX 导出，请更新节点", 409
+                    )
+            else:
+                self._check_gpus(client, run)
             self._stage(run_id, "检查训练镜像")
             if not client.image_exists(self._image):
                 raise ApplicationError(
@@ -125,6 +154,30 @@ class TrainingOrchestrator:
                     409,
                 )
             self._send_dataset(client, run)
+            source = (run.progress or {}).get("source") or {}
+            training_input = None
+            if source.get("sha256"):
+                if contract.get("training_protocol") != TRAINING_PROTOCOL:
+                    raise ApplicationError(
+                        "TRAINING_PROTOCOL_MISMATCH", "节点不支持受管权重，请更新 Manager", 409
+                    )
+                self._send_weight(client, run, source["sha256"])
+                if source.get("best_sha256"):
+                    self._send_weight(client, run, source["best_sha256"], "best.pt")
+                checkpoint = source.get("checkpoint_state") or {}
+                training_input = {
+                    "sha256": source["sha256"],
+                    "resume": source.get("mode") == "resume",
+                    "dataset_sha256": run.progress["dataset"]["sha256"],
+                    "epoch": checkpoint.get("epoch", 0),
+                    "epochs": checkpoint.get("epochs", 0),
+                    **({"best_sha256": source["best_sha256"]} if source.get("best_sha256") else {}),
+                    **(
+                        {"optimizer": checkpoint["optimizer"], "lr0": checkpoint["lr0"]}
+                        if checkpoint.get("optimizer")
+                        else {}
+                    ),
+                }
             if self._finish_unstarted(run_id):
                 return
             self._stage(run_id, "启动训练容器")
@@ -133,21 +186,36 @@ class TrainingOrchestrator:
                 "POST",
                 "/trainings",
                 json={
+                    **({"operation": operation} if operation != "train" else {}),
+                    **(
+                        {"export_verification": run.progress["export_verification"]}
+                        if operation == "export"
+                        else {}
+                    ),
+                    **({"training_input": training_input} if training_input else {}),
                     "training_id": str(run.id),
                     "dataset_id": str(run.dataset_id),
                     "image": self._image,
                     "parameters": {"model": run.model, **run.parameters},
+                    "parameter_contract_id": CONTRACT_ID,
+                    "submitted_parameters": (run.progress or {})
+                    .get("configuration", {})
+                    .get("submitted", run.parameters),
                     "gpu_device_ids": list(run.gpu_device_ids),
                 },
                 timeout=120,
             )
             # 准备期间用户点了停止：状态已是 stopping，交给同步流程去停容器
             self._repository.update(
-                run_id, {TrainingStatus.PREPARING, TrainingStatus.STOPPING},
-                stage=None, started_at=datetime.now(UTC),
+                run_id,
+                {TrainingStatus.PREPARING, TrainingStatus.STOPPING},
+                stage=None,
+                started_at=datetime.now(UTC),
             )
             self._repository.update(
-                run_id, {TrainingStatus.PREPARING}, status=TrainingStatus.RUNNING,
+                run_id,
+                {TrainingStatus.PREPARING},
+                status=TrainingStatus.RUNNING,
             )
         except ApplicationError as exc:
             self._fail(run_id, exc.message)
@@ -194,11 +262,25 @@ class TrainingOrchestrator:
             progress=report,
         )
 
+    def _send_weight(
+        self, client: NodeClient, run: TrainingRun, digest: str, filename: str = "model.pt"
+    ) -> None:
+        self._stage(run.id, "同步来源权重")
+        path = self._storage.run_directory(run.id) / ".source" / filename
+        if not path.is_file() or sha256(path) != digest:
+            raise ApplicationError("WEIGHT_CORRUPT", "本次训练的来源权重缺失或损坏", 409)
+        current = client.request("GET", f"/training/weights/{digest}", allow_missing=True)
+        if not current or current.get("sha256") != digest:
+            client.upload(f"/training/weights/{digest}", path)
+
     def _finish_unstarted(self, run_id: UUID) -> bool:
         """训练容器启动前就被停止的任务直接结束。"""
         return self._repository.update(
-            run_id, {TrainingStatus.STOPPING},
-            status=TrainingStatus.STOPPED, stage=None, finished_at=datetime.now(UTC),
+            run_id,
+            {TrainingStatus.STOPPING},
+            status=TrainingStatus.STOPPED,
+            stage=None,
+            finished_at=datetime.now(UTC),
         )
 
     # 同步 -----------------------------------------------------------------
@@ -224,11 +306,20 @@ class TrainingOrchestrator:
                 self._stage(run.id, f"停止训练失败：{exc.message}，稍后重试")
             return
         metrics = tuple(state.get("metrics") or ())
-        progress = state.get("progress")
+        progress = state.get("progress") or {}
+        for key in ("dataset", "source", "operation", "export_verification"):
+            if (run.progress or {}).get(key):
+                progress = {**progress, key: run.progress[key]}
+        if "configuration" not in progress and (run.progress or {}).get("configuration"):
+            progress = {**progress, "configuration": run.progress["configuration"]}
+        state["progress"] = progress or None
         if metrics != run.metrics or progress != run.progress or run.stage:
             self._repository.update(
-                run.id, {TrainingStatus.RUNNING, TrainingStatus.STOPPING},
-                progress=progress, metrics=metrics, stage=None,
+                run.id,
+                {TrainingStatus.RUNNING, TrainingStatus.STOPPING},
+                progress=progress,
+                metrics=metrics,
+                stage=None,
             )
         if node_state in {"completed", "stopped", "failed"}:
             self._collect(client, run, state)
@@ -238,22 +329,52 @@ class TrainingOrchestrator:
         artifacts: dict[str, int] = {}
         try:
             for name in state.get("files") or {}:
-                artifacts[name] = client.download(
-                    f"/trainings/{run.id}/files/{name}", directory / name
+                target = (directory / name).resolve()
+                if directory.resolve() not in target.parents or "\\" in name:
+                    raise ApplicationError("ARTIFACT_INVALID", "节点返回了非法产物路径", 409)
+                artifacts[name] = client.download(f"/trainings/{run.id}/files/{name}", target)
+            if (run.progress or {}).get("operation") == "export" and (
+                artifacts or state.get("state") == "completed"
+            ):
+                try:
+                    entries = registered_artifacts(directory, verify_hash=True)
+                    if set(artifacts) != {*entries, "artifact-manifest.json"}:
+                        raise ValueError("节点产物与导出登记清单不一致")
+                except (ValueError, OSError, TypeError) as exc:
+                    raise ApplicationError("EXPORT_ARTIFACT_INVALID", str(exc), 409) from exc
+            checkpoint = (state.get("progress") or {}).get("checkpoint")
+            if checkpoint:
+                name = checkpoint.get("file")
+                path = (
+                    directory / name
+                    if isinstance(name, str) and name in artifacts
+                    else directory / ".missing"
                 )
-            logs = client.request(
-                "GET", f"/trainings/{run.id}/logs", params={"tail": LOG_TAIL}, allow_missing=True
-            ) or []
+                if not path.is_file() or sha256(path) != checkpoint.get("sha256"):
+                    raise ApplicationError(
+                        "CHECKPOINT_CORRUPT", "恢复 checkpoint 校验失败，节点副本保留", 409
+                    )
+            logs = (
+                client.request(
+                    "GET",
+                    f"/trainings/{run.id}/logs",
+                    params={"tail": LOG_TAIL},
+                    allow_missing=True,
+                )
+                or []
+            )
         except ApplicationError as exc:
             self._stage(run.id, f"收回训练结果失败：{exc.message}，稍后重试")
             return
         node_state = state["state"]
         status = NODE_FINISHED.get(node_state) or (
-            TrainingStatus.STOPPED if run.status is TrainingStatus.STOPPING
+            TrainingStatus.STOPPED
+            if run.status is TrainingStatus.STOPPING
             else TrainingStatus.FAILED
         )
         finished = self._repository.update(
-            run.id, {TrainingStatus.RUNNING, TrainingStatus.STOPPING},
+            run.id,
+            {TrainingStatus.RUNNING, TrainingStatus.STOPPING},
             status=status,
             stage=None,
             progress=state.get("progress"),
@@ -305,12 +426,19 @@ class TrainingOrchestrator:
     def _fail(self, run_id: UUID, message: str) -> None:
         now = datetime.now(UTC)
         if self._repository.update(
-            run_id, {TrainingStatus.PREPARING, TrainingStatus.RUNNING},
-            status=TrainingStatus.FAILED, stage=None, error=message, finished_at=now,
+            run_id,
+            {TrainingStatus.PREPARING, TrainingStatus.RUNNING},
+            status=TrainingStatus.FAILED,
+            stage=None,
+            error=message,
+            finished_at=now,
         ):
             return
         # 用户已经要求停止的任务出错时按已停止处理
         self._repository.update(
-            run_id, {TrainingStatus.STOPPING},
-            status=TrainingStatus.STOPPED, stage=None, finished_at=now,
+            run_id,
+            {TrainingStatus.STOPPING},
+            status=TrainingStatus.STOPPED,
+            stage=None,
+            finished_at=now,
         )

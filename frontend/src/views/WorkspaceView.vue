@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { useRoute } from 'vue-router'
 
 import { assetsApi } from '@/api/assets'
-import { deploymentsApi, type Deployment } from '@/api/deployments'
+import { deploymentsApi, type Deployment, type DeploymentRoute } from '@/api/deployments'
 import { ApiError } from '@/api/http'
 import { tasksApi } from '@/api/tasks'
 import { systemApi, type GpuInfo } from '@/api/system'
@@ -22,7 +22,7 @@ import type { ImageAsset } from '@/types/asset'
 import type { CreateTaskPayload, InferenceTask, TaskStatus } from '@/types/task'
 import { errorMessage } from '@/utils/errors'
 import {
-  defaultParameters, mergeParameters, parameterIssue as findParameterIssue, type ParameterValues,
+  mergeParameters, parameterIssue as findParameterIssue, type ParameterValues,
 } from '@/utils/parameters'
 import { nodeLabel, relativeTime, resultSummary } from '@/utils/presentation'
 import { taskStatusLabel } from '@/utils/status'
@@ -73,10 +73,11 @@ const parameterValues = ref<ParameterValues>({})
 const preset = ref<InferenceTask | null>(null)
 const presetLoading = ref(false)
 const notice = ref('')
-const parameterIssue = computed(() => findParameterIssue(activeSelection.value?.parameters, parameterValues.value))
+const editorIssue = ref('')
+const parameterIssue = computed(() => editorIssue.value || findParameterIssue(activeSelection.value?.parameters, parameterValues.value))
 
 function resetParameters() {
-  parameterValues.value = defaultParameters(activeSelection.value?.parameters)
+  parameterValues.value = mergeParameters(activeSelection.value?.parameters, selectedDeployment.value?.runtime_profile?.defaults)
 }
 
 // ---- 运行位置 ----
@@ -87,18 +88,33 @@ const selectedGpuId = ref('')
 const runtimeLoading = ref(false)
 const runtimeError = ref('')
 const nodeGpus = computed(() => gpus.value.filter((gpu) => gpu.node_id === selectedNodeId.value))
-// 已部署的实例：选中后任务固定在该部署的服务器和 GPU 上运行
+// 已部署的实例与服务路由：选中后任务在对应部署实例上运行
 const deployments = ref<Deployment[]>([])
+const serviceRoutes = ref<DeploymentRoute[]>([])
 const selectedDeploymentId = ref('')
+const selectedServiceKey = ref('')
+const availableRoutes = computed(() => serviceRoutes.value.filter(
+  (item) => item.active_algorithm_version_id === activeSelection.value?.id,
+))
+const selectedRoute = computed(() => availableRoutes.value.find((item) => item.key === selectedServiceKey.value))
 const runningDeployments = computed(() => deployments.value.filter(
   (item) => item.status === 'running' && item.algorithm_version_id === activeSelection.value?.id,
 ))
-const selectedDeployment = computed(() => runningDeployments.value.find((item) => item.id === selectedDeploymentId.value))
+const selectedDeployment = computed(() => {
+  if (selectedRoute.value) {
+    return deployments.value.find((item) => item.id === selectedRoute.value?.active_deployment_id)
+  }
+  return runningDeployments.value.find((item) => item.id === selectedDeploymentId.value)
+})
 const deploymentLabel = (item: Deployment) => `${nodeLabel(item.node_id, nodes.value)}${item.gpu_device_ids.length ? ` · GPU ${item.gpu_device_ids.join(', ')}` : ' · CPU'}`
-const placementSummary = computed(() => selectedDeployment.value
-  ? `部署实例 · ${deploymentLabel(selectedDeployment.value)}`
-  : `${nodeLabel(selectedNodeId.value, nodes.value)}${selectedGpuId.value ? ` · GPU ${selectedGpuId.value}` : ''}`)
+const placementSummary = computed(() => selectedRoute.value
+  ? `服务入口 · ${selectedRoute.value.name}（${selectedRoute.value.key}）`
+  : selectedDeployment.value
+    ? `部署实例 · ${deploymentLabel(selectedDeployment.value)}`
+    : `${nodeLabel(selectedNodeId.value, nodes.value)}${selectedGpuId.value ? ` · GPU ${selectedGpuId.value}` : ''}`)
 const placementIssue = computed(() => {
+  if (selectedServiceKey.value && !runtimeLoading.value && (!selectedRoute.value || selectedRoute.value.rollout_status === 'degraded')) return '所选服务入口当前没有可用的运行部署，请重新选择。'
+  if (selectedServiceKey.value) return ''
   if (selectedDeploymentId.value && !runtimeLoading.value && !selectedDeployment.value) return '所选部署实例已不在运行，请重新选择。'
   if (selectedDeploymentId.value) return ''
   if (runtimeLoading.value || !selectedNodeId.value) return ''
@@ -111,14 +127,24 @@ const placementIssue = computed(() => {
 const waitingForPlacement = computed(() => runtimeLoading.value && Boolean(selectedNodeId.value))
 watch(selectedNodeId, () => { selectedGpuId.value = '' })
 
+watch(selectedDeployment, (deployment) => {
+  if (!deployment || !activeSelection.value) return
+  parameterValues.value = mergeParameters(activeSelection.value.parameters, {
+    ...deployment.runtime_profile?.defaults,
+    ...(preset.value?.deployment_id === deployment.id ? preset.value.parameters : {}),
+  })
+})
+
 // 换算法时恢复默认参数；“复用配置”打开时套用原任务的参数
 watch(activeSelection, (algorithm, previous) => {
   resetParameters()
   selectedGpuId.value = ''
   // 只在用户换算法时清掉部署实例；首次加载时算法列表可能比部署列表先到
-  if (previous && algorithm?.id !== previous.id) selectedDeploymentId.value = ''
+  if (previous && algorithm?.id !== previous.id && preset.value?.algorithm_version_id !== algorithm?.id) { selectedDeploymentId.value = ''; selectedServiceKey.value = '' }
   if (preset.value && algorithm && preset.value.algorithm_version_id === algorithm.id) {
-    parameterValues.value = mergeParameters(algorithm.parameters, preset.value.parameters)
+    parameterValues.value = mergeParameters(algorithm.parameters, {
+      ...selectedDeployment.value?.runtime_profile?.defaults, ...preset.value.parameters,
+    })
     selectedGpuId.value = preset.value.gpu_device_ids.length === 1 ? preset.value.gpu_device_ids[0]! : ''
   }
 }, { immediate: true })
@@ -127,14 +153,16 @@ async function loadRuntimeResources() {
   runtimeLoading.value = true
   runtimeError.value = ''
   try {
-    const [resources, deployed] = await Promise.all([
+    const [resources, deployed, routes] = await Promise.all([
       systemApi.executionResources(),
       // 部署列表读取失败不影响自动调度和指定服务器
       deploymentsApi.list().catch(() => [] as Deployment[]),
+      deploymentsApi.listRoutes ? deploymentsApi.listRoutes().catch(() => [] as DeploymentRoute[]) : Promise.resolve([] as DeploymentRoute[]),
     ])
     nodes.value = resources.nodes
     gpus.value = resources.gpus
     deployments.value = deployed
+    serviceRoutes.value = routes
     if (selectedGpuId.value && !nodeGpus.value.some((gpu) => String(gpu.index) === selectedGpuId.value)) selectedGpuId.value = ''
   } catch (reason) {
     runtimeError.value = errorMessage(reason, '运行资源加载失败')
@@ -148,6 +176,7 @@ interface FrozenRunConfig {
   nodeId?: string
   gpuDeviceIds: string[]
   deploymentId?: string
+  serviceKey?: string
 }
 interface BatchRun { total: number; submitted: number; taskIds: Record<string, string> }
 
@@ -185,9 +214,11 @@ function frozenConfig(): FrozenRunConfig {
   return {
     algorithmVersionId: activeSelection.value!.id,
     parameters: { ...parameterValues.value },
-    ...(selectedDeployment.value
-      ? { deploymentId: selectedDeployment.value.id, gpuDeviceIds: [] }
-      : { nodeId: selectedNodeId.value || undefined, gpuDeviceIds: selectedGpuId.value ? [selectedGpuId.value] : [] }),
+    ...(selectedRoute.value
+      ? { serviceKey: selectedRoute.value.key, gpuDeviceIds: [] }
+      : selectedDeployment.value
+        ? { deploymentId: selectedDeployment.value.id, gpuDeviceIds: [] }
+        : { nodeId: selectedNodeId.value || undefined, gpuDeviceIds: selectedGpuId.value ? [selectedGpuId.value] : [] }),
   }
 }
 function payloadFor(assetId: string, config: FrozenRunConfig): CreateTaskPayload {
@@ -197,6 +228,7 @@ function payloadFor(assetId: string, config: FrozenRunConfig): CreateTaskPayload
     parameters: config.parameters,
     node_id: config.nodeId,
     gpu_device_ids: config.gpuDeviceIds,
+    ...(config.serviceKey ? { service_key: config.serviceKey } : {}),
     ...(config.deploymentId ? { deployment_id: config.deploymentId } : {}),
   }
 }
@@ -364,6 +396,7 @@ onMounted(async () => {
   if (typeof route.query.asset === 'string') linked.unshift(route.query.asset)
   if (typeof route.query.algorithm === 'string') selectedAlgorithmId.value = route.query.algorithm
   if (typeof route.query.deployment === 'string') selectedDeploymentId.value = route.query.deployment
+  if (typeof route.query.service === 'string') selectedServiceKey.value = route.query.service
   const fromTask = route.query.from_task
   const resources = loadRuntimeResources()
   if (typeof fromTask === 'string') {
@@ -372,12 +405,15 @@ onMounted(async () => {
       const original = await tasksApi.get(fromTask)
       await resources
       preset.value = original
+      selectedDeploymentId.value = original.deployment_id ?? ''
       selectedAlgorithmId.value = original.algorithm_version_id
       if (original.asset_id) linked.unshift(original.asset_id)
       selectedNodeId.value = original.node_id ?? ''
       await nextTick()
       if (activeSelection.value?.id === original.algorithm_version_id) {
-        parameterValues.value = mergeParameters(activeSelection.value.parameters, original.parameters)
+        parameterValues.value = mergeParameters(activeSelection.value.parameters, {
+          ...selectedDeployment.value?.runtime_profile?.defaults, ...original.parameters,
+        })
       }
       selectedGpuId.value = original.gpu_device_ids.length === 1 ? original.gpu_device_ids[0]! : ''
       notice.value = !activeSelection.value || activeSelection.value.id !== original.algorithm_version_id
@@ -432,26 +468,32 @@ onUnmounted(() => {
         <section v-if="activeSelection" class="config-section">
           <header class="config-heading">
             <h2>参数</h2>
-            <button type="button" class="text-button" @click="resetParameters">恢复默认</button>
           </header>
-          <ParameterForm v-model="parameterValues" :parameters="activeSelection.parameters" />
+          <ParameterForm v-model="parameterValues" :parameters="activeSelection.parameters" :defaults="selectedDeployment?.runtime_profile?.defaults" @validity="editorIssue = $event" />
           <p v-if="!Object.keys(activeSelection.parameters).length" class="muted-copy">这个算法没有可调参数。</p>
         </section>
 
-        <details class="config-section placement-section" :open="Boolean(selectedNodeId || selectedDeploymentId) || undefined">
+        <p v-if="selectedDeployment?.runtime_profile?.allowed_overrides" class="muted-copy">部署已锁定部分参数；允许修改：{{ selectedDeployment.runtime_profile.allowed_overrides.join(', ') || '无' }}。默认参数已加载。</p>
+        <details class="config-section placement-section" :open="Boolean(selectedNodeId || selectedDeploymentId || selectedServiceKey) || undefined">
           <summary>
             <span>运行位置</span>
             <strong>{{ placementSummary }}</strong>
           </summary>
           <fieldset class="execution-placement">
             <legend class="visually-hidden">运行位置</legend>
-            <label v-if="runningDeployments.length || selectedDeploymentId">部署实例
+            <label v-if="availableRoutes.length || selectedServiceKey">服务路由入口
+              <select v-model="selectedServiceKey" @change="selectedDeploymentId = selectedServiceKey ? '' : selectedDeploymentId">
+                <option value="">不指定</option>
+                <option v-for="routeItem in availableRoutes" :key="routeItem.key" :value="routeItem.key">{{ routeItem.name }}（{{ routeItem.key }}）</option>
+              </select>
+            </label>
+            <label v-if="!selectedServiceKey && (runningDeployments.length || selectedDeploymentId)">部署实例
               <select v-model="selectedDeploymentId">
                 <option value="">不指定</option>
                 <option v-for="item in runningDeployments" :key="item.id" :value="item.id">{{ deploymentLabel(item) }}</option>
               </select>
             </label>
-            <label v-if="!selectedDeploymentId">执行服务器
+            <label v-if="!selectedDeploymentId && !selectedServiceKey">执行服务器
               <select v-model="selectedNodeId" :disabled="runtimeLoading && !nodes.length">
                 <option value="">自动调度</option>
                 <option v-for="node in nodes" :key="node.id" :value="node.id">{{ nodeLabel(node.id, nodes) }}</option>

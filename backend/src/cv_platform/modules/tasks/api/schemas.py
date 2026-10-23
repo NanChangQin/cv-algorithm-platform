@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class CreateTaskRequest(BaseModel):
     algorithm_version_id: UUID | None = None
     algorithm_key: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{2,63}$")
+    service_key: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$")
     asset_id: UUID | None = None
     asset_uri: str | None = Field(default=None, min_length=1, max_length=2_048)
     parameters: dict[str, Any] = Field(default_factory=dict)
@@ -21,8 +22,14 @@ class CreateTaskRequest(BaseModel):
     def require_input(self) -> "CreateTaskRequest":
         if self.asset_id is None and self.asset_uri is None:
             raise ValueError("asset_id is required")
-        if self.algorithm_version_id is None and self.algorithm_key is None:
-            raise ValueError("algorithm_version_id or algorithm_key is required")
+        if (
+            self.algorithm_version_id is None
+            and self.algorithm_key is None
+            and self.service_key is None
+        ):
+            raise ValueError("algorithm_version_id, algorithm_key, or service_key is required")
+        if self.service_key is not None and self.deployment_id is not None:
+            raise ValueError("service_key 与 deployment_id 不能同时指定")
         if self.gpu_device_ids and not self.node_id:
             raise ValueError("指定 GPU 时必须选择运行服务器")
         if any(not item.isascii() or not item.isdigit() for item in self.gpu_device_ids):
@@ -33,6 +40,7 @@ class CreateTaskRequest(BaseModel):
 
 
 class TaskResponse(BaseModel):
+    deployment_id: UUID | None = None
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

@@ -173,6 +173,7 @@ def build_container() -> ApplicationContainer:
             manager_api_token=manager_token,
         ),
         settings.task_worker_count,
+        deployments=deployments,
     )
     # 与 Algorithm Manager 共用的数据目录里，节点自己使用 training/，主服务器使用 training-store/
     training_storage = TrainingDatasetStorage(
@@ -227,7 +228,7 @@ def build_container() -> ApplicationContainer:
             settings.max_video_upload_bytes,
         ),
         workflows=InMemoryWorkflowService(algorithms, database),
-        operations=OperationsService(algorithms, tasks, instances, database),
+        operations=OperationsService(algorithms, tasks, instances, database, deployments=deployments),
         projects=projects,
         training=training,
         training_storage=training_storage,
@@ -239,7 +240,9 @@ def build_container() -> ApplicationContainer:
         deployment_orchestrator=DeploymentOrchestrator(
             deployments, algorithms, manager, instances,
             settings.storage_root / "deployment-staging",
+            tasks=tasks,
         ),
         coordinator_lock=LeaderLock(database, "cv-platform-coordinator"),
         database=database,
     )
+

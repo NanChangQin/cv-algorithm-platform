@@ -2,6 +2,9 @@
 FROM pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 
 ARG ULTRALYTICS_VERSION=8.4.183
+LABEL cv.platform.parameter-contract="ultralytics:8.4.183:parameters-v1"
+LABEL cv.platform.training-protocol="ultralytics:8.4.183:sources-v1"
+LABEL cv.platform.export-protocol="ultralytics:8.4.183:onnx-v1"
 # 国内网络可传入镜像源，例如 --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ARG PIP_INDEX_URL=https://pypi.org/simple
 # 基础镜像使用 Ubuntu 24.04 的系统 Python（PEP 668），容器内直接安装依赖
@@ -12,7 +15,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir "ultralytics==${ULTRALYTICS_VERSION}" "PyYAML>=6,<7"
+COPY packages/algorithm-sdk /opt/algorithm-sdk
+RUN pip install --no-cache-dir "ultralytics==${ULTRALYTICS_VERSION}" "PyYAML>=6,<7" \
+    "onnx==1.19.1" "onnxruntime==1.23.2" "onnxslim==0.1.82" \
+    /opt/algorithm-sdk
 
 # 训练容器默认断网运行：预训练权重和绘图字体在构建时准备好。
 # assets/ 里已有的文件直接使用（无法访问 GitHub 的机器离线构建），缺少的再下载。
@@ -30,6 +36,7 @@ check_font('Arial.ttf'); check_font('Arial.Unicode.ttf')" \
     && chmod -R a+rX /opt/weights /opt/ultralytics-assets
 
 COPY runtimes/yolo-trainer/train.py /opt/trainer/train.py
+COPY runtimes/yolo-trainer/export_model.py /opt/trainer/export_model.py
 RUN useradd --create-home --uid 10001 algorithm
 USER 10001
 CMD ["python", "/opt/trainer/train.py"]

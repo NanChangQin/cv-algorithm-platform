@@ -33,6 +33,7 @@ class InferenceTask:
     project_id: UUID = DEFAULT_PROJECT_ID
     node_id: str | None = None
     gpu_device_ids: tuple[str, ...] = ()
+    deployment_id: UUID | None = None
     execution_node_id: str | None = None
     execution_gpu_device_ids: tuple[str, ...] = ()
 
@@ -49,6 +50,7 @@ class InferenceTask:
         owner_id: str = "local-admin",
         node_id: str | None = None,
         gpu_device_ids: tuple[str, ...] = (),
+        deployment_id: UUID | None = None,
     ) -> "InferenceTask":
         now = datetime.now(UTC)
         return cls(
@@ -65,6 +67,7 @@ class InferenceTask:
             owner_id=owner_id,
             node_id=node_id,
             gpu_device_ids=gpu_device_ids,
+            deployment_id=deployment_id,
         )
 
     def transition(

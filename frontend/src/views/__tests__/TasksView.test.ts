@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskDrawer from '@/components/tasks/TaskDrawer.vue'
 import TaskTable from '@/components/tasks/TaskTable.vue'
 
-const calls = vi.hoisted(() => ({ archive: vi.fn(), resources: vi.fn(), page: vi.fn(), summary: vi.fn(), byIds: vi.fn(), replace: vi.fn() }))
+const calls = vi.hoisted(() => ({ archive: vi.fn(), resources: vi.fn(), page: vi.fn(), summary: vi.fn(), byIds: vi.fn(), replace: vi.fn(), datasets: vi.fn(), datasetFeedback: vi.fn() }))
 vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ replace: calls.replace }) }))
 vi.mock('@/api/tasks', () => ({ tasksApi: { archive: calls.archive, page: calls.page, summary: calls.summary, byIds: calls.byIds } }))
+vi.mock('@/api/training', () => ({ trainingApi: { datasets: calls.datasets, datasetFeedback: calls.datasetFeedback } }))
 vi.mock('@/api/assets', () => ({ assetsApi: { byIds: vi.fn().mockResolvedValue([{ id: 'asset-1', original_name: 'bear.jpg' }]), thumbnailUrl: () => '' } }))
 vi.mock('@/api/system', () => ({ systemApi: { executionResources: calls.resources } }))
 vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => ({ algorithms: ref([{ id: 'algorithm-1', name: 'Detector', version: '1' }]) }) }))
@@ -144,6 +145,33 @@ describe('task center', () => {
     expect(calls.archive).toHaveBeenCalledWith(['task-1'])
     expect(wrapper.text()).toContain('下载服务暂不可用')
     expect(wrapper.text()).toContain('已选 1 项')
+    wrapper.unmount()
+  })
+
+  it('feeds selected completed tasks back into a training dataset to create a new version', async () => {
+    calls.datasets.mockResolvedValue([
+      { id: 'ds-1', name: '安全帽数据集', version: 1, class_names: ['helmet', 'person'] },
+    ])
+    calls.datasetFeedback.mockResolvedValue({
+      id: 'ds-2',
+      name: '安全帽数据集',
+      version: 2,
+      class_names: ['helmet', 'person'],
+    })
+    const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+    await wrapper.findAll('button').find((button) => button.text() === '选择本页已完成结果')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '回流至数据集')!.trigger('click')
+    await flushPromises()
+    expect(calls.datasets).toHaveBeenCalled()
+    await wrapper.find('[aria-label="回流目标划分"]').setValue('val')
+    await wrapper.findAll('button').find((button) => button.text().includes('确认回流'))!.trigger('click')
+    await flushPromises()
+    expect(calls.datasetFeedback).toHaveBeenCalledWith('ds-1', {
+      samples: [{ task_id: 'task-1' }],
+      target_split: 'val',
+      min_confidence: 0.25,
+    })
     wrapper.unmount()
   })
 })

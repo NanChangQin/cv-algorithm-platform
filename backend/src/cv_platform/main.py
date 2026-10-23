@@ -129,6 +129,7 @@ def create_app() -> FastAPI:
         f"{settings.api_prefix}/instances",
     )
     developer_prefixes = (
+        f"{settings.api_prefix}/exports",
         f"{settings.api_prefix}/training",
         f"{settings.api_prefix}/algorithms/import",
         f"{settings.api_prefix}/build-jobs",

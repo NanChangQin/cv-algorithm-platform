@@ -1,0 +1,534 @@
+{
+  "id": "ultralytics:8.4.183:parameters-v1",
+  "framework": "ultralytics",
+  "framework_version": "8.4.183",
+  "mode": "val",
+  "task": "detect",
+  "parameters": {
+    "split": {
+      "type": "json",
+      "default": "val",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "train",
+          "val",
+          "test"
+        ]
+      },
+      "title": "验证划分",
+      "description": "验证划分；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "batch": {
+      "type": "json",
+      "default": 16,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 65536
+      },
+      "title": "批大小",
+      "description": "正整数为批大小；-1 自动选择；0~1 之间的小数表示显存占比。多卡必须使用正整数。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "imgsz": {
+      "type": "json",
+      "default": 640,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 32,
+            "multipleOf": 32
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 32,
+              "multipleOf": 32
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        ]
+      },
+      "title": "输入尺寸",
+      "description": "训练使用单个尺寸；预测可使用整数或 [高度, 宽度]，尺寸为 32 的倍数。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "conf": {
+      "type": "json",
+      "default": 0.001,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "置信度阈值",
+      "description": "置信度阈值；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "iou": {
+      "type": "json",
+      "default": 0.7,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "NMS交并比",
+      "description": "NMS交并比；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "classes": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        ]
+      },
+      "title": "类别筛选",
+      "description": "类别编号数组，如 [0, 2]；null 表示全部类别。",
+      "group": "运行与精度",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "plots": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "生成图表",
+      "description": "生成图表；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "workers": {
+      "type": "json",
+      "default": 8,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "title": "读图进程",
+      "description": "读图进程；适用版本 8.4.183。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "task": {
+      "type": "json",
+      "default": "detect",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "任务",
+      "description": "任务；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "任务类型由算法适配器确定"
+    },
+    "mode": {
+      "type": "json",
+      "default": "train",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "模式",
+      "description": "模式；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "运行模式由任务入口确定"
+    },
+    "data": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "数据集",
+      "description": "数据集；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过数据集选择器配置"
+    },
+    "device": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ]
+      },
+      "title": "计算设备",
+      "description": "计算设备；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过服务器和 GPU 选择器配置"
+    },
+    "project": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "输出项目",
+      "description": "输出项目；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "平台映射到本次任务输出目录"
+    },
+    "name": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "运行名称",
+      "description": "运行名称；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "平台映射到本次任务名称/目录"
+    },
+    "verbose": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "详细日志",
+      "description": "详细日志；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "single_cls": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "单类别训练",
+      "description": "单类别训练；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "rect": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "矩形输入",
+      "description": "矩形输入；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "fraction": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "maximum": 1
+      },
+      "title": "数据子集",
+      "description": "支持数据比例、图片数量或 [train, val, test] 设置；test 条目允许 0。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "compile": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "enum": [
+          false,
+          true,
+          "default",
+          "reduce-overhead",
+          "max-autotune",
+          "max-autotune-no-cudagraphs"
+        ]
+      },
+      "title": "图编译",
+      "description": "false 禁用；true 使用默认编译；也可指定受支持的 torch.compile 模式。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "channels_last": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "title": "内存布局",
+      "description": "内存布局；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_json": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存JSON",
+      "description": "保存JSON；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "max_det": {
+      "type": "json",
+      "default": 300,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "最大目标数",
+      "description": "最大目标数；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "quantize": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "enum": [
+          null,
+          16,
+          32,
+          "fp16",
+          "fp32",
+          "w16a16",
+          "w32a32"
+        ]
+      },
+      "title": "量化精度",
+      "description": "统一精度选项；推理支持 FP16/FP32，INT8 需要已量化产物，不能临时转换 .pt。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "dnn": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "OpenCV后端",
+      "description": "OpenCV后端；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "当前验证使用 PyTorch 权重；OpenCV DNN 需要 ONNX 后端"
+    },
+    "nms": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "title": "NMS模式",
+      "description": "null 使用默认检测头；true 使用常规 NMS；false 在模型支持时使用无 NMS 头。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "visualize": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "特征可视化",
+      "description": "特征可视化；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "augment": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "测试时增强",
+      "description": "测试时增强；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "agnostic_nms": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "类别无关NMS",
+      "description": "类别无关NMS；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_txt": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存文本",
+      "description": "保存文本；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_conf": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存置信度",
+      "description": "保存置信度；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "show_labels": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "显示类别",
+      "description": "显示类别；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "show_conf": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "显示分数",
+      "description": "显示分数；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cfg": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "配置文件",
+      "description": "配置文件；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "请导入专家配置内容，容器内配置文件路径由平台管理"
+    }
+  },
+  "default_key_count": 113,
+  "sha256": "2bb2482dba75c99f9f84036fd86ec60bbb601e445742f7758d5de331210a9d9f"
+}

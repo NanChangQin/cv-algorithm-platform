@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import httpx
+from cv_algorithm_sdk.runtime_profile import PROTOCOL
 
 from ....core.errors import ApplicationError
 from ..domain.models import RuntimeInstance, RuntimeRequest
@@ -29,6 +30,17 @@ class HttpAlgorithmManagerGateway:
         return [self._to_instance(item) for item in payload]
 
     def ensure_running(self, request: RuntimeRequest) -> RuntimeInstance:
+        if request.runtime_scope:
+            try:
+                capabilities = self._request("GET", "/instances/capabilities")
+            except ApplicationError as exc:
+                if exc.status_code != 404:
+                    raise
+                capabilities = {}
+            if capabilities.get("runtime_profile_protocol") != PROTOCOL:
+                raise ApplicationError(
+                    "RUNTIME_PROFILE_UNSUPPORTED",
+                    "节点不支持部署隔离与运行配置，请先升级 Manager", 409)
         payload = self._request(
             "POST",
             "/instances/ensure",
@@ -73,6 +85,10 @@ class HttpAlgorithmManagerGateway:
             "device": request.device,
             "memory_mb": request.memory_mb,
             "cpu_count": request.cpu_count,
+            "runtime_scope": request.runtime_scope,
+            "prediction_timeout_seconds": request.prediction_timeout_seconds,
+            "shm_mb": request.shm_mb,
+            "runtime_config": request.runtime_config,
             "gpu_device_ids": list(request.gpu_device_ids),
             **({"model_directory": request.model_directory} if request.model_directory else {}),
         }
@@ -130,5 +146,7 @@ class HttpAlgorithmManagerGateway:
                 else None
             ),
             node_id=self._node_id,
+            runtime_scope=str(payload.get("runtime_scope") or ""),
+            prediction_timeout_seconds=payload.get("prediction_timeout_seconds"),
             gpu_device_ids=tuple(str(item) for item in payload.get("gpu_device_ids", [])),
         )

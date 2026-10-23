@@ -1,6 +1,13 @@
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    field_validator,
+    model_validator,
+)
 
 
 class ResultModel(BaseModel):
@@ -54,6 +61,7 @@ class ObjectDetectionResult(ResultModel):
     input: ImageMetadata
     timing: TimingMetadata
     data: ObjectDetectionData
+    configuration: dict[str, Any] | None = None
 
 
 class ClassificationPrediction(ResultModel):
