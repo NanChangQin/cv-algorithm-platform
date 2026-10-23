@@ -32,6 +32,8 @@ class InstanceService:
                         spec.algorithm_version_id
                     )
                     if item.image == spec.image
+                    and item.runtime_scope == spec.runtime_scope
+                    and (not spec.runtime_scope or item.container_name == spec.container_name)
                     and (spec.device == "auto" or item.device == spec.device)
                     and (
                         not spec.gpu_device_ids
@@ -44,6 +46,9 @@ class InstanceService:
                 ),
                 default=None,
             )
+            if (current is not None and spec.runtime_scope
+                and current.configuration_sha256 != spec.configuration_sha256):
+                raise ManagerError("RUNTIME_PROFILE_CONFLICT", "部署配置已变化，请重新部署", 409)
             if current is not None and current.status is InstanceStatus.HEALTHY:
                 try:
                     healthy = self._runtime.is_healthy(current)
@@ -79,6 +84,10 @@ class InstanceService:
             except Exception as exc:
                 failed = current.transition(InstanceStatus.FAILED, str(exc))
                 self._repository.save(failed)
+                if spec.runtime_scope:
+                    with suppress(Exception):
+                        self._runtime.remove(current.id)
+                        self._repository.delete(current.id)
                 raise ManagerError("CONTAINER_START_FAILED", str(exc), 502) from exc
 
             healthy = current.transition(InstanceStatus.HEALTHY)
@@ -89,7 +98,8 @@ class InstanceService:
         if not 0 <= replicas <= 100:
             raise ManagerError("REPLICA_COUNT_INVALID", "副本数必须在 0 到 100 之间")
         with self._locks[spec.algorithm_version_id]:
-            current = self._repository.find_all_by_algorithm(spec.algorithm_version_id)
+            current = [item for item in self._repository.find_all_by_algorithm(
+                spec.algorithm_version_id) if item.runtime_scope == spec.runtime_scope]
             healthy = []
             for item in current:
                 if item.status is not InstanceStatus.HEALTHY:

@@ -1,0 +1,97 @@
+{
+  "gpu": "NVIDIA GeForce RTX 2080 Ti",
+  "torch": "2.10.0+cu128",
+  "checkpoint": {
+    "protocol": "ultralytics:8.4.183:sources-v1",
+    "framework_version": "8.4.183",
+    "sha256": "1aeb60f0cc95020b285d44e15b466ff15b5a03ccaa55e3e93a527f761a1b0300",
+    "epoch": 1,
+    "epochs": 3,
+    "file": "weights/resume-000001.pt",
+    "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resumable": true,
+    "reason": null,
+    "state": [
+      "epoch",
+      "optimizer",
+      "scaler",
+      "ema",
+      "updates",
+      "stopper"
+    ],
+    "optimizer": "SGD",
+    "lr0": 0.01
+  },
+  "restoration": {
+    "start_epoch": 1,
+    "next_epoch": 2,
+    "optimizer_states": 255,
+    "ema_updates": 1,
+    "scaler": {
+      "scale": 128.0,
+      "growth_factor": 2.0,
+      "backoff_factor": 0.5,
+      "growth_interval": 2000,
+      "_growth_tracker": 1
+    },
+    "stopper": {
+      "best_fitness": 0.11194,
+      "best_epoch": 1,
+      "patience": 50,
+      "possible_stop": false
+    },
+    "source_sha256": "1aeb60f0cc95020b285d44e15b466ff15b5a03ccaa55e3e93a527f761a1b0300"
+  },
+  "resumed_epochs": [
+    1,
+    2,
+    3
+  ],
+  "finetune_epochs": [
+    1
+  ],
+  "last_optimizer_stripped": true,
+  "full_optimizer_preserved": true,
+  "evaluation": {
+    "framework_version": "8.4.183",
+    "split": "test",
+    "dataset_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "weight_sha256": "6c4f4890350983a01d2e72ddcbefbd35e39b0cfbe7dcda6777138bb5f2f21ff4",
+    "metrics": {
+      "metrics/precision(B)": 0.012903225806451613,
+      "metrics/recall(B)": 1.0,
+      "metrics/mAP50(B)": 0.06123076923076922,
+      "metrics/mAP50-95(B)": 0.048984615384615376,
+      "fitness": 0.048984615384615376
+    },
+    "per_class": [
+      {
+        "class_id": 0,
+        "name": "box",
+        "instances": 4,
+        "precision": 0.012903225806451613,
+        "recall": 1.0,
+        "f1": 0.025477707006369425,
+        "map50": 0.06123076923076922,
+        "map50_95": 0.048984615384615376
+      }
+    ],
+    "speed": {
+      "preprocess": 0.1551629975438118,
+      "inference": 19.11663031205535,
+      "loss": 0.005180947482585907,
+      "postprocess": 1.0477257892489433
+    },
+    "confusion_matrix": [
+      [
+        4.0,
+        306.0
+      ],
+      [
+        0.0,
+        0.0
+      ]
+    ],
+    "confusion_matrix_note": null
+  }
+}

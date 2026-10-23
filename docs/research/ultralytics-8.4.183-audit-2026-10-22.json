@@ -1,0 +1,3529 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-22T15:33:58.419491+08:00",
+  "review_date": "2026-10-22",
+  "repository_head": "4132e5f15e5c2c853f436ade83a2be4ca2644bbf",
+  "scope": "Static local-source audit and live documentation/package inspection. No platform features are implemented or GPU-validated by this inventory.",
+  "notes": [
+    "Parameter counts are documentation table rows, not a support percentage. Rows include platform-managed selectors and task-specific arguments.",
+    "The 113 default.yaml keys are shared across modes; do not sum per-mode counts to infer unique parameters.",
+    "This inventory is not an executable JSON Schema. Runtime compatibility depends on task, model head, format, hardware, dependency environment and API signatures.",
+    "Documented descriptions are omitted; names, types, defaults and matrices record configuration facts.",
+    "Current evaluation jobs exist, but use platform metrics; no_dedicated_ultralytics_job means no standalone Ultralytics val/export/benchmark job.",
+    "stream and persist are API arguments. save_dir and augmentations are allowed custom keys. They must be considered in addition to default.yaml.",
+    "Tracking and tuning controls need their own schemas; Solutions and visualization APIs are extensions outside the core train-to-deploy scope."
+  ],
+  "ultralytics": {
+    "version": "8.4.183",
+    "wheel": {
+      "url": "https://files.pythonhosted.org/packages/5b/4a/e29f91208f783d4e372bd3bc65e2d550618dedd8af6fd10ccd00e48f843d/ultralytics-8.4.183-py3-none-any.whl",
+      "filename": "ultralytics-8.4.183-py3-none-any.whl",
+      "sha256": "0826261c54f80c18c0fa0db4afd728f581c78db49cf2d9d6f254a2ce7c10576b"
+    },
+    "default_yaml_key_count": 113,
+    "default_yaml_sha256": "13b58f3804fef762813cb78baa2a95dd5b3c5741723ebfdea6c7a99a54d314b1",
+    "default_parameters": [
+      {
+        "name": "task",
+        "default_yaml": "detect",
+        "line": 6
+      },
+      {
+        "name": "mode",
+        "default_yaml": "train",
+        "line": 7
+      },
+      {
+        "name": "model",
+        "default_yaml": "",
+        "line": 10
+      },
+      {
+        "name": "data",
+        "default_yaml": "",
+        "line": 11
+      },
+      {
+        "name": "epochs",
+        "default_yaml": "100",
+        "line": 12
+      },
+      {
+        "name": "time",
+        "default_yaml": "",
+        "line": 13
+      },
+      {
+        "name": "patience",
+        "default_yaml": "100",
+        "line": 14
+      },
+      {
+        "name": "batch",
+        "default_yaml": "16",
+        "line": 15
+      },
+      {
+        "name": "imgsz",
+        "default_yaml": "640",
+        "line": 16
+      },
+      {
+        "name": "save",
+        "default_yaml": "True",
+        "line": 17
+      },
+      {
+        "name": "save_period",
+        "default_yaml": "-1",
+        "line": 18
+      },
+      {
+        "name": "cache",
+        "default_yaml": "False",
+        "line": 19
+      },
+      {
+        "name": "device",
+        "default_yaml": "",
+        "line": 20
+      },
+      {
+        "name": "workers",
+        "default_yaml": "8",
+        "line": 21
+      },
+      {
+        "name": "project",
+        "default_yaml": "",
+        "line": 22
+      },
+      {
+        "name": "name",
+        "default_yaml": "",
+        "line": 23
+      },
+      {
+        "name": "exist_ok",
+        "default_yaml": "False",
+        "line": 24
+      },
+      {
+        "name": "pretrained",
+        "default_yaml": "True",
+        "line": 25
+      },
+      {
+        "name": "cls_remap",
+        "default_yaml": "True",
+        "line": 26
+      },
+      {
+        "name": "optimizer",
+        "default_yaml": "auto",
+        "line": 27
+      },
+      {
+        "name": "verbose",
+        "default_yaml": "True",
+        "line": 28
+      },
+      {
+        "name": "seed",
+        "default_yaml": "0",
+        "line": 29
+      },
+      {
+        "name": "deterministic",
+        "default_yaml": "True",
+        "line": 30
+      },
+      {
+        "name": "single_cls",
+        "default_yaml": "False",
+        "line": 31
+      },
+      {
+        "name": "rect",
+        "default_yaml": "False",
+        "line": 32
+      },
+      {
+        "name": "cos_lr",
+        "default_yaml": "False",
+        "line": 33
+      },
+      {
+        "name": "close_mosaic",
+        "default_yaml": "10",
+        "line": 34
+      },
+      {
+        "name": "resume",
+        "default_yaml": "False",
+        "line": 35
+      },
+      {
+        "name": "amp",
+        "default_yaml": "True",
+        "line": 36
+      },
+      {
+        "name": "fraction",
+        "default_yaml": "1.0",
+        "line": 37
+      },
+      {
+        "name": "profile",
+        "default_yaml": "False",
+        "line": 38
+      },
+      {
+        "name": "freeze",
+        "default_yaml": "",
+        "line": 39
+      },
+      {
+        "name": "multi_scale",
+        "default_yaml": "0.0",
+        "line": 40
+      },
+      {
+        "name": "compile",
+        "default_yaml": "False",
+        "line": 41
+      },
+      {
+        "name": "channels_last",
+        "default_yaml": "",
+        "line": 42
+      },
+      {
+        "name": "overlap_mask",
+        "default_yaml": "True",
+        "line": 45
+      },
+      {
+        "name": "mask_ratio",
+        "default_yaml": "4",
+        "line": 46
+      },
+      {
+        "name": "dropout",
+        "default_yaml": "0.0",
+        "line": 49
+      },
+      {
+        "name": "val",
+        "default_yaml": "True",
+        "line": 52
+      },
+      {
+        "name": "split",
+        "default_yaml": "val",
+        "line": 53
+      },
+      {
+        "name": "save_json",
+        "default_yaml": "False",
+        "line": 54
+      },
+      {
+        "name": "conf",
+        "default_yaml": "",
+        "line": 55
+      },
+      {
+        "name": "iou",
+        "default_yaml": "0.7",
+        "line": 56
+      },
+      {
+        "name": "max_det",
+        "default_yaml": "300",
+        "line": 57
+      },
+      {
+        "name": "quantize",
+        "default_yaml": "",
+        "line": 58
+      },
+      {
+        "name": "dnn",
+        "default_yaml": "False",
+        "line": 59
+      },
+      {
+        "name": "plots",
+        "default_yaml": "True",
+        "line": 60
+      },
+      {
+        "name": "nms",
+        "default_yaml": "",
+        "line": 61
+      },
+      {
+        "name": "source",
+        "default_yaml": "",
+        "line": 64
+      },
+      {
+        "name": "vid_stride",
+        "default_yaml": "1",
+        "line": 65
+      },
+      {
+        "name": "stream_buffer",
+        "default_yaml": "False",
+        "line": 66
+      },
+      {
+        "name": "visualize",
+        "default_yaml": "False",
+        "line": 67
+      },
+      {
+        "name": "augment",
+        "default_yaml": "False",
+        "line": 68
+      },
+      {
+        "name": "agnostic_nms",
+        "default_yaml": "False",
+        "line": 69
+      },
+      {
+        "name": "classes",
+        "default_yaml": "",
+        "line": 70
+      },
+      {
+        "name": "retina_masks",
+        "default_yaml": "False",
+        "line": 71
+      },
+      {
+        "name": "embed",
+        "default_yaml": "",
+        "line": 72
+      },
+      {
+        "name": "show",
+        "default_yaml": "False",
+        "line": 75
+      },
+      {
+        "name": "save_frames",
+        "default_yaml": "False",
+        "line": 76
+      },
+      {
+        "name": "save_txt",
+        "default_yaml": "False",
+        "line": 77
+      },
+      {
+        "name": "save_conf",
+        "default_yaml": "False",
+        "line": 78
+      },
+      {
+        "name": "save_crop",
+        "default_yaml": "False",
+        "line": 79
+      },
+      {
+        "name": "show_labels",
+        "default_yaml": "True",
+        "line": 80
+      },
+      {
+        "name": "show_conf",
+        "default_yaml": "True",
+        "line": 81
+      },
+      {
+        "name": "show_boxes",
+        "default_yaml": "True",
+        "line": 82
+      },
+      {
+        "name": "line_width",
+        "default_yaml": "",
+        "line": 83
+      },
+      {
+        "name": "format",
+        "default_yaml": "torchscript",
+        "line": 86
+      },
+      {
+        "name": "optimize",
+        "default_yaml": "False",
+        "line": 87
+      },
+      {
+        "name": "dynamic",
+        "default_yaml": "False",
+        "line": 88
+      },
+      {
+        "name": "simplify",
+        "default_yaml": "True",
+        "line": 89
+      },
+      {
+        "name": "opset",
+        "default_yaml": "",
+        "line": 90
+      },
+      {
+        "name": "workspace",
+        "default_yaml": "",
+        "line": 91
+      },
+      {
+        "name": "lr0",
+        "default_yaml": "0.01",
+        "line": 94
+      },
+      {
+        "name": "lrf",
+        "default_yaml": "0.01",
+        "line": 95
+      },
+      {
+        "name": "momentum",
+        "default_yaml": "0.937",
+        "line": 96
+      },
+      {
+        "name": "weight_decay",
+        "default_yaml": "0.0005",
+        "line": 97
+      },
+      {
+        "name": "warmup_epochs",
+        "default_yaml": "3.0",
+        "line": 98
+      },
+      {
+        "name": "warmup_momentum",
+        "default_yaml": "0.8",
+        "line": 99
+      },
+      {
+        "name": "warmup_bias_lr",
+        "default_yaml": "0.1",
+        "line": 100
+      },
+      {
+        "name": "distill_model",
+        "default_yaml": "",
+        "line": 101
+      },
+      {
+        "name": "dis",
+        "default_yaml": "6.0",
+        "line": 102
+      },
+      {
+        "name": "box",
+        "default_yaml": "7.5",
+        "line": 103
+      },
+      {
+        "name": "cls",
+        "default_yaml": "0.5",
+        "line": 104
+      },
+      {
+        "name": "cls_pw",
+        "default_yaml": "0.0",
+        "line": 105
+      },
+      {
+        "name": "dfl",
+        "default_yaml": "1.5",
+        "line": 106
+      },
+      {
+        "name": "pose",
+        "default_yaml": "12.0",
+        "line": 107
+      },
+      {
+        "name": "kobj",
+        "default_yaml": "1.0",
+        "line": 108
+      },
+      {
+        "name": "rle",
+        "default_yaml": "1.0",
+        "line": 109
+      },
+      {
+        "name": "angle",
+        "default_yaml": "1.0",
+        "line": 110
+      },
+      {
+        "name": "dlog",
+        "default_yaml": "1.0",
+        "line": 111
+      },
+      {
+        "name": "dgrad",
+        "default_yaml": "0.5",
+        "line": 112
+      },
+      {
+        "name": "dlam",
+        "default_yaml": "1.0",
+        "line": 113
+      },
+      {
+        "name": "nbs",
+        "default_yaml": "64",
+        "line": 114
+      },
+      {
+        "name": "hsv_h",
+        "default_yaml": "0.015",
+        "line": 115
+      },
+      {
+        "name": "hsv_s",
+        "default_yaml": "0.7",
+        "line": 116
+      },
+      {
+        "name": "hsv_v",
+        "default_yaml": "0.4",
+        "line": 117
+      },
+      {
+        "name": "degrees",
+        "default_yaml": "0.0",
+        "line": 118
+      },
+      {
+        "name": "translate",
+        "default_yaml": "0.1",
+        "line": 119
+      },
+      {
+        "name": "scale",
+        "default_yaml": "0.5",
+        "line": 120
+      },
+      {
+        "name": "shear",
+        "default_yaml": "0.0",
+        "line": 121
+      },
+      {
+        "name": "perspective",
+        "default_yaml": "0.0",
+        "line": 122
+      },
+      {
+        "name": "flipud",
+        "default_yaml": "0.0",
+        "line": 123
+      },
+      {
+        "name": "fliplr",
+        "default_yaml": "0.5",
+        "line": 124
+      },
+      {
+        "name": "bgr",
+        "default_yaml": "0.0",
+        "line": 125
+      },
+      {
+        "name": "mosaic",
+        "default_yaml": "1.0",
+        "line": 126
+      },
+      {
+        "name": "mixup",
+        "default_yaml": "0.0",
+        "line": 127
+      },
+      {
+        "name": "cutmix",
+        "default_yaml": "0.0",
+        "line": 128
+      },
+      {
+        "name": "copy_paste",
+        "default_yaml": "0.0",
+        "line": 129
+      },
+      {
+        "name": "copy_paste_mode",
+        "default_yaml": "flip",
+        "line": 130
+      },
+      {
+        "name": "auto_augment",
+        "default_yaml": "randaugment",
+        "line": 131
+      },
+      {
+        "name": "erasing",
+        "default_yaml": "0.4",
+        "line": 132
+      },
+      {
+        "name": "cfg",
+        "default_yaml": "",
+        "line": 135
+      },
+      {
+        "name": "tracker",
+        "default_yaml": "tracktrack.yaml",
+        "line": 138
+      }
+    ],
+    "additional_config_keys": [
+      "augmentations",
+      "save_dir"
+    ],
+    "deprecated_aliases": {
+      "half": "quantize=16 if true",
+      "int8": "quantize=8 if true; takes precedence over half when quantize is absent",
+      "end2end": "nms with inverted boolean"
+    },
+    "alias_notes": "Use the pinned runtime deprecation handler for false values and explicit-key precedence; this summary is not a full normalization algorithm."
+  },
+  "sources": [
+    {
+      "name": "home",
+      "url": "https://docs.ultralytics.com/zh/",
+      "retrieved_html_sha256": "93e8da471012e8e8cbb77b108db445ca5706cd6bd676d1aae3bf81a69aba4baf"
+    },
+    {
+      "name": "cfg",
+      "url": "https://docs.ultralytics.com/zh/usage/cfg/",
+      "retrieved_html_sha256": "5be6b9aae7db19ca7ab43ae068da0e1873fd50642c553d6fc5687f70e82a4aac"
+    },
+    {
+      "name": "train",
+      "url": "https://docs.ultralytics.com/zh/modes/train/",
+      "retrieved_html_sha256": "b9f1aa0d59ec16583f4364523c782d916177135ce80c2ed9ea26c944b44d4cd8"
+    },
+    {
+      "name": "val",
+      "url": "https://docs.ultralytics.com/zh/modes/val/",
+      "retrieved_html_sha256": "d89dc0633881de22540f245e80fb595b3b7df2fc094679e8ab36c7b5f8abfdf6"
+    },
+    {
+      "name": "predict",
+      "url": "https://docs.ultralytics.com/zh/modes/predict/",
+      "retrieved_html_sha256": "a5f70957a3a09c9e8d487357f0553763e27f7d0278eafc029e9f4bc2437a4d1b"
+    },
+    {
+      "name": "export",
+      "url": "https://docs.ultralytics.com/zh/modes/export/",
+      "retrieved_html_sha256": "61c9669cb936ba4a46fe868ee49b76b44eda27ba9c7f65811c2d47dd13a150a8"
+    },
+    {
+      "name": "track",
+      "url": "https://docs.ultralytics.com/zh/modes/track/",
+      "retrieved_html_sha256": "53bb4f4fcd699428e7f221c299a92fe18edf91bd44c425440a90c6a12c8c79e1"
+    },
+    {
+      "name": "benchmark",
+      "url": "https://docs.ultralytics.com/zh/modes/benchmark/",
+      "retrieved_html_sha256": "da98ae3fdb13ec2f9bd39fa357775c4e2a12da01d050133013e5aeb56453ee03"
+    },
+    {
+      "name": "tune",
+      "url": "https://docs.ultralytics.com/zh/guides/hyperparameter-tuning/",
+      "retrieved_html_sha256": "d9eebeb73722fed30b5004baac553dfcab6014b51a9a25ffbf7e8dc83f46e156"
+    }
+  ],
+  "local_source_sha256": {
+    "backend/src/cv_platform/modules/training/api.py": "b2b610dcf44ff59b68146bae7e39295d1177819333a985eb13c5e63bfbe4aed0",
+    "backend/src/cv_platform/modules/training/datasets.py": "9dc8f84e49edce7c4b90989c2596c5fb60653acdf14a45b62ca7798665bb9796",
+    "backend/src/cv_platform/modules/training/publish.py": "b2f04f9eea7eeafd66221d5f6e2ea06addb38a0543fb835fa27137f2f7b97391",
+    "backend/src/cv_platform/modules/deployments/targets.py": "e8fd40e788d72b425037b5ec16ae897ddb6c311f0719142d6ebb9cd481dd564a",
+    "backend/src/cv_platform/modules/evaluations/metrics.py": "1ac88ea2687f4f5cafec8d7eb9b4e8cd8543b78b7919ecacf24663c37d52337b",
+    "services/algorithm-manager/src/algorithm_manager/training.py": "2109f518e819542df57f04a23565609dcd9a0f1863e55095869b3d303a88d407",
+    "runtimes/yolo-trainer/train.py": "1b2f53a2c20c6e6300f6ef0612dc60efbefccc9dc8ec8669528991f2d97102ff",
+    "runtimes/yolo-trainer/Dockerfile": "6fb22e8fb1c5f10293304af30081091fcec70e9bd560969c50162683d37a8f1a",
+    "examples/yolo/src/yolo_algorithm/algorithm.py": "81c30dc40d32235717d6daedbcdf1214473726e6d54d7f230e0c9aca3676f23e",
+    "packages/algorithm-sdk/src/cv_algorithm_sdk/manifest.py": "8142832f9524f163e19bdb164c643595e52c3a706e9721f3590db03a0116d533",
+    "frontend/src/types/algorithm.ts": "8c293253b888ffd02a49707a8642c78d5db622f6b21ff832a81d08c9624769ff",
+    "frontend/src/components/algorithms/ParameterForm.vue": "1ec81a9aa52035650067b2ed2428f3e8531e53623107552f84e44c722d127bfc"
+  },
+  "training_backend_user_field_count": 9,
+  "training_backend_fields": {
+    "epochs": {
+      "line": 69,
+      "annotation": "int",
+      "definition": "Field(default=100, ge=1, le=1000)"
+    },
+    "batch": {
+      "line": 70,
+      "annotation": "int",
+      "definition": "Field(default=16, ge=-1, le=512)"
+    },
+    "imgsz": {
+      "line": 71,
+      "annotation": "int",
+      "definition": "Field(default=640, ge=32, le=2048, multiple_of=32)"
+    },
+    "lr0": {
+      "line": 72,
+      "annotation": "float",
+      "definition": "Field(default=0.01, gt=0, le=1)"
+    },
+    "optimizer": {
+      "line": 73,
+      "annotation": "Literal['auto', 'SGD', 'Adam', 'AdamW']",
+      "definition": "'auto'"
+    },
+    "patience": {
+      "line": 74,
+      "annotation": "int",
+      "definition": "Field(default=50, ge=0, le=1000)"
+    },
+    "workers": {
+      "line": 75,
+      "annotation": "int",
+      "definition": "Field(default=4, ge=0, le=32)"
+    },
+    "seed": {
+      "line": 76,
+      "annotation": "int",
+      "definition": "Field(default=0, ge=0, le=2 ** 31 - 1)"
+    },
+    "cos_lr": {
+      "line": 77,
+      "annotation": "bool",
+      "definition": "False"
+    }
+  },
+  "modes": {
+    "train": {
+      "documented_row_count": 83,
+      "parameters": [
+        {
+          "name": "model",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "mapped_selector",
+            "binding": "model selector (six bundled .pt weights)"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "data",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "mapped_selector",
+            "binding": "dataset_id resolved to managed data.yaml"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "epochs",
+          "default_documented": "100",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "epochs",
+            "backend": {
+              "line": 69,
+              "annotation": "int",
+              "definition": "Field(default=100, ge=1, le=1000)"
+            },
+            "manager": {
+              "line": 47,
+              "annotation": "int",
+              "definition": "Field(ge=1, le=1000)"
+            }
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "time",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "patience",
+          "default_documented": "100",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "patience",
+            "backend": {
+              "line": 74,
+              "annotation": "int",
+              "definition": "Field(default=50, ge=0, le=1000)"
+            },
+            "manager": {
+              "line": 52,
+              "annotation": "int",
+              "definition": "Field(default=50, ge=0, le=1000)"
+            }
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "batch",
+          "default_documented": "16",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "batch",
+            "backend": {
+              "line": 70,
+              "annotation": "int",
+              "definition": "Field(default=16, ge=-1, le=512)"
+            },
+            "manager": {
+              "line": 48,
+              "annotation": "int",
+              "definition": "Field(ge=-1, le=512)"
+            }
+          },
+          "documented_type": "int 或 float",
+          "group": "core"
+        },
+        {
+          "name": "imgsz",
+          "default_documented": "640",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "imgsz",
+            "backend": {
+              "line": 71,
+              "annotation": "int",
+              "definition": "Field(default=640, ge=32, le=2048, multiple_of=32)"
+            },
+            "manager": {
+              "line": 49,
+              "annotation": "int",
+              "definition": "Field(ge=32, le=2048, multiple_of=32)"
+            }
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "save",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "save_period",
+          "default_documented": "-1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "cache",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "device",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "mapped_selector",
+            "binding": "node_id + gpu_device_ids mapped to container GPU indices"
+          },
+          "documented_type": "int 或 str 或 list",
+          "group": "core"
+        },
+        {
+          "name": "workers",
+          "default_documented": "8",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "workers",
+            "backend": {
+              "line": 75,
+              "annotation": "int",
+              "definition": "Field(default=4, ge=0, le=32)"
+            },
+            "manager": {
+              "line": 53,
+              "annotation": "int",
+              "definition": "Field(default=4, ge=0, le=32)"
+            }
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "project",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "fixed_by_runner",
+            "value": "/workspace"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "name",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "fixed_by_runner",
+            "value": "train"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "exist_ok",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "fixed_by_runner",
+            "value": true
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "save_dir",
+          "default_documented": "None",
+          "runtime_default_key": false,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "pretrained",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "cls_remap",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "optimizer",
+          "default_documented": "'auto'",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "optimizer",
+            "backend": {
+              "line": 73,
+              "annotation": "Literal['auto', 'SGD', 'Adam', 'AdamW']",
+              "definition": "'auto'"
+            },
+            "manager": {
+              "line": 51,
+              "annotation": "Literal['auto', 'SGD', 'Adam', 'AdamW']",
+              "definition": "'auto'"
+            }
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "seed",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "seed",
+            "backend": {
+              "line": 76,
+              "annotation": "int",
+              "definition": "Field(default=0, ge=0, le=2 ** 31 - 1)"
+            },
+            "manager": {
+              "line": 54,
+              "annotation": "int",
+              "definition": "Field(default=0, ge=0, le=2 ** 31 - 1)"
+            }
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "deterministic",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "verbose",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "single_cls",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "classes",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "list[int]",
+          "group": "core"
+        },
+        {
+          "name": "rect",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "multi_scale",
+          "default_documented": "0.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "cos_lr",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "cos_lr",
+            "backend": {
+              "line": 77,
+              "annotation": "bool",
+              "definition": "False"
+            },
+            "manager": {
+              "line": 55,
+              "annotation": "bool",
+              "definition": "False"
+            }
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "close_mosaic",
+          "default_documented": "10",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "resume",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "amp",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "quantize",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int 或 str",
+          "group": "core"
+        },
+        {
+          "name": "fraction",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float、int 或 list",
+          "group": "core"
+        },
+        {
+          "name": "profile",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "freeze",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int 或 list",
+          "group": "core"
+        },
+        {
+          "name": "lr0",
+          "default_documented": "0.01",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "lr0",
+            "backend": {
+              "line": 72,
+              "annotation": "float",
+              "definition": "Field(default=0.01, gt=0, le=1)"
+            },
+            "manager": {
+              "line": 50,
+              "annotation": "float",
+              "definition": "Field(gt=0, le=1)"
+            }
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "lrf",
+          "default_documented": "0.01",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "momentum",
+          "default_documented": "0.937",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "weight_decay",
+          "default_documented": "0.0005",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "warmup_epochs",
+          "default_documented": "3.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "warmup_momentum",
+          "default_documented": "0.8",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "warmup_bias_lr",
+          "default_documented": "0.1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "distill_model",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "dis",
+          "default_documented": "6.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "box",
+          "default_documented": "7.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "cls",
+          "default_documented": "0.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "cls_pw",
+          "default_documented": "0.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "dfl",
+          "default_documented": "1.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "pose",
+          "default_documented": "12.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "kobj",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "rle",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "angle",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "dlog",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "dgrad",
+          "default_documented": "0.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "dlam",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "nbs",
+          "default_documented": "64",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "overlap_mask",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "mask_ratio",
+          "default_documented": "4",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "dropout",
+          "default_documented": "0.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "val",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "nms",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool，可选",
+          "group": "core"
+        },
+        {
+          "name": "plots",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "fixed_by_runner",
+            "value": true
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "compile",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "channels_last",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "max_det",
+          "default_documented": "300",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "hsv_h",
+          "default_documented": "0.015",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "hsv_s",
+          "default_documented": "0.7",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "hsv_v",
+          "default_documented": "0.4",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "degrees",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "translate",
+          "default_documented": "0.1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "scale",
+          "default_documented": "0.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float | tuple",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "shear",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "perspective",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "flipud",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "fliplr",
+          "default_documented": "0.5",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, classify, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "bgr",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "mosaic",
+          "default_documented": "1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "mixup",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "cutmix",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "detect, segment, semantic, pose, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "copy_paste",
+          "default_documented": "0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "segment, semantic, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "copy_paste_mode",
+          "default_documented": "flip",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "str",
+          "documented_tasks": "segment, semantic, obb",
+          "group": "augmentation"
+        },
+        {
+          "name": "auto_augment",
+          "default_documented": "randaugment",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "str",
+          "documented_tasks": "classify",
+          "group": "augmentation"
+        },
+        {
+          "name": "erasing",
+          "default_documented": "0.4",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "float",
+          "documented_tasks": "classify",
+          "group": "augmentation"
+        },
+        {
+          "name": "augmentations",
+          "default_documented": "None",
+          "runtime_default_key": false,
+          "platform": {
+            "status": "not_exposed"
+          },
+          "documented_type": "list",
+          "documented_tasks": "detect, segment, semantic, depth, pose, obb",
+          "group": "augmentation"
+        }
+      ]
+    },
+    "val": {
+      "documented_row_count": 30,
+      "parameters": [
+        {
+          "name": "data",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "imgsz",
+          "default_documented": "640",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "batch",
+          "default_documented": "16",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "save_json",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "conf",
+          "default_documented": "0.001",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "iou",
+          "default_documented": "0.7",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "max_det",
+          "default_documented": "300",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "quantize",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int 或 str",
+          "group": "core"
+        },
+        {
+          "name": "device",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "dnn",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "plots",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "classes",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "list[int]",
+          "group": "core"
+        },
+        {
+          "name": "rect",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "split",
+          "default_documented": "'val'",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "fraction",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float、int 或 list",
+          "group": "core"
+        },
+        {
+          "name": "project",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "name",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "verbose",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "save_txt",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "save_conf",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "workers",
+          "default_documented": "8",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "augment",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "agnostic_nms",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "single_cls",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "visualize",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "show_labels",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "show_conf",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "compile",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "channels_last",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "nms",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool，可选",
+          "group": "core"
+        }
+      ]
+    },
+    "predict": {
+      "documented_row_count": 36,
+      "parameters": [
+        {
+          "name": "source",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "mapped_selector",
+            "binding": "asset_uri resolved to a single local image"
+          },
+          "documented_type": "str 或 int 或 None",
+          "group": "core"
+        },
+        {
+          "name": "conf",
+          "default_documented": "0.25",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "confidence"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "iou",
+          "default_documented": "0.7",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "iou_threshold"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "imgsz",
+          "default_documented": "640",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "image_size"
+          },
+          "documented_type": "int 或 tuple",
+          "group": "core"
+        },
+        {
+          "name": "rect",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "quantize",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "int 或 str",
+          "group": "core"
+        },
+        {
+          "name": "device",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "runtime_environment",
+            "binding": "CV_YOLO_DEVICE + node/GPU placement"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "dnn",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "data",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "batch",
+          "default_documented": "1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "max_det",
+          "default_documented": "300",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "max_detections"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "vid_stride",
+          "default_documented": "1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "stream_buffer",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "visualize",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "augment",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "agnostic_nms",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "configurable_with_restrictions",
+            "field": "agnostic_nms"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "classes",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "list[int]",
+          "group": "core"
+        },
+        {
+          "name": "retina_masks",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "embed",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "list[int]",
+          "group": "core"
+        },
+        {
+          "name": "project",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "name",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "stream",
+          "default_documented": "False",
+          "runtime_default_key": false,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "verbose",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "fixed_by_adapter",
+            "value": false
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "compile",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool 或 str",
+          "group": "core"
+        },
+        {
+          "name": "channels_last",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "nms",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool，可选",
+          "group": "core"
+        },
+        {
+          "name": "show",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "save",
+          "default_documented": "False or True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "save_frames",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "save_txt",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "save_conf",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "save_crop",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "show_labels",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "show_conf",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "show_boxes",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "bool",
+          "group": "output"
+        },
+        {
+          "name": "line_width",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "not_exposed_in_yolo_adapter"
+          },
+          "documented_type": "int or None",
+          "group": "output"
+        }
+      ]
+    },
+    "export": {
+      "documented_row_count": 20,
+      "parameters": [
+        {
+          "name": "format",
+          "default_documented": "'torchscript'",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "name",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "imgsz",
+          "default_documented": "640",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int 或 tuple",
+          "group": "core"
+        },
+        {
+          "name": "optimize",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "quantize",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int 或 str",
+          "group": "core"
+        },
+        {
+          "name": "dynamic",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "simplify",
+          "default_documented": "True",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "opset",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "workspace",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float 或 None",
+          "group": "core"
+        },
+        {
+          "name": "nms",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool，可选",
+          "group": "core"
+        },
+        {
+          "name": "conf",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "iou",
+          "default_documented": "0.7",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float",
+          "group": "core"
+        },
+        {
+          "name": "max_det",
+          "default_documented": "300",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "agnostic_nms",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "batch",
+          "default_documented": "1",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "int",
+          "group": "core"
+        },
+        {
+          "name": "device",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "verbose",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "bool",
+          "group": "core"
+        },
+        {
+          "name": "data",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "split",
+          "default_documented": "'val'",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "str",
+          "group": "core"
+        },
+        {
+          "name": "fraction",
+          "default_documented": "1.0",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "documented_type": "float、int 或 list",
+          "group": "core"
+        }
+      ]
+    },
+    "benchmark": {
+      "documented_row_count": 8,
+      "parameters": [
+        {
+          "name": "model",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "data",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "imgsz",
+          "default_documented": "640",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "quantize",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "device",
+          "default_documented": "None",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "verbose",
+          "default_documented": "False",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "eps",
+          "default_documented": "0.001",
+          "runtime_default_key": false,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        },
+        {
+          "name": "format",
+          "default_documented": "''",
+          "runtime_default_key": true,
+          "platform": {
+            "status": "no_dedicated_ultralytics_job"
+          },
+          "group": "core"
+        }
+      ]
+    }
+  },
+  "runtime_export_format_count_including_pytorch": 23,
+  "runtime_export_formats": [
+    {
+      "label": "PyTorch",
+      "format": "-",
+      "suffix": ".pt",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [],
+      "environment": "base"
+    },
+    {
+      "label": "TorchScript",
+      "format": "torchscript",
+      "suffix": ".torchscript",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "nms",
+        "dynamic"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "ONNX",
+      "format": "onnx",
+      "suffix": ".onnx",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "OpenVINO",
+      "format": "openvino",
+      "suffix": "_openvino_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "TensorRT",
+      "format": "engine",
+      "suffix": ".engine",
+      "cpu": false,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "workspace",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "CoreML",
+      "format": "coreml",
+      "suffix": ".mlpackage",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "dynamic",
+        "quantize",
+        "nms"
+      ],
+      "environment": "coreml"
+    },
+    {
+      "label": "Core AI",
+      "format": "coreai",
+      "suffix": ".aimodel",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "TensorFlow SavedModel",
+      "format": "saved_model",
+      "suffix": "_saved_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "fraction",
+        "quantize",
+        "opset",
+        "nms"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "TensorFlow GraphDef",
+      "format": "pb",
+      "suffix": ".pb",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "opset"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "TensorFlow Edge TPU",
+      "format": "edgetpu",
+      "suffix": "_edgetpu.tflite",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "data",
+        "fraction",
+        "quantize",
+        "opset"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "LiteRT",
+      "format": "litert",
+      "suffix": ".tflite",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "data",
+        "fraction"
+      ],
+      "environment": "litert"
+    },
+    {
+      "label": "PaddlePaddle",
+      "format": "paddle",
+      "suffix": "_paddle_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "MNN",
+      "format": "mnn",
+      "suffix": ".mnn",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms"
+      ],
+      "environment": "mnn"
+    },
+    {
+      "label": "NCNN",
+      "format": "ncnn",
+      "suffix": "_ncnn_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "quantize"
+      ],
+      "environment": "ncnn"
+    },
+    {
+      "label": "IMX",
+      "format": "imx",
+      "suffix": "_imx_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "data",
+        "quantize",
+        "fraction",
+        "nms"
+      ],
+      "environment": "isolated-imx"
+    },
+    {
+      "label": "RKNN",
+      "format": "rknn",
+      "suffix": "_rknn_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "data",
+        "fraction"
+      ],
+      "environment": "isolated-rknn"
+    },
+    {
+      "label": "ExecuTorch",
+      "format": "executorch",
+      "suffix": "_executorch_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch"
+      ],
+      "environment": "executorch"
+    },
+    {
+      "label": "Axelera AI",
+      "format": "axelera",
+      "suffix": "_axelera_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "fraction",
+        "data"
+      ],
+      "environment": "isolated-axelera"
+    },
+    {
+      "label": "DEEPX",
+      "format": "deepx",
+      "suffix": "_deepx_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "data",
+        "quantize",
+        "opset",
+        "simplify",
+        "optimize"
+      ],
+      "environment": "isolated-deepx"
+    },
+    {
+      "label": "Qualcomm QNN",
+      "format": "qnn",
+      "suffix": "_qnn.onnx",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "fraction",
+        "data"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "Hailo",
+      "format": "hailo",
+      "suffix": "_hailo_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "name",
+        "quantize",
+        "data",
+        "fraction",
+        "simplify",
+        "conf",
+        "iou"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "Huawei Ascend",
+      "format": "ascend",
+      "suffix": "_ascend_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "AMD Xilinx",
+      "format": "xilinx",
+      "suffix": "_xilinx_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "name",
+        "quantize",
+        "data",
+        "fraction",
+        "opset",
+        "simplify"
+      ],
+      "environment": "isolated-xilinx"
+    }
+  ],
+  "tracking": {
+    "platform_status": "not_implemented_as_stateful_tracking",
+    "tracker_default": "tracktrack.yaml",
+    "tracker_configs": {
+      "botsort": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "botsort",
+          "line": 6
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.25",
+          "line": 7
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.1",
+          "line": 8
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.25",
+          "line": 9
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 10
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.8",
+          "line": 11
+        },
+        {
+          "name": "fuse_score",
+          "default_yaml": "True",
+          "line": 12
+        },
+        {
+          "name": "gmc_method",
+          "default_yaml": "sparseOptFlow",
+          "line": 15
+        },
+        {
+          "name": "proximity_thresh",
+          "default_yaml": "0.5",
+          "line": 18
+        },
+        {
+          "name": "appearance_thresh",
+          "default_yaml": "0.8",
+          "line": 19
+        },
+        {
+          "name": "with_reid",
+          "default_yaml": "False",
+          "line": 20
+        },
+        {
+          "name": "model",
+          "default_yaml": "auto",
+          "line": 21
+        }
+      ],
+      "bytetrack": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "bytetrack",
+          "line": 6
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.25",
+          "line": 7
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.1",
+          "line": 8
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.25",
+          "line": 9
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 10
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.8",
+          "line": 11
+        },
+        {
+          "name": "fuse_score",
+          "default_yaml": "True",
+          "line": 12
+        }
+      ],
+      "deepocsort": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "deepocsort",
+          "line": 7
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.3",
+          "line": 8
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.1",
+          "line": 9
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.3",
+          "line": 10
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 11
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.8",
+          "line": 12
+        },
+        {
+          "name": "fuse_score",
+          "default_yaml": "True",
+          "line": 13
+        },
+        {
+          "name": "delta_t",
+          "default_yaml": "3",
+          "line": 16
+        },
+        {
+          "name": "inertia",
+          "default_yaml": "0.2",
+          "line": 17
+        },
+        {
+          "name": "use_byte",
+          "default_yaml": "False",
+          "line": 18
+        },
+        {
+          "name": "gmc_method",
+          "default_yaml": "none",
+          "line": 21
+        },
+        {
+          "name": "with_reid",
+          "default_yaml": "False",
+          "line": 22
+        },
+        {
+          "name": "model",
+          "default_yaml": "auto",
+          "line": 23
+        },
+        {
+          "name": "proximity_thresh",
+          "default_yaml": "0.5",
+          "line": 24
+        },
+        {
+          "name": "appearance_thresh",
+          "default_yaml": "0.9",
+          "line": 25
+        },
+        {
+          "name": "alpha_fixed_emb",
+          "default_yaml": "0.95",
+          "line": 26
+        }
+      ],
+      "fasttrack": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "fasttrack",
+          "line": 8
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.25",
+          "line": 9
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.1",
+          "line": 10
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.25",
+          "line": 11
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 12
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.8",
+          "line": 13
+        },
+        {
+          "name": "fuse_score",
+          "default_yaml": "True",
+          "line": 14
+        },
+        {
+          "name": "reset_velocity_offset_occ",
+          "default_yaml": "5",
+          "line": 17
+        },
+        {
+          "name": "reset_pos_offset_occ",
+          "default_yaml": "3",
+          "line": 18
+        },
+        {
+          "name": "enlarge_bbox_occ",
+          "default_yaml": "1.1",
+          "line": 19
+        },
+        {
+          "name": "dampen_motion_occ",
+          "default_yaml": "0.5",
+          "line": 20
+        },
+        {
+          "name": "active_occ_to_lost_thresh",
+          "default_yaml": "10",
+          "line": 21
+        },
+        {
+          "name": "occ_cover_thresh",
+          "default_yaml": "0.7",
+          "line": 22
+        },
+        {
+          "name": "occ_reappear_window",
+          "default_yaml": "40",
+          "line": 23
+        },
+        {
+          "name": "init_iou_suppress",
+          "default_yaml": "0.7",
+          "line": 24
+        }
+      ],
+      "ocsort": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "ocsort",
+          "line": 7
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.25",
+          "line": 8
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.1",
+          "line": 9
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.25",
+          "line": 10
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 11
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.8",
+          "line": 12
+        },
+        {
+          "name": "fuse_score",
+          "default_yaml": "True",
+          "line": 13
+        },
+        {
+          "name": "delta_t",
+          "default_yaml": "3",
+          "line": 16
+        },
+        {
+          "name": "inertia",
+          "default_yaml": "0.2",
+          "line": 17
+        },
+        {
+          "name": "use_byte",
+          "default_yaml": "False",
+          "line": 18
+        }
+      ],
+      "tracktrack": [
+        {
+          "name": "tracker_type",
+          "default_yaml": "tracktrack",
+          "line": 8
+        },
+        {
+          "name": "track_high_thresh",
+          "default_yaml": "0.6",
+          "line": 9
+        },
+        {
+          "name": "track_low_thresh",
+          "default_yaml": "0.25",
+          "line": 10
+        },
+        {
+          "name": "new_track_thresh",
+          "default_yaml": "0.7",
+          "line": 11
+        },
+        {
+          "name": "track_buffer",
+          "default_yaml": "30",
+          "line": 12
+        },
+        {
+          "name": "match_thresh",
+          "default_yaml": "0.7",
+          "line": 13
+        },
+        {
+          "name": "lost_match_thr",
+          "default_yaml": "0.0",
+          "line": 14
+        },
+        {
+          "name": "iou_weight",
+          "default_yaml": "0.5",
+          "line": 17
+        },
+        {
+          "name": "reid_weight",
+          "default_yaml": "0.5",
+          "line": 18
+        },
+        {
+          "name": "conf_weight",
+          "default_yaml": "0.1",
+          "line": 19
+        },
+        {
+          "name": "angle_weight",
+          "default_yaml": "0.05",
+          "line": 20
+        },
+        {
+          "name": "penalty_p",
+          "default_yaml": "0.2",
+          "line": 23
+        },
+        {
+          "name": "penalty_q",
+          "default_yaml": "0.4",
+          "line": 24
+        },
+        {
+          "name": "reduce_step",
+          "default_yaml": "0.05",
+          "line": 25
+        },
+        {
+          "name": "tai_thr",
+          "default_yaml": "0.55",
+          "line": 28
+        },
+        {
+          "name": "min_track_len",
+          "default_yaml": "3",
+          "line": 29
+        },
+        {
+          "name": "gmc_method",
+          "default_yaml": "sparseOptFlow",
+          "line": 32
+        },
+        {
+          "name": "with_reid",
+          "default_yaml": "False",
+          "line": 35
+        },
+        {
+          "name": "model",
+          "default_yaml": "auto",
+          "line": 36
+        }
+      ]
+    },
+    "api_arguments": {
+      "stream": false,
+      "persist": false
+    },
+    "inherited_parameters": "predict schema plus tracker configuration"
+  },
+  "tuning": {
+    "platform_status": "not_implemented",
+    "api_arguments": {
+      "use_ray": false,
+      "iterations": 300
+    },
+    "search_space_parameters": [
+      {
+        "name": "lr0",
+        "type": "float",
+        "range_documented": "(1e-5, 1e-2)"
+      },
+      {
+        "name": "lrf",
+        "type": "float",
+        "range_documented": "(0.01, 1.0)"
+      },
+      {
+        "name": "momentum",
+        "type": "float",
+        "range_documented": "(0.7, 0.98)"
+      },
+      {
+        "name": "weight_decay",
+        "type": "float",
+        "range_documented": "(0.0, 0.001)"
+      },
+      {
+        "name": "warmup_epochs",
+        "type": "float",
+        "range_documented": "(0.0, 5.0)"
+      },
+      {
+        "name": "warmup_momentum",
+        "type": "float",
+        "range_documented": "(0.0, 0.95)"
+      },
+      {
+        "name": "box",
+        "type": "float",
+        "range_documented": "(1.0, 20.0)"
+      },
+      {
+        "name": "cls",
+        "type": "float",
+        "range_documented": "(0.1, 4.0)"
+      },
+      {
+        "name": "cls_pw",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "dfl",
+        "type": "float",
+        "range_documented": "(0.4, 12.0)"
+      },
+      {
+        "name": "hsv_h",
+        "type": "float",
+        "range_documented": "(0.0, 0.1)"
+      },
+      {
+        "name": "hsv_s",
+        "type": "float",
+        "range_documented": "(0.0, 0.9)"
+      },
+      {
+        "name": "hsv_v",
+        "type": "float",
+        "range_documented": "(0.0, 0.9)"
+      },
+      {
+        "name": "degrees",
+        "type": "float",
+        "range_documented": "(0.0, 45.0)"
+      },
+      {
+        "name": "translate",
+        "type": "float",
+        "range_documented": "(0.0, 0.9)"
+      },
+      {
+        "name": "scale",
+        "type": "float",
+        "range_documented": "(0.0, 0.95)"
+      },
+      {
+        "name": "shear",
+        "type": "float",
+        "range_documented": "(0.0, 10.0)"
+      },
+      {
+        "name": "perspective",
+        "type": "float",
+        "range_documented": "(0.0, 0.001)"
+      },
+      {
+        "name": "flipud",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "fliplr",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "bgr",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "mosaic",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "mixup",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "cutmix",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "copy_paste",
+        "type": "float",
+        "range_documented": "(0.0, 1.0)"
+      },
+      {
+        "name": "close_mosaic",
+        "type": "int",
+        "range_documented": "(0.0, 10.0)"
+      }
+    ],
+    "additional_settings_note": "Derive Tuner, Ray and storage/search controls from the selected version and backend; model.tune also accepts training kwargs."
+  }
+}

@@ -12,6 +12,11 @@ from cv_algorithm_sdk import (
     PredictRequest,
     TimingMetadata,
 )
+from cv_algorithm_sdk.runtime_contract import (
+    CONTRACT_ID,
+    FRAMEWORK_VERSION,
+    normalize_parameters,
+)
 
 from .settings import YoloSettings
 
@@ -29,13 +34,18 @@ class YoloAlgorithm(DetectionAlgorithm):
             raise ValueError("CV_YOLO_MODE must be ultralytics or stub")
         if not self._settings.weights_path.is_file():
             raise FileNotFoundError(f"YOLO weights not found: {self._settings.weights_path}")
+        import ultralytics
         from ultralytics import YOLO
+
+        if self.manifest.schema_version == "1.1" and ultralytics.__version__ != FRAMEWORK_VERSION:
+            raise ValueError("推理镜像版本与参数契约不一致，请重建 YOLO 推理镜像")
 
         self._model = YOLO(str(self._settings.weights_path), task="detect")
 
     def predict(self, request: PredictRequest) -> ObjectDetectionResult:
         parameters = self.manifest.resolve_parameters(request.parameters)
-        confidence = float(parameters["confidence"])
+        canonical = normalize_parameters("predict", parameters)
+        confidence = float(canonical["conf"])
         if self._settings.mode == "stub":
             return self._stub_result(request, confidence)
         if self._model is None:
@@ -45,11 +55,8 @@ class YoloAlgorithm(DetectionAlgorithm):
         device = None if self._settings.device == "auto" else self._settings.device
         predictions = self._model.predict(
             source=str(image_path),
-            conf=confidence,
-            iou=float(parameters["iou_threshold"]),
-            max_det=int(parameters["max_detections"]),
-            imgsz=int(parameters["image_size"]),
-            agnostic_nms=bool(parameters["agnostic_nms"]),
+            **canonical,
+            **({"rect": False} if self.manifest.runtime.framework == "onnx" else {}),
             device=device,
             verbose=False,
         )
@@ -78,7 +85,25 @@ class YoloAlgorithm(DetectionAlgorithm):
                 postprocess_ms=float(speed.get("postprocess", 0)),
             ),
             data=ObjectDetectionData(detections=detections),
+            configuration=self._configuration(request.parameters, canonical),
         )
+
+    def _configuration(self, submitted: dict, normalized: dict) -> dict:
+        predictor = getattr(self._model, "predictor", None)
+        args = getattr(predictor, "args", None)
+        effective = {
+            key: getattr(args, key) for key in normalized if args is not None and hasattr(args, key)
+        }
+        # args.imgsz can remain a scalar (dynamic ONNX) or precede stride rounding.
+        # The predictor stores its checked [height, width] separately.
+        if "imgsz" in normalized and getattr(predictor, "imgsz", None) is not None:
+            effective["imgsz"] = list(predictor.imgsz)
+        return {
+            "contract_id": CONTRACT_ID, "submitted": submitted, "normalized": normalized,
+            "effective": effective,
+            **({"input_tensor_shape": predictor.input_tensor_shape}
+               if getattr(predictor, "input_tensor_shape", None) is not None else {}),
+        }
 
     def _resolve_asset(self, asset_uri: str) -> Path:
         parsed = urlparse(asset_uri)

@@ -16,6 +16,7 @@ from ..modules.system.api import router as system_router
 from ..modules.tasks.api.events import router as task_events_router
 from ..modules.tasks.api.router import router as tasks_router
 from ..modules.training.api import router as training_router
+from ..modules.training.exports import router as exports_router
 from ..modules.workflows.api import router as workflows_router
 
 api_router = APIRouter()
@@ -36,3 +37,4 @@ api_router.include_router(deployment_targets_router)
 api_router.include_router(operations_router)
 api_router.include_router(projects_router)
 api_router.include_router(training_router)
+api_router.include_router(exports_router)

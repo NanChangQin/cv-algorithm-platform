@@ -1,0 +1,1284 @@
+{
+  "framework": "ultralytics",
+  "framework_version": "8.4.183",
+  "source_wheel_sha256": "0826261c54f80c18c0fa0db4afd728f581c78db49cf2d9d6f254a2ce7c10576b",
+  "default_key_count": 113,
+  "parameters": {
+    "task": {
+      "default": "detect",
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "track",
+        "benchmark",
+        "tune"
+      ]
+    },
+    "mode": {
+      "default": "train",
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "track",
+        "benchmark",
+        "tune"
+      ]
+    },
+    "model": {
+      "default": null,
+      "modes": [
+        "train",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "data": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "epochs": {
+      "default": 100,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "time": {
+      "default": null,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "patience": {
+      "default": 100,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "batch": {
+      "default": 16,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "int"
+    },
+    "imgsz": {
+      "default": 640,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "save": {
+      "default": true,
+      "modes": [
+        "train",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "save_period": {
+      "default": -1,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "cache": {
+      "default": false,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool 或 str"
+    },
+    "device": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "workers": {
+      "default": 8,
+      "modes": [
+        "train",
+        "val"
+      ],
+      "documented_type": "int"
+    },
+    "project": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict"
+      ],
+      "documented_type": "str"
+    },
+    "name": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "str"
+    },
+    "exist_ok": {
+      "default": false,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "pretrained": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool 或 str"
+    },
+    "cls_remap": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "optimizer": {
+      "default": "auto",
+      "modes": [
+        "train"
+      ],
+      "documented_type": "str"
+    },
+    "verbose": {
+      "default": true,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "seed": {
+      "default": 0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "deterministic": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "single_cls": {
+      "default": false,
+      "modes": [
+        "train",
+        "val"
+      ],
+      "documented_type": "bool"
+    },
+    "rect": {
+      "default": false,
+      "modes": [
+        "train",
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "cos_lr": {
+      "default": false,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "close_mosaic": {
+      "default": 10,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "resume": {
+      "default": false,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "amp": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool 或 str"
+    },
+    "fraction": {
+      "default": 1.0,
+      "modes": [
+        "train",
+        "val",
+        "export"
+      ],
+      "documented_type": "float、int 或 list"
+    },
+    "profile": {
+      "default": false,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "freeze": {
+      "default": null,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int 或 list"
+    },
+    "multi_scale": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "compile": {
+      "default": false,
+      "modes": [
+        "train",
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool 或 str"
+    },
+    "channels_last": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "overlap_mask": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "mask_ratio": {
+      "default": 4,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "dropout": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "val": {
+      "default": true,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "bool"
+    },
+    "split": {
+      "default": "val",
+      "modes": [
+        "val",
+        "export"
+      ],
+      "documented_type": "str"
+    },
+    "save_json": {
+      "default": false,
+      "modes": [
+        "val"
+      ],
+      "documented_type": "bool"
+    },
+    "conf": {
+      "default": null,
+      "modes": [
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "float"
+    },
+    "iou": {
+      "default": 0.7,
+      "modes": [
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "float"
+    },
+    "max_det": {
+      "default": 300,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "int"
+    },
+    "quantize": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "dnn": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "plots": {
+      "default": true,
+      "modes": [
+        "train",
+        "val"
+      ],
+      "documented_type": "bool"
+    },
+    "nms": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "bool，可选"
+    },
+    "source": {
+      "default": null,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "str 或 int 或 None"
+    },
+    "vid_stride": {
+      "default": 1,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "int"
+    },
+    "stream_buffer": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "visualize": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "augment": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "agnostic_nms": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict",
+        "export"
+      ],
+      "documented_type": "bool"
+    },
+    "classes": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict"
+      ],
+      "documented_type": "list[int]"
+    },
+    "retina_masks": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "embed": {
+      "default": null,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "list[int]"
+    },
+    "show": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "save_frames": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "save_txt": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "save_conf": {
+      "default": false,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "save_crop": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "show_labels": {
+      "default": true,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "show_conf": {
+      "default": true,
+      "modes": [
+        "val",
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "show_boxes": {
+      "default": true,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "line_width": {
+      "default": null,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "int or None"
+    },
+    "format": {
+      "default": "torchscript",
+      "modes": [
+        "export",
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "optimize": {
+      "default": false,
+      "modes": [
+        "export"
+      ],
+      "documented_type": "bool"
+    },
+    "dynamic": {
+      "default": false,
+      "modes": [
+        "export"
+      ],
+      "documented_type": "bool"
+    },
+    "simplify": {
+      "default": true,
+      "modes": [
+        "export"
+      ],
+      "documented_type": "bool"
+    },
+    "opset": {
+      "default": null,
+      "modes": [
+        "export"
+      ],
+      "documented_type": "int"
+    },
+    "workspace": {
+      "default": null,
+      "modes": [
+        "export"
+      ],
+      "documented_type": "float 或 None"
+    },
+    "lr0": {
+      "default": 0.01,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "lrf": {
+      "default": 0.01,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "momentum": {
+      "default": 0.937,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "weight_decay": {
+      "default": 0.0005,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "warmup_epochs": {
+      "default": 3.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "warmup_momentum": {
+      "default": 0.8,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "warmup_bias_lr": {
+      "default": 0.1,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "distill_model": {
+      "default": null,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "str"
+    },
+    "dis": {
+      "default": 6.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "box": {
+      "default": 7.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "cls": {
+      "default": 0.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "cls_pw": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "dfl": {
+      "default": 1.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "pose": {
+      "default": 12.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "kobj": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "rle": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "angle": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "dlog": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "dgrad": {
+      "default": 0.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "dlam": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float"
+    },
+    "nbs": {
+      "default": 64,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "int"
+    },
+    "hsv_h": {
+      "default": 0.015,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "hsv_s": {
+      "default": 0.7,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "hsv_v": {
+      "default": 0.4,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "degrees": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "translate": {
+      "default": 0.1,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "scale": {
+      "default": 0.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float | tuple",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "shear": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "perspective": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "flipud": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "fliplr": {
+      "default": 0.5,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, classify, pose, obb"
+    },
+    "bgr": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "mosaic": {
+      "default": 1.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, pose, obb"
+    },
+    "mixup": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, pose, obb"
+    },
+    "cutmix": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "detect, segment, semantic, pose, obb"
+    },
+    "copy_paste": {
+      "default": 0.0,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "segment, semantic, obb"
+    },
+    "copy_paste_mode": {
+      "default": "flip",
+      "modes": [
+        "train"
+      ],
+      "documented_type": "str",
+      "tasks": "segment, semantic, obb"
+    },
+    "auto_augment": {
+      "default": "randaugment",
+      "modes": [
+        "train"
+      ],
+      "documented_type": "str",
+      "tasks": "classify"
+    },
+    "erasing": {
+      "default": 0.4,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "float",
+      "tasks": "classify"
+    },
+    "cfg": {
+      "default": null,
+      "modes": [
+        "train",
+        "val",
+        "predict",
+        "export",
+        "track",
+        "benchmark",
+        "tune"
+      ]
+    },
+    "tracker": {
+      "default": "tracktrack.yaml",
+      "modes": [
+        "track"
+      ]
+    },
+    "save_dir": {
+      "default": null,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "str"
+    },
+    "augmentations": {
+      "default": null,
+      "modes": [
+        "train"
+      ],
+      "documented_type": "list",
+      "tasks": "detect, segment, semantic, depth, pose, obb"
+    },
+    "stream": {
+      "default": false,
+      "modes": [
+        "predict"
+      ],
+      "documented_type": "bool"
+    },
+    "eps": {
+      "default": 0.001,
+      "modes": [
+        "benchmark"
+      ],
+      "documented_type": ""
+    },
+    "persist": {
+      "default": false,
+      "modes": [
+        "track"
+      ]
+    },
+    "iterations": {
+      "default": 300,
+      "modes": [
+        "tune"
+      ]
+    },
+    "use_ray": {
+      "default": false,
+      "modes": [
+        "tune"
+      ]
+    },
+    "space": {
+      "default": null,
+      "modes": [
+        "tune"
+      ]
+    }
+  },
+  "export_formats": [
+    {
+      "label": "PyTorch",
+      "format": "-",
+      "suffix": ".pt",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [],
+      "environment": "base"
+    },
+    {
+      "label": "TorchScript",
+      "format": "torchscript",
+      "suffix": ".torchscript",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "nms",
+        "dynamic"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "ONNX",
+      "format": "onnx",
+      "suffix": ".onnx",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "OpenVINO",
+      "format": "openvino",
+      "suffix": "_openvino_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "TensorRT",
+      "format": "engine",
+      "suffix": ".engine",
+      "cpu": false,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "workspace",
+        "nms",
+        "fraction"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "CoreML",
+      "format": "coreml",
+      "suffix": ".mlpackage",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "dynamic",
+        "quantize",
+        "nms"
+      ],
+      "environment": "coreml"
+    },
+    {
+      "label": "Core AI",
+      "format": "coreai",
+      "suffix": ".aimodel",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "TensorFlow SavedModel",
+      "format": "saved_model",
+      "suffix": "_saved_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "data",
+        "fraction",
+        "quantize",
+        "opset",
+        "nms"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "TensorFlow GraphDef",
+      "format": "pb",
+      "suffix": ".pb",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "opset"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "TensorFlow Edge TPU",
+      "format": "edgetpu",
+      "suffix": "_edgetpu.tflite",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "data",
+        "fraction",
+        "quantize",
+        "opset"
+      ],
+      "environment": "tensorflow"
+    },
+    {
+      "label": "LiteRT",
+      "format": "litert",
+      "suffix": ".tflite",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "data",
+        "fraction"
+      ],
+      "environment": "litert"
+    },
+    {
+      "label": "PaddlePaddle",
+      "format": "paddle",
+      "suffix": "_paddle_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "MNN",
+      "format": "mnn",
+      "suffix": ".mnn",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "dynamic",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms"
+      ],
+      "environment": "mnn"
+    },
+    {
+      "label": "NCNN",
+      "format": "ncnn",
+      "suffix": "_ncnn_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "batch",
+        "quantize"
+      ],
+      "environment": "ncnn"
+    },
+    {
+      "label": "IMX",
+      "format": "imx",
+      "suffix": "_imx_model",
+      "cpu": true,
+      "gpu": true,
+      "format_specific_arguments": [
+        "data",
+        "quantize",
+        "fraction",
+        "nms"
+      ],
+      "environment": "isolated-imx"
+    },
+    {
+      "label": "RKNN",
+      "format": "rknn",
+      "suffix": "_rknn_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "data",
+        "fraction"
+      ],
+      "environment": "isolated-rknn"
+    },
+    {
+      "label": "ExecuTorch",
+      "format": "executorch",
+      "suffix": "_executorch_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch"
+      ],
+      "environment": "executorch"
+    },
+    {
+      "label": "Axelera AI",
+      "format": "axelera",
+      "suffix": "_axelera_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "quantize",
+        "fraction",
+        "data"
+      ],
+      "environment": "isolated-axelera"
+    },
+    {
+      "label": "DEEPX",
+      "format": "deepx",
+      "suffix": "_deepx_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "data",
+        "quantize",
+        "opset",
+        "simplify",
+        "optimize"
+      ],
+      "environment": "isolated-deepx"
+    },
+    {
+      "label": "Qualcomm QNN",
+      "format": "qnn",
+      "suffix": "_qnn.onnx",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "fraction",
+        "data"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "Hailo",
+      "format": "hailo",
+      "suffix": "_hailo_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "name",
+        "quantize",
+        "data",
+        "fraction",
+        "simplify",
+        "conf",
+        "iou"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "Huawei Ascend",
+      "format": "ascend",
+      "suffix": "_ascend_model",
+      "cpu": false,
+      "gpu": false,
+      "format_specific_arguments": [
+        "batch",
+        "name",
+        "quantize",
+        "opset",
+        "simplify",
+        "nms"
+      ],
+      "environment": "base"
+    },
+    {
+      "label": "AMD Xilinx",
+      "format": "xilinx",
+      "suffix": "_xilinx_model",
+      "cpu": true,
+      "gpu": false,
+      "format_specific_arguments": [
+        "name",
+        "quantize",
+        "data",
+        "fraction",
+        "opset",
+        "simplify"
+      ],
+      "environment": "isolated-xilinx"
+    }
+  ]
+}

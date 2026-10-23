@@ -1,0 +1,1597 @@
+{
+  "id": "ultralytics:8.4.183:parameters-v1",
+  "framework": "ultralytics",
+  "framework_version": "8.4.183",
+  "mode": "train",
+  "task": "detect",
+  "parameters": {
+    "epochs": {
+      "type": "json",
+      "default": 100,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "训练轮数",
+      "description": "训练轮数；适用版本 8.4.183。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "batch": {
+      "type": "json",
+      "default": 16,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "integer",
+            "minimum": 1
+          },
+          {
+            "const": -1
+          },
+          {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "exclusiveMaximum": 1
+          }
+        ]
+      },
+      "title": "批大小",
+      "description": "正整数为批大小；-1 自动选择；0~1 之间的小数表示显存占比。多卡必须使用正整数。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "imgsz": {
+      "type": "json",
+      "default": 640,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 32,
+        "multipleOf": 32
+      },
+      "title": "输入尺寸",
+      "description": "训练使用单个尺寸；预测可使用整数或 [高度, 宽度]，尺寸为 32 的倍数。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "lr0": {
+      "type": "json",
+      "default": 0.01,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "初始学习率",
+      "description": "初始学习率。optimizer=auto 时由框架自动决定，不会使用手填值。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "optimizer": {
+      "type": "json",
+      "default": "auto",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "SGD",
+          "MuSGD",
+          "Adam",
+          "Adamax",
+          "AdamW",
+          "NAdam",
+          "RAdam",
+          "RMSProp"
+        ]
+      },
+      "title": "优化器",
+      "description": "自动选择或显式指定优化器；自动模式会调整实际学习率。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "patience": {
+      "type": "json",
+      "default": 50,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "title": "提前停止",
+      "description": "连续多少轮没有提升后停止；0 表示关闭提前停止。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "workers": {
+      "type": "json",
+      "default": 4,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "title": "读图进程",
+      "description": "读图进程；适用版本 8.4.183。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "seed": {
+      "type": "json",
+      "default": 0,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "title": "随机种子",
+      "description": "随机种子；适用版本 8.4.183。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "cos_lr": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "余弦学习率",
+      "description": "余弦学习率；适用版本 8.4.183。",
+      "group": "常用参数",
+      "common": true,
+      "status": "configurable",
+      "reason": null
+    },
+    "task": {
+      "type": "json",
+      "default": "detect",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "任务",
+      "description": "任务；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "任务类型由算法适配器确定"
+    },
+    "mode": {
+      "type": "json",
+      "default": "train",
+      "json_schema": {
+        "type": "string"
+      },
+      "title": "模式",
+      "description": "模式；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "运行模式由任务入口确定"
+    },
+    "model": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "模型",
+      "description": "模型；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过模型选择器配置"
+    },
+    "data": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "数据集",
+      "description": "数据集；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过数据集选择器配置"
+    },
+    "time": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "number",
+          "null"
+        ],
+        "exclusiveMinimum": 0
+      },
+      "title": "训练时限",
+      "description": "最长训练时长，单位小时；设置后框架按时限调整总轮数。null 表示不限时。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存结果",
+      "description": "控制常规 checkpoint 保存；关闭后框架仍可能在最后一轮保存，中途停止可能没有权重。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_period": {
+      "type": "json",
+      "default": -1,
+      "json_schema": {
+        "type": "integer",
+        "minimum": -1
+      },
+      "title": "定期保存",
+      "description": "定期保存；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cache": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "enum": [
+          false,
+          true,
+          "ram",
+          "disk"
+        ]
+      },
+      "title": "图片缓存",
+      "description": "false 不缓存；true/ram 缓存在内存；disk 缓存到本次训练的可写数据副本。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "device": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": [
+              "integer",
+              "string",
+              "null"
+            ]
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          }
+        ]
+      },
+      "title": "计算设备",
+      "description": "计算设备；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过服务器和 GPU 选择器配置"
+    },
+    "project": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "输出项目",
+      "description": "输出项目；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "平台映射到本次任务输出目录"
+    },
+    "name": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "运行名称",
+      "description": "运行名称；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "平台映射到本次任务名称/目录"
+    },
+    "exist_ok": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "允许覆盖",
+      "description": "允许覆盖；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "每次任务使用独立目录"
+    },
+    "pretrained": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "预训练",
+      "description": "预训练；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cls_remap": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "类别重映射",
+      "description": "类别重映射；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "verbose": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "详细日志",
+      "description": "详细日志；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "deterministic": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "确定性计算",
+      "description": "确定性计算；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "single_cls": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "单类别训练",
+      "description": "单类别训练；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "rect": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "矩形输入",
+      "description": "矩形输入；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "close_mosaic": {
+      "type": "json",
+      "default": 10,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "title": "关闭拼接轮数",
+      "description": "关闭拼接轮数；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "resume": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "断点续训",
+      "description": "断点续训；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "通过训练记录的断点续训入口选择完整 checkpoint；固定原数据和训练计划"
+    },
+    "amp": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "enum": [
+          true,
+          false,
+          "fp16",
+          "bf16",
+          "fp32"
+        ]
+      },
+      "title": "混合精度",
+      "description": "true/fp16 启用 FP16 自动混合精度；bf16 使用 BF16；false/fp32 使用 FP32。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "fraction": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "anyOf": [
+          {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "integer",
+                "minimum": 2
+              }
+            ]
+          },
+          {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "prefixItems": [
+              {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 2
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 2
+                  }
+                ]
+              },
+              {
+                "anyOf": [
+                  {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 1
+                      },
+                      {
+                        "type": "integer",
+                        "minimum": 2
+                      }
+                    ]
+                  },
+                  {
+                    "const": 0
+                  }
+                ]
+              }
+            ],
+            "items": false
+          }
+        ]
+      },
+      "title": "数据子集",
+      "description": "支持数据比例、图片数量或 [train, val, test] 设置；test 条目允许 0。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "profile": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "训练性能分析",
+      "description": "训练性能分析；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "训练时跨格式 profiling 需要导出环境，将在导出阶段接入"
+    },
+    "freeze": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "integer",
+            "minimum": 0
+          },
+          {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ]
+            },
+            "minItems": 1
+          }
+        ]
+      },
+      "title": "冻结层",
+      "description": "冻结前 N 层，或提供层编号/模块名称列表；null 表示不冻结。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "multi_scale": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "多尺度范围",
+      "description": "多尺度范围；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "compile": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "enum": [
+          false,
+          true,
+          "default",
+          "reduce-overhead",
+          "max-autotune",
+          "max-autotune-no-cudagraphs"
+        ]
+      },
+      "title": "图编译",
+      "description": "false 禁用；true 使用默认编译；也可指定受支持的 torch.compile 模式。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "channels_last": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "title": "内存布局",
+      "description": "内存布局；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "overlap_mask": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "重叠掩码",
+      "description": "重叠掩码；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 segment 任务"
+    },
+    "mask_ratio": {
+      "type": "json",
+      "default": 4,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "掩码下采样",
+      "description": "掩码下采样；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 segment 任务"
+    },
+    "dropout": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "随机失活",
+      "description": "随机失活；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 classify 任务"
+    },
+    "val": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "训练验证",
+      "description": "控制逐轮验证；关闭后框架仍可能执行最终验证或提前停止检查。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "split": {
+      "type": "json",
+      "default": "val",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "train",
+          "val"
+        ]
+      },
+      "title": "验证划分",
+      "description": "验证划分；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_json": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存JSON",
+      "description": "保存JSON；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "conf": {
+      "type": "json",
+      "default": 0.001,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "置信度阈值",
+      "description": "置信度阈值；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "iou": {
+      "type": "json",
+      "default": 0.7,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "NMS交并比",
+      "description": "NMS交并比；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "max_det": {
+      "type": "json",
+      "default": 300,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "最大目标数",
+      "description": "最大目标数；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "quantize": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "enum": [
+          null,
+          8,
+          16,
+          32,
+          "int8",
+          "fp16",
+          "fp32",
+          "w8a8",
+          "w16a16",
+          "w32a32",
+          "w8a16",
+          "w8a32"
+        ]
+      },
+      "title": "量化精度",
+      "description": "统一精度选项；推理支持 FP16/FP32，INT8 需要已量化产物，不能临时转换 .pt。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "unavailable",
+      "reason": "QAT 训练需要专用运行环境，将在量化阶段接入；训练精度使用 amp"
+    },
+    "dnn": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "OpenCV后端",
+      "description": "OpenCV后端；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "plots": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "生成图表",
+      "description": "生成图表；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "nms": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "boolean",
+          "null"
+        ]
+      },
+      "title": "NMS模式",
+      "description": "null 使用默认检测头；true 使用常规 NMS；false 在模型支持时使用无 NMS 头。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "visualize": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "特征可视化",
+      "description": "特征可视化；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "augment": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "测试时增强",
+      "description": "测试时增强；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "agnostic_nms": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "类别无关NMS",
+      "description": "类别无关NMS；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "classes": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        ]
+      },
+      "title": "类别筛选",
+      "description": "类别编号数组，如 [0, 2]；null 表示全部类别。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_txt": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存文本",
+      "description": "保存文本；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "save_conf": {
+      "type": "json",
+      "default": false,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "保存置信度",
+      "description": "保存置信度；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "show_labels": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "显示类别",
+      "description": "显示类别；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "show_conf": {
+      "type": "json",
+      "default": true,
+      "json_schema": {
+        "type": "boolean"
+      },
+      "title": "显示分数",
+      "description": "显示分数；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "lrf": {
+      "type": "json",
+      "default": 0.01,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "最终学习率比例",
+      "description": "最终学习率比例；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "momentum": {
+      "type": "json",
+      "default": 0.937,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "动量",
+      "description": "动量；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "weight_decay": {
+      "type": "json",
+      "default": 0.0005,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "权重衰减",
+      "description": "权重衰减；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "warmup_epochs": {
+      "type": "json",
+      "default": 3.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "预热轮数",
+      "description": "预热轮数；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "warmup_momentum": {
+      "type": "json",
+      "default": 0.8,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "预热动量",
+      "description": "预热动量；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "warmup_bias_lr": {
+      "type": "json",
+      "default": 0.1,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "预热偏置学习率",
+      "description": "预热偏置学习率；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "distill_model": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "教师模型",
+      "description": "教师模型；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "教师模型需要受管模型资源，将在模型选择阶段接入"
+    },
+    "dis": {
+      "type": "json",
+      "default": 6.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "蒸馏损失",
+      "description": "蒸馏损失权重；需要教师模型，当前入口尚未接入教师模型选择。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "box": {
+      "type": "json",
+      "default": 7.5,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "框损失",
+      "description": "框损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cls": {
+      "type": "json",
+      "default": 0.5,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "分类损失",
+      "description": "分类损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cls_pw": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "类别权重幂",
+      "description": "类别权重幂；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "dfl": {
+      "type": "json",
+      "default": 1.5,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "位置分布损失",
+      "description": "位置分布损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "pose": {
+      "type": "json",
+      "default": 12.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "姿态损失",
+      "description": "姿态损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 pose 任务"
+    },
+    "kobj": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "关键点置信度损失",
+      "description": "关键点置信度损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 pose 任务"
+    },
+    "rle": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "关键点回归损失",
+      "description": "关键点回归损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 pose 任务"
+    },
+    "angle": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "旋转角损失",
+      "description": "旋转角损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 obb 任务"
+    },
+    "dlog": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "深度对数损失",
+      "description": "深度对数损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 depth 任务"
+    },
+    "dgrad": {
+      "type": "json",
+      "default": 0.5,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "深度梯度损失",
+      "description": "深度梯度损失；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 depth 任务"
+    },
+    "dlam": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "深度方差权重",
+      "description": "深度方差权重；适用版本 8.4.183。",
+      "group": "损失与任务",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 depth 任务"
+    },
+    "nbs": {
+      "type": "json",
+      "default": 64,
+      "json_schema": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "title": "标称批大小",
+      "description": "标称批大小；适用版本 8.4.183。",
+      "group": "优化与调度",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "hsv_h": {
+      "type": "json",
+      "default": 0.015,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "色调增强",
+      "description": "色调增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "hsv_s": {
+      "type": "json",
+      "default": 0.7,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "饱和度增强",
+      "description": "饱和度增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "hsv_v": {
+      "type": "json",
+      "default": 0.4,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "明度增强",
+      "description": "明度增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "degrees": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "旋转范围",
+      "description": "旋转范围；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "translate": {
+      "type": "json",
+      "default": 0.1,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "平移范围",
+      "description": "平移范围；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "scale": {
+      "type": "json",
+      "default": 0.5,
+      "json_schema": {
+        "anyOf": [
+          {
+            "type": "number",
+            "minimum": 0
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "minItems": 2,
+            "maxItems": 2
+          }
+        ]
+      },
+      "title": "缩放范围",
+      "description": "可用单个缩放范围，或 [最小值, 最大值]；显式范围必须从小到大。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "shear": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0
+      },
+      "title": "错切范围",
+      "description": "错切范围；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "perspective": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "透视变换",
+      "description": "透视变换；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "flipud": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "垂直翻转",
+      "description": "垂直翻转；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "fliplr": {
+      "type": "json",
+      "default": 0.5,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "水平翻转",
+      "description": "水平翻转；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "bgr": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "通道交换",
+      "description": "通道交换；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "mosaic": {
+      "type": "json",
+      "default": 1.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "拼接增强",
+      "description": "拼接增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "mixup": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "混合增强",
+      "description": "混合增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "cutmix": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "裁块增强",
+      "description": "裁块增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "configurable",
+      "reason": null
+    },
+    "copy_paste": {
+      "type": "json",
+      "default": 0.0,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "复制粘贴增强",
+      "description": "复制粘贴增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 segment, semantic, obb 任务"
+    },
+    "copy_paste_mode": {
+      "type": "json",
+      "default": "flip",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "flip",
+          "mixup"
+        ]
+      },
+      "title": "复制粘贴模式",
+      "description": "复制粘贴模式；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 segment, semantic, obb 任务"
+    },
+    "auto_augment": {
+      "type": "json",
+      "default": "randaugment",
+      "json_schema": {
+        "type": "string",
+        "enum": [
+          "randaugment",
+          "autoaugment",
+          "augmix"
+        ]
+      },
+      "title": "自动增强策略",
+      "description": "自动增强策略；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 classify 任务"
+    },
+    "erasing": {
+      "type": "json",
+      "default": 0.4,
+      "json_schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      },
+      "title": "随机擦除",
+      "description": "随机擦除；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "unavailable",
+      "reason": "仅用于 classify 任务"
+    },
+    "cfg": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "配置文件",
+      "description": "配置文件；适用版本 8.4.183。",
+      "group": "运行与精度",
+      "common": false,
+      "status": "managed",
+      "reason": "请导入专家配置内容，容器内配置文件路径由平台管理"
+    },
+    "save_dir": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "title": "保存目录",
+      "description": "保存目录；适用版本 8.4.183。",
+      "group": "验证与输出",
+      "common": false,
+      "status": "managed",
+      "reason": "平台管理产物目录"
+    },
+    "augmentations": {
+      "type": "json",
+      "default": null,
+      "json_schema": {
+        "type": [
+          "array",
+          "null"
+        ]
+      },
+      "title": "自定义增强",
+      "description": "自定义增强；适用版本 8.4.183。",
+      "group": "数据增强",
+      "common": false,
+      "status": "unavailable",
+      "reason": "自定义增强实例需要插件适配；当前可配置内置增强参数"
+    }
+  },
+  "default_key_count": 113,
+  "sha256": "0a1f9be0bb7b6dad600df5e682157dfe907b5322075526d2ab9ff6dc875737b4"
+}

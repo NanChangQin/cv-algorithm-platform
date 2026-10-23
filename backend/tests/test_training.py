@@ -1,10 +1,13 @@
+import hashlib
 import io
 import zipfile
+from pathlib import Path
 from uuid import UUID
 
 import pytest
 import yaml
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from cv_platform.core.errors import ApplicationError
 from cv_platform.dependencies import get_container
@@ -24,6 +27,11 @@ def make_zip(entries: dict[str, str | bytes]) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         for name, content in entries.items():
+            if Path(name).suffix.lower() in {".jpg", ".png"} and isinstance(content, str):
+                image = io.BytesIO()
+                color = int.from_bytes(hashlib.sha256(content.encode()).digest()[:3])
+                Image.new("RGB", (32, 24), color).save(image, format="PNG")
+                content = image.getvalue()
             archive.writestr(name, content)
     return buffer.getvalue()
 
@@ -340,3 +348,73 @@ def test_a_start_that_fails_midway_does_not_leave_training_on_the_node(
     get_container().training_orchestrator.prepare(UUID(run["id"]))
     assert get_run(client, run["id"])["status"] == "failed"
     assert node.deleted == [f"/trainings/{run['id']}"]
+
+
+def test_parameter_contract_and_complex_submission_roundtrip(client, node):
+    from cv_algorithm_sdk.runtime_contract import get_contract
+
+    response = client.get("/api/v1/training/parameter-contract")
+    assert response.status_code == 200
+    assert response.json() == get_contract("train")
+    dataset = upload_dataset(client, ultralytics_layout())
+    submitted = {"epochs": 3, "batch": .7, "classes": [0], "freeze": [0, "model.1"],
+                 "amp": "bf16", "time": None, "cos_lr": False, "scale": [.5, 1.5]}
+    run = create_run(client, dataset["id"], parameters=submitted)
+    assert run["progress"]["configuration"]["submitted"] == submitted
+    assert get_run(client, run["id"])["progress"]["configuration"]["submitted"] == submitted
+    orchestrator = get_container().training_orchestrator
+    orchestrator.prepare(UUID(run["id"]))
+    assert node.started[0]["submitted_parameters"] == submitted
+    assert node.started[0]["parameters"]["freeze"] == [0, "model.1"]
+    node.state = {"state": "running", "progress": {"epoch": 0}, "metrics": []}
+    orchestrator.sync(UUID(run["id"]))
+    assert get_run(client, run["id"])["progress"]["configuration"]["submitted"] == submitted
+    snapshot = {"submitted": submitted, "effective": {"batch": 6, "optimizer": "AdamW"}}
+    node.state = {"state": "completed", "progress": {"configuration": snapshot},
+                  "files": {"parameter-resolution.json": 20}}
+    orchestrator.sync(UUID(run["id"]))
+    final = get_run(client, run["id"])
+    assert final["progress"]["configuration"] == snapshot
+    assert "parameter-resolution.json" in final["artifacts"]
+
+
+@pytest.mark.parametrize("submitted", [{}, {"epochs": 1}])
+def test_submitted_configuration_is_persisted_without_injected_defaults(client, node, submitted):
+    dataset = upload_dataset(client, ultralytics_layout())
+    run = create_run(client, dataset["id"], parameters=submitted)
+    stored = get_run(client, run["id"])
+    assert stored["progress"]["configuration"]["submitted"] == submitted
+    assert "batch" in stored["progress"]["configuration"]["normalized"]
+    get_container().training_orchestrator.prepare(UUID(run["id"]))
+    assert node.started[0]["submitted_parameters"] == submitted
+
+
+@pytest.mark.parametrize("parameters", [
+    {"epohs": 3}, {"epochs": True}, {"classes": [True]}, {"device": "0"},
+    {"resume": True}, {"imgsz": [640, 640]}, {"classes": [99]},
+])
+def test_parameter_api_rejects_invalid_fields(client, parameters):
+    dataset = upload_dataset(client, ultralytics_layout())
+    response = client.post("/api/v1/training/runs", json={
+        "dataset_id": dataset["id"], "model": "yolo26n.pt", "node_id": "local",
+        "parameters": parameters,
+    })
+    assert response.status_code == 422, response.text
+
+
+def test_contract_mismatch_fails_before_start(client, node):
+    dataset = upload_dataset(client, ultralytics_layout())
+    run = create_run(client, dataset["id"])
+    original = node.request
+
+    def request(method, path, **kwargs):
+        if path == "/training/parameter-contract":
+            return {"sha256": "outdated"}
+        return original(method, path, **kwargs)
+
+    node.request = request
+    get_container().training_orchestrator.prepare(UUID(run["id"]))
+    final = get_run(client, run["id"])
+    assert final["status"] == "failed"
+    assert "参数契约不匹配" in final["error"]
+    assert node.started == []

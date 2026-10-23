@@ -30,6 +30,10 @@ def _matches(task: InferenceTask, criteria: TaskQuery) -> bool:
             criteria.algorithm_version_id is None
             or task.algorithm_version_id == criteria.algorithm_version_id
         )
+        and (
+            criteria.deployment_id is None
+            or task.deployment_id == criteria.deployment_id
+        )
         and (criteria.asset_id is None or task.asset_id == criteria.asset_id)
         and (not criteria.statuses or task.status in criteria.statuses)
         and (criteria.node_id is None or node == criteria.node_id)

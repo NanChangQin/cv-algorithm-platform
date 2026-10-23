@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from cv_algorithm_sdk.runtime_profile import PROTOCOL, RuntimeProfile
 
 from ..domain.models import AlgorithmInstance, ContainerSpec, InstanceStatus
 
@@ -58,6 +59,13 @@ class DockerContainerRuntime:
         if spec.device == "gpu" or spec.gpu_device_ids:
             gpu_options = self._gpu_options(spec.gpu_device_ids)
 
+        environment = gpu_options.pop("environment", {})
+        if spec.runtime_config is not None:
+            labels = self._client.images.get(spec.image).labels or {}
+            if labels.get("cv.platform.runtime-profile") != PROTOCOL:
+                raise ValueError("镜像不支持 RuntimeProfile，请重建 ONNX 推理镜像")
+            profile = RuntimeProfile.model_validate(spec.runtime_config)
+            environment["CV_RUNTIME_PROFILE"] = profile.model_dump_json()
         container = self._client.containers.create(
             image=spec.image,
             name=spec.container_name,
@@ -66,6 +74,8 @@ class DockerContainerRuntime:
             mem_limit=f"{spec.memory_mb}m",
             nano_cpus=int(spec.cpu_count * 1_000_000_000),
             pids_limit=256,
+            shm_size=f"{spec.shm_mb}m",
+            environment=environment,
             **gpu_options,
             privileged=False,
             read_only=True,
@@ -78,6 +88,9 @@ class DockerContainerRuntime:
                 PORT_LABEL: str(spec.internal_port),
                 DEVICE_LABEL: spec.device,
                 GPU_IDS_LABEL: ",".join(spec.gpu_device_ids),
+                "cv.platform.runtime-scope": spec.runtime_scope,
+                "cv.platform.runtime-config-sha256": spec.configuration_sha256,
+                "cv.platform.prediction-timeout": str(spec.prediction_timeout_seconds or ""),
             },
             volumes={
                 str(self._host_data_root): {"bind": "/data", "mode": "ro"},
@@ -137,6 +150,11 @@ class DockerContainerRuntime:
                     created_at=created_at,
                     updated_at=datetime.now(UTC),
                     last_used_at=datetime.now(UTC),
+                    runtime_scope=labels.get("cv.platform.runtime-scope", ""),
+                    configuration_sha256=labels.get("cv.platform.runtime-config-sha256", ""),
+                    prediction_timeout_seconds=(
+                        int(labels["cv.platform.prediction-timeout"])
+                        if labels.get("cv.platform.prediction-timeout") else None),
                     gpu_device_ids=tuple(
                         item for item in labels.get(GPU_IDS_LABEL, "").split(",") if item
                     ),

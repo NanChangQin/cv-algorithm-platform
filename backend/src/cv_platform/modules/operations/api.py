@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
 from ...core.request_context import project_id_from
@@ -72,5 +72,14 @@ def reconcile_autoscaling(request: Request, container=Depends(get_container)):
 
 
 @router.get("/metrics")
-def metrics(request: Request, container=Depends(get_container)):
-    return container.operations.metrics(project_id_from(request))
+def metrics(
+    request: Request,
+    deployment_id: UUID | None = None,
+    window_seconds: int = Query(default=60, ge=5, le=86400),
+    container=Depends(get_container),
+):
+    return container.operations.metrics(
+        project_id_from(request),
+        deployment_id=deployment_id,
+        window_seconds=window_seconds,
+    )

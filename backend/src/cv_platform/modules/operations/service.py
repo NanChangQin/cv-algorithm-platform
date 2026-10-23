@@ -1,7 +1,7 @@
 import hashlib
 import math
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from threading import RLock
 from uuid import UUID
 
@@ -11,7 +11,96 @@ from ...core.database import Database
 from ...core.errors import ApplicationError
 from ..algorithms.domain.repositories import AlgorithmRepository
 from ..instances.application.service import RuntimeInstanceService
-from ..tasks.domain.repositories import TaskRepository
+from ..tasks.domain.entities import InferenceTask
+from ..tasks.domain.repositories import TaskQuery, TaskRepository
+
+
+def _percentile(sorted_values: list[float], ratio: float) -> float:
+    if not sorted_values:
+        return 0.0
+    if len(sorted_values) == 1:
+        return round(sorted_values[0], 3)
+    position = (len(sorted_values) - 1) * ratio
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return round(sorted_values[lower], 3)
+    weight = position - lower
+    return round(sorted_values[lower] * (1 - weight) + sorted_values[upper] * weight, 3)
+
+
+def _summarize_tasks(
+    items: list[InferenceTask], *, now: datetime, window_seconds: int = 60
+) -> dict[str, object]:
+    inference_ms: list[float] = []
+    end_to_end_ms: list[float] = []
+    queue_wait_ms: list[float] = []
+    completed = 0
+    failed = 0
+    in_flight = 0
+    recent_completed = 0
+    cutoff = now - timedelta(seconds=max(1, window_seconds))
+
+    for task in items:
+        if task.status is TaskStatus.COMPLETED:
+            completed += 1
+            if task.result is not None:
+                inference_ms.append(float(task.result.timing.inference_ms))
+            if task.completed_at is not None:
+                end_to_end_ms.append(
+                    max(0.0, (task.completed_at - task.created_at).total_seconds() * 1000.0)
+                )
+                if task.completed_at >= cutoff:
+                    recent_completed += 1
+            if task.started_at is not None:
+                queue_wait_ms.append(
+                    max(0.0, (task.started_at - task.created_at).total_seconds() * 1000.0)
+                )
+        elif task.status is TaskStatus.FAILED:
+            failed += 1
+            if task.started_at is not None:
+                queue_wait_ms.append(
+                    max(0.0, (task.started_at - task.created_at).total_seconds() * 1000.0)
+                )
+        elif task.status in {
+            TaskStatus.QUEUED,
+            TaskStatus.PREPARING,
+            TaskStatus.STARTING,
+            TaskStatus.RUNNING,
+        }:
+            in_flight += 1
+
+    inference_ms.sort()
+    end_to_end_ms.sort()
+    queue_wait_ms.sort()
+    terminal_total = completed + failed
+    error_rate = round(failed / terminal_total, 4) if terminal_total else 0.0
+    qps = round(recent_completed / max(1, window_seconds), 4)
+    return {
+        "completed_samples": len(inference_ms),
+        "failed_tasks": failed,
+        "in_flight_tasks": in_flight,
+        "error_rate": error_rate,
+        "qps_1m": qps,
+        "average_inference_ms": (
+            round(sum(inference_ms) / len(inference_ms), 3) if inference_ms else 0.0
+        ),
+        "inference_p50_ms": _percentile(inference_ms, 0.50),
+        "inference_p95_ms": _percentile(inference_ms, 0.95),
+        "inference_p99_ms": _percentile(inference_ms, 0.99),
+        "average_end_to_end_ms": (
+            round(sum(end_to_end_ms) / len(end_to_end_ms), 3) if end_to_end_ms else 0.0
+        ),
+        "end_to_end_p50_ms": _percentile(end_to_end_ms, 0.50),
+        "end_to_end_p95_ms": _percentile(end_to_end_ms, 0.95),
+        "end_to_end_p99_ms": _percentile(end_to_end_ms, 0.99),
+        "average_queue_wait_ms": (
+            round(sum(queue_wait_ms) / len(queue_wait_ms), 3) if queue_wait_ms else 0.0
+        ),
+        "queue_wait_p50_ms": _percentile(queue_wait_ms, 0.50),
+        "queue_wait_p95_ms": _percentile(queue_wait_ms, 0.95),
+        "queue_wait_p99_ms": _percentile(queue_wait_ms, 0.99),
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,11 +120,13 @@ class OperationsService:
         tasks: TaskRepository,
         instances: RuntimeInstanceService,
         database: Database | None = None,
+        deployments=None,
     ) -> None:
         self._algorithms = algorithms
         self._tasks = tasks
         self._instances = instances
         self._database = database
+        self._deployments = deployments
         self._policies: dict[UUID, AutoscalingPolicy] = {}
         self._last_active_at: dict[UUID, datetime] = {}
         self._lock = RLock()
@@ -117,12 +208,12 @@ class OperationsService:
                 cursor.execute("SELECT * FROM autoscaling_policies ORDER BY algorithm_version_id")
                 policies = [
                     AutoscalingPolicy(
-                        algorithm_version_id=row["algorithm_version_id"],
-                        min_replicas=int(row["min_replicas"]),
-                        max_replicas=int(row["max_replicas"]),
-                        target_concurrency=int(row["target_concurrency"]),
-                        idle_seconds=int(row["idle_seconds"]),
-                        updated_at=row["updated_at"],
+                        row["algorithm_version_id"],
+                        int(row["min_replicas"]),
+                        int(row["max_replicas"]),
+                        int(row["target_concurrency"]),
+                        int(row["idle_seconds"]),
+                        row["updated_at"],
                     )
                     for row in cursor.fetchall()
                 ]
@@ -192,16 +283,41 @@ class OperationsService:
                 )
         return {"reconciled_at": datetime.now(UTC).isoformat(), "items": outcomes}
 
-    def metrics(self, project_id: UUID | None = None) -> dict[str, object]:
+    def metrics(
+        self,
+        project_id: UUID | None = None,
+        *,
+        deployment_id: UUID | None = None,
+        window_seconds: int = 60,
+    ) -> dict[str, object]:
         counts = {
             status.value: total
             for status, total in self._tasks.count_by_status(project_id).items()
         }
-        average, samples = self._tasks.inference_time_stats(project_id)
+        now = datetime.now(UTC)
+        tasks = self._tasks.query(
+            TaskQuery(project_id=project_id, deployment_id=deployment_id, limit=5000)
+        )
+        summary = _summarize_tasks(tasks, now=now, window_seconds=window_seconds)
+        by_deployment: dict[str, dict[str, object]] = {}
+        grouped: dict[UUID, list[InferenceTask]] = {}
+        for item in tasks:
+            if item.deployment_id is not None:
+                grouped.setdefault(item.deployment_id, []).append(item)
+        for dep_id, dep_tasks in grouped.items():
+            dep_summary = _summarize_tasks(dep_tasks, now=now, window_seconds=window_seconds)
+            if self._deployments is not None:
+                dep = self._deployments.get(dep_id)
+                if dep is not None:
+                    dep_summary["algorithm_version_id"] = str(dep.algorithm_version_id)
+                    dep_summary["node_id"] = dep.node_id
+                    dep_summary["status"] = dep.status.value
+            by_deployment[str(dep_id)] = dep_summary
+
         return {
             "tasks_by_status": counts,
-            "average_inference_ms": round(average, 3),
-            "completed_samples": samples,
+            **summary,
+            "deployment_metrics": by_deployment,
             "autoscaling_policies": len(self.list_policies(project_id)),
             "runtime_instances": sum(
                 self._instance_in_project(instance.algorithm_version_id, project_id)

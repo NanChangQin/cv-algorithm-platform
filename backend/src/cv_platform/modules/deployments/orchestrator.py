@@ -14,19 +14,29 @@ from threading import Lock
 from typing import Any
 from uuid import UUID
 
+from cv_algorithm_sdk import TaskStatus
+
 from ...core.errors import ApplicationError
 from ..algorithms.domain.entities import AlgorithmVersion
 from ..algorithms.domain.repositories import AlgorithmRepository
 from ..instances.application.service import RuntimeInstanceService
 from ..scheduling.cluster_gateway import ClusterAlgorithmManagerGateway
 from ..scheduling.node_client import NodeClient
-from .domain import Deployment, DeploymentStatus, initial_steps
+from ..tasks.domain.repositories import TaskQuery, TaskRepository
+from .domain import Deployment, DeploymentRoute, DeploymentStatus, initial_steps
 from .repository import InMemoryDeploymentRepository, PostgresDeploymentRepository
 
 logger = logging.getLogger(__name__)
 
 # 运行中的部署多久检查一次实例；同时刷新实例的最近使用时间，避免被空闲回收
 CHECK_INTERVAL = 60
+DEFAULT_DRAIN_TIMEOUT = 120
+IN_FLIGHT_TASK_STATUSES = (
+    TaskStatus.QUEUED,
+    TaskStatus.PREPARING,
+    TaskStatus.STARTING,
+    TaskStatus.RUNNING,
+)
 
 
 def model_directory(algorithm: AlgorithmVersion) -> str:
@@ -42,12 +52,14 @@ class DeploymentOrchestrator:
         cluster: ClusterAlgorithmManagerGateway,
         instances: RuntimeInstanceService,
         staging_root: Path,
+        tasks: TaskRepository | None = None,
     ) -> None:
         self._repository = repository
         self._algorithms = algorithms
         self._cluster = cluster
         self._instances = instances
         self._staging = staging_root
+        self._tasks = tasks
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cv-deploy")
         self._busy: set[UUID] = set()
         self._busy_lock = Lock()
@@ -56,6 +68,7 @@ class DeploymentOrchestrator:
     def tick(self) -> None:
         active = self._repository.list_active()
         due = []
+        draining = []
         for deployment in active:
             if deployment.status is DeploymentStatus.QUEUED:
                 self._submit(deployment.id, self.deploy)
@@ -68,10 +81,15 @@ class DeploymentOrchestrator:
                         deployment.id, {DeploymentStatus.PREPARING},
                         status=DeploymentStatus.QUEUED, steps=initial_steps(),
                     )
+            elif deployment.status is DeploymentStatus.DRAINING:
+                draining.append(deployment)
             elif time.monotonic() - self._checked_at.get(deployment.id, 0) >= CHECK_INTERVAL:
                 due.append(deployment)
         if due:
             self.check(due)
+        self.reconcile_routes()
+        if draining:
+            self.reconcile_draining(draining)
 
     def shutdown(self, wait: bool = False) -> None:
         self._pool.shutdown(wait=wait, cancel_futures=not wait)
@@ -82,11 +100,12 @@ class DeploymentOrchestrator:
         if not self._repository.update(
             deployment_id, {DeploymentStatus.QUEUED},
             status=DeploymentStatus.PREPARING, steps=initial_steps(), error=None,
-            instance_id=None,
+            instance_id=None, readiness=None,
         ):
             return
         deployment = self._repository.get(deployment_id)
         progress = _Steps(self._repository, deployment)
+        instance = None
         try:
             algorithm = self._algorithms.get(deployment.algorithm_version_id)
             if algorithm is None:
@@ -107,24 +126,54 @@ class DeploymentOrchestrator:
                 algorithm.project_id,
                 node_id=deployment.node_id,
                 gpu_device_ids=deployment.gpu_device_ids,
+                runtime_scope=deployment.id.hex,
+                runtime_profile=deployment.runtime_profile,
             )
             progress.done("start", f"容器 {instance.container_name}")
+            readiness = None
+            if (algorithm.lineage or {}).get("export_job_id"):
+                progress.start("verify", "读取模型加载和预热推理证据")
+                readiness = target.request("GET", f"/instances/{instance.id}/readiness")
+                if (not readiness.get("ready") or not readiness.get("smoke_passed")
+                    or readiness.get("backend") != "onnxruntime"
+                    or readiness.get("warmup_runs", 0) < 1):
+                    raise ApplicationError("MODEL_SMOKE_FAILED", "模型加载或预热推理未通过", 502)
+                from cv_algorithm_sdk.runtime_profile import RuntimeProfile
+
+                profile = RuntimeProfile.model_validate(deployment.runtime_profile or {})
+                expected_hash = algorithm.lineage["export_report"]["artifact_sha256"]
+                if (readiness.get("artifact_sha256") != expected_hash
+                    or readiness.get("threads") != profile.threads
+                    or readiness.get("warmup_runs") != profile.warmup_runs
+                    or readiness.get("providers") != ["CPUExecutionProvider"]):
+                    raise ApplicationError("MODEL_SMOKE_FAILED", "运行模型或配置与部署不一致", 502)
+                progress.done("verify", f"ORT CPU 预热 {readiness['warmup_runs']} 次通过")
+            else:
+                progress.finish("verify", "skipped", "现有适配器仅提供服务健康检查")
             self._checked_at[deployment_id] = time.monotonic()
             if not self._repository.update(
                 deployment_id, {DeploymentStatus.PREPARING},
                 status=DeploymentStatus.RUNNING, instance_id=instance.id,
-                started_at=datetime.now(UTC),
+                started_at=datetime.now(UTC), readiness=readiness,
             ):
                 # 启动过程中用户点了停止
                 self._stop_instance(instance.id)
                 self._repository.update(
                     deployment_id, {DeploymentStatus.STOPPING}, status=DeploymentStatus.STOPPED,
                 )
+            else:
+                self.reconcile_routes()
         except ApplicationError as exc:
+            if instance is not None:
+                self._stop_instance(instance.id)
             self._fail(deployment_id, progress, exc.message)
+            self.reconcile_routes()
         except Exception:
+            if instance is not None:
+                self._stop_instance(instance.id)
             logger.exception("deployment failed", extra={"deployment_id": str(deployment_id)})
             self._fail(deployment_id, progress, "部署失败，请查看平台日志")
+            self.reconcile_routes()
 
     def _check_node(
         self, target: NodeClient, deployment: Deployment, algorithm: AlgorithmVersion
@@ -259,6 +308,102 @@ class DeploymentOrchestrator:
                 deployment_id, {DeploymentStatus.STOPPING}, status=DeploymentStatus.STOPPED,
             )
 
+    # 路由切换与请求排空 ---------------------------------------------------
+
+    def reconcile_routes(self) -> None:
+        for route in self._repository.list_pending_routes():
+            if route.candidate_deployment_id is None:
+                continue
+            candidate = self._repository.get(route.candidate_deployment_id)
+            if candidate is None:
+                self._repository.update_route(
+                    route.project_id, route.key,
+                    candidate_deployment_id=None,
+                    last_error="候选部署已被删除，保持原服务版本",
+                )
+                continue
+            if candidate.status is DeploymentStatus.RUNNING:
+                self.promote_route(route, candidate)
+            elif candidate.status in {DeploymentStatus.FAILED, DeploymentStatus.STOPPED}:
+                reason = candidate.error or f"候选部署状态为 {candidate.status.value}"
+                self._repository.update_route(
+                    route.project_id, route.key,
+                    candidate_deployment_id=None,
+                    last_error=f"候选部署未就绪（{reason}），已保持当前线上版本",
+                )
+
+    def promote_route(
+        self, route: DeploymentRoute, candidate: Deployment
+    ) -> DeploymentRoute | None:
+        previous_id = route.active_deployment_id
+        updated = self._repository.update_route(
+            route.project_id,
+            route.key,
+            active_deployment_id=candidate.id,
+            previous_deployment_id=(
+                previous_id if previous_id != candidate.id else route.previous_deployment_id
+            ),
+            candidate_deployment_id=None,
+            last_error=None,
+        )
+        if previous_id != candidate.id:
+            self.retire_deployment(previous_id, drain_timeout_seconds=route.drain_timeout_seconds)
+        return updated
+
+    def retire_deployment(
+        self, deployment_id: UUID, *, drain_timeout_seconds: int = DEFAULT_DRAIN_TIMEOUT
+    ) -> None:
+        # 如果该部署仍作为其他服务路由的 active 或 candidate，则不能排空或停止
+        for other in self._repository.list_routes_for_deployment(deployment_id):
+            if deployment_id in {other.active_deployment_id, other.candidate_deployment_id}:
+                return
+        deployment = self._repository.get(deployment_id)
+        if deployment is None or deployment.status is not DeploymentStatus.RUNNING:
+            return
+        if self.in_flight_tasks(deployment.id) > 0:
+            self._repository.update(
+                deployment.id, {DeploymentStatus.RUNNING}, status=DeploymentStatus.DRAINING,
+            )
+            return
+        if deployment.instance_id:
+            self._stop_instance(deployment.instance_id)
+        self._repository.update(
+            deployment.id, {DeploymentStatus.RUNNING, DeploymentStatus.DRAINING},
+            status=DeploymentStatus.STOPPED,
+        )
+
+    def reconcile_draining(self, deployments: list[Deployment] | None = None) -> None:
+        items = deployments if deployments is not None else [
+            item for item in self._repository.list_active()
+            if item.status is DeploymentStatus.DRAINING
+        ]
+        now = datetime.now(UTC)
+        for deployment in items:
+            if deployment.status is not DeploymentStatus.DRAINING:
+                continue
+            in_flight = self.in_flight_tasks(deployment.id)
+            timeout = self._drain_timeout_for(deployment.id)
+            elapsed = (now - deployment.updated_at).total_seconds()
+            if in_flight == 0 or elapsed >= timeout:
+                if deployment.instance_id:
+                    self._stop_instance(deployment.instance_id)
+                self._repository.update(
+                    deployment.id, {DeploymentStatus.DRAINING}, status=DeploymentStatus.STOPPED,
+                )
+
+    def in_flight_tasks(self, deployment_id: UUID) -> int:
+        if self._tasks is None:
+            return 0
+        return self._tasks.count(
+            TaskQuery(deployment_id=deployment_id, statuses=IN_FLIGHT_TASK_STATUSES)
+        )
+
+    def _drain_timeout_for(self, deployment_id: UUID) -> int:
+        routes = self._repository.list_routes_for_deployment(deployment_id)
+        if not routes:
+            return DEFAULT_DRAIN_TIMEOUT
+        return max(route.drain_timeout_seconds for route in routes)
+
     # 运行检查 -------------------------------------------------------------
 
     def check(self, deployments: list[Deployment]) -> None:
@@ -292,10 +437,56 @@ class DeploymentOrchestrator:
                 self._mark_lost(deployment, reason)
 
     def _mark_lost(self, deployment: Deployment, reason: str) -> None:
-        self._repository.update(
+        if not self._repository.update(
             deployment.id, {DeploymentStatus.RUNNING},
             status=DeploymentStatus.FAILED, error=f"{reason}，点“启动”重新部署",
-        )
+        ):
+            return
+        self._auto_recover_routes(deployment.id, reason)
+
+    def _auto_recover_routes(self, failed_deployment_id: UUID, reason: str) -> None:
+        for route in self._repository.list_routes_for_deployment(failed_deployment_id):
+            if route.active_deployment_id != failed_deployment_id:
+                continue
+            if route.previous_deployment_id is None:
+                self._repository.update_route(
+                    route.project_id, route.key,
+                    last_error=f"当前部署异常（{reason}），无可回滚的历史部署",
+                )
+                continue
+            previous = self._repository.get(route.previous_deployment_id)
+            if previous is None:
+                self._repository.update_route(
+                    route.project_id, route.key,
+                    previous_deployment_id=None,
+                    last_error=f"当前部署异常（{reason}），历史部署已被删除",
+                )
+                continue
+            if previous.status in {DeploymentStatus.RUNNING, DeploymentStatus.DRAINING}:
+                if previous.status is DeploymentStatus.DRAINING:
+                    self._repository.update(
+                        previous.id, {DeploymentStatus.DRAINING}, status=DeploymentStatus.RUNNING,
+                    )
+                self._repository.update_route(
+                    route.project_id, route.key,
+                    active_deployment_id=previous.id,
+                    previous_deployment_id=failed_deployment_id,
+                    candidate_deployment_id=None,
+                    last_error=f"原部署异常（{reason}），已自动回滚到上一版本",
+                )
+                continue
+            if previous.status in {DeploymentStatus.STOPPED, DeploymentStatus.FAILED}:
+                self._repository.update(
+                    previous.id, {DeploymentStatus.STOPPED, DeploymentStatus.FAILED},
+                    status=DeploymentStatus.QUEUED, steps=initial_steps(),
+                    error=None, readiness=None,
+                )
+            self._repository.update_route(
+                route.project_id, route.key,
+                candidate_deployment_id=previous.id,
+                last_error=f"原部署异常（{reason}），正在启动上一版本进行自动回滚",
+            )
+            self._submit(previous.id, self.deploy)
 
     # 工具 -----------------------------------------------------------------
 
@@ -393,3 +584,4 @@ def _zip_directory(source: Path, staging: Path) -> Path:
 
 def _mb(size: float) -> str:
     return f"{size / 1024**2:.1f} MB"
+

@@ -70,6 +70,10 @@ function boxSize(detection: Detection) {
 
 <template>
   <section ref="root" class="result-viewer" :class="{ compact }" :style="canvasMaxHeight ? { '--result-max-height': `${canvasMaxHeight}px` } : undefined">
+    <details v-if="result.type === 'object_detection' && result.configuration" class="inline-details">
+      <summary>推理参数与生效配置</summary>
+      <pre class="annotation-example">{{ JSON.stringify(result.configuration, null, 2) }}</pre>
+    </details>
     <div class="result-toolbar">
       <label class="confidence-control">
         <span>最低置信度</span>

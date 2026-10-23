@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 import httpx
+from cv_algorithm_sdk.runtime_profile import PROTOCOL, RuntimeProfile
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -48,6 +49,10 @@ class EnsureInstanceRequest(BaseModel):
     memory_mb: int = Field(default=1024, ge=256, le=262_144)
     cpu_count: float = Field(default=1, ge=0.1, le=64)
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=32)
+    runtime_scope: str = Field(default="", pattern=r"^(|[a-f0-9]{32})$")
+    prediction_timeout_seconds: int | None = Field(default=None, ge=1, le=600)
+    shm_mb: int = Field(default=64, ge=16, le=16384)
+    runtime_config: RuntimeProfile | None = None
     model_directory: str | None = Field(
         default=None, pattern=r"^[a-z0-9][a-z0-9-]*(/[a-z0-9][a-z0-9-]*){0,2}$"
     )
@@ -78,6 +83,8 @@ class InstanceResponse(BaseModel):
     error: str | None
     last_used_at: datetime | None
     gpu_device_ids: list[str]
+    runtime_scope: str = ""
+    prediction_timeout_seconds: int | None = None
 
     @classmethod
     def from_entity(cls, instance: AlgorithmInstance) -> "InstanceResponse":
@@ -90,6 +97,10 @@ class EnsureReplicasRequest(EnsureInstanceRequest):
 
 def build_router(get_service: object) -> APIRouter:
     router = APIRouter(prefix="/instances", tags=["instances"])
+
+    @router.get("/capabilities")
+    def capabilities():
+        return {"runtime_profile_protocol": PROTOCOL}
 
     @router.get("", response_model=list[InstanceResponse])
     def list_instances(service: InstanceService = Depends(get_service)) -> list[InstanceResponse]:
@@ -142,6 +153,16 @@ def build_router(get_service: object) -> APIRouter:
     ) -> InstanceResponse:
         return InstanceResponse.from_entity(service.touch(instance_id))
 
+    @router.get("/{instance_id}/readiness")
+    def readiness(instance_id: str, service: InstanceService = Depends(get_service)):
+        instance = service.get_instance(instance_id)
+        try:
+            response = httpx.get(f"{instance.endpoint}/readiness", timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ManagerError("MODEL_READINESS_FAILED", "模型就绪证据读取失败", 502) from exc
+
     @router.post("/{instance_id}/predict")
     def predict_remote(
         instance_id: str,
@@ -188,7 +209,8 @@ def build_router(get_service: object) -> APIRouter:
                     "input": {"asset_uri": f"file:///data/remote-inputs/{input_path.name}"},
                     "parameters": parsed_parameters,
                 },
-                timeout=settings.prediction_timeout_seconds,
+                timeout=getattr(instance, "prediction_timeout_seconds", None)
+                    or settings.prediction_timeout_seconds,
             )
             return Response(
                 content=response.content,

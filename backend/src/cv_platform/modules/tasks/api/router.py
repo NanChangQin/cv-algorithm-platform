@@ -35,6 +35,7 @@ def get_service(
         container.task_queue,
         project_id_from(request),
         request.state.session.username,
+        deployments=container.deployments,
     )
 
 
@@ -45,7 +46,25 @@ def create_task(
     service: TaskService = Depends(get_service),
     container: ApplicationContainer = Depends(get_container),
 ) -> TaskResponse:
+    deployment_id = payload.deployment_id
     algorithm_version_id = payload.algorithm_version_id
+    if payload.service_key is not None:
+        from ...deployments.targets import DeploymentService
+
+        deployment = DeploymentService(
+            container.deployments, container.algorithms, container.algorithm_manager,
+            project_id_from(request), request.state.session.username,
+            orchestrator=container.deployment_orchestrator,
+        ).resolve_route_deployment(payload.service_key)
+        if (
+            algorithm_version_id is not None
+            and algorithm_version_id != deployment.algorithm_version_id
+        ):
+            raise ApplicationError(
+                "PLACEMENT_INVALID", "所选服务入口当前运行的版本与请求不一致", 409
+            )
+        deployment_id = deployment.id
+        algorithm_version_id = deployment.algorithm_version_id
     if algorithm_version_id is None and payload.algorithm_key is not None:
         routing_key = str(payload.asset_id or payload.asset_uri)
         algorithm_version_id = container.operations.choose_version(
@@ -56,18 +75,20 @@ def create_task(
     if algorithm_version_id is None:
         raise ApplicationError("ALGORITHM_NOT_FOUND", "算法版本不存在", 404)
     node_id, gpu_device_ids = payload.node_id, tuple(payload.gpu_device_ids)
-    if payload.deployment_id is not None:
+    if deployment_id is not None:
         from ...deployments.targets import DeploymentService
 
         node_id, gpu_device_ids = DeploymentService(
             container.deployments, container.algorithms, container.algorithm_manager,
             project_id_from(request), request.state.session.username,
-        ).running_placement(payload.deployment_id, algorithm_version_id)
+            orchestrator=container.deployment_orchestrator,
+        ).running_placement(deployment_id, algorithm_version_id)
     if node_id is not None:
         container.algorithm_manager.validate_node(node_id)
     task = service.create_task(
         algorithm_version_id,
         payload.parameters,
+        deployment_id=deployment_id,
         asset_id=payload.asset_id,
         asset_uri=payload.asset_uri,
         node_id=node_id,
@@ -190,3 +211,4 @@ def get_task_result(
     if task.status is not TaskStatus.COMPLETED or task.result is None:
         raise ApplicationError("RESULT_NOT_READY", "任务结果尚未生成", 409)
     return TaskResultResponse(task_id=task.id, result=task.result)
+

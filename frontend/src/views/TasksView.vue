@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { assetsApi } from '@/api/assets'
 import { systemApi } from '@/api/system'
 import { tasksApi } from '@/api/tasks'
+import { trainingApi, type TrainingDataset } from '@/api/training'
 import TaskDrawer from '@/components/tasks/TaskDrawer.vue'
 import TaskTable from '@/components/tasks/TaskTable.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
@@ -43,6 +44,13 @@ const page = ref(1)
 const pendingId = ref('')
 const selectedResults = ref<string[]>([])
 const downloading = ref(false)
+const datasets = ref<TrainingDataset[]>([])
+const feedbackOpen = ref(false)
+const feedbackDatasetId = ref('')
+const feedbackSplit = ref<'train' | 'val' | 'test'>('train')
+const feedbackMinConf = ref(0.25)
+const feedbackAsBackground = ref(false)
+const feedbackSubmitting = ref(false)
 const downloadError = ref('')
 const openTaskId = ref(typeof route.query.task === 'string' ? route.query.task : '')
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
@@ -206,6 +214,39 @@ function selectPageResults() {
   const completed = tasks.value.filter((task) => task.status === 'completed').map((task) => task.id)
   selectedResults.value = [...new Set([...selectedResults.value, ...completed])].slice(0, 100)
 }
+async function openFeedbackPanel() {
+  downloadError.value = ''
+  feedbackOpen.value = true
+  if (!datasets.value.length && trainingApi.datasets) {
+    try {
+      datasets.value = await trainingApi.datasets()
+      if (!feedbackDatasetId.value && datasets.value[0]) feedbackDatasetId.value = datasets.value[0].id
+    } catch (reason) {
+      downloadError.value = errorMessage(reason, '加载训练数据集失败')
+    }
+  }
+}
+async function submitFeedback() {
+  if (!feedbackDatasetId.value || !selectedResults.value.length || feedbackSubmitting.value) return
+  feedbackSubmitting.value = true
+  downloadError.value = ''
+  try {
+    const created = await trainingApi.datasetFeedback(feedbackDatasetId.value, {
+      samples: selectedResults.value.map((task_id) => (
+        feedbackAsBackground.value ? { task_id, boxes: [] } : { task_id }
+      )),
+      target_split: feedbackSplit.value,
+      min_confidence: feedbackMinConf.value,
+    })
+    toast.success(`已回流生成数据集 ${created.name} v${created.version}`)
+    feedbackOpen.value = false
+    selectedResults.value = []
+  } catch (reason) {
+    downloadError.value = errorMessage(reason, '样本回流失败')
+  } finally {
+    feedbackSubmitting.value = false
+  }
+}
 async function downloadArchive() {
   downloading.value = true
   downloadError.value = ''
@@ -286,10 +327,45 @@ async function downloadArchive() {
         <span v-if="selectedResults.length">已选 {{ selectedResults.length }} 项</span>
         <button v-if="selectedResults.length" type="button" class="text-button" @click="selectedResults = []">清空选择</button>
       </div>
-      <button v-if="selectedResults.length" type="button" class="primary-button compact-button" :disabled="downloading" @click="downloadArchive">
-        {{ downloading ? '打包中…' : '下载结果 ZIP' }}
-      </button>
+      <div v-if="selectedResults.length" class="toolbar-actions">
+        <button type="button" class="secondary-button compact-button" @click="openFeedbackPanel">回流至数据集</button>
+        <button type="button" class="primary-button compact-button" :disabled="downloading" @click="downloadArchive">
+          {{ downloading ? '打包中…' : '下载结果 ZIP' }}
+        </button>
+      </div>
     </div>
+    <section v-if="feedbackOpen && selectedResults.length" class="section-block training-form" aria-label="样本回流">
+      <header class="section-heading">
+        <div><h2>回流样本生成新数据集版本</h2></div>
+        <button type="button" class="text-button" @click="feedbackOpen = false">取消</button>
+      </header>
+      <div class="training-form-grid">
+        <label class="field-label">目标数据集
+          <select v-model="feedbackDatasetId" aria-label="回流目标数据集">
+            <option value="" disabled>选择目标数据集</option>
+            <option v-for="ds in datasets" :key="ds.id" :value="ds.id">{{ ds.name }} · v{{ ds.version }}（{{ ds.class_names.join(', ') }}）</option>
+          </select>
+        </label>
+        <label class="field-label">目标划分
+          <select v-model="feedbackSplit" aria-label="回流目标划分">
+            <option value="train">train（训练集）</option>
+            <option value="val">val（验证集）</option>
+            <option value="test">test（测试集）</option>
+          </select>
+        </label>
+        <label class="field-label">最低置信度过滤
+          <input v-model.number="feedbackMinConf" type="number" min="0" max="1" step="0.05" :disabled="feedbackAsBackground" />
+        </label>
+        <label class="checkbox-label">
+          <input v-model="feedbackAsBackground" type="checkbox" /> 作为纯背景图回流（忽略预测框，用于抑制误检）
+        </label>
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" class="primary-button compact-button" :disabled="!feedbackDatasetId || feedbackSubmitting" @click="submitFeedback">
+          {{ feedbackSubmitting ? '正在回流…' : `确认回流 ${selectedResults.length} 项` }}
+        </button>
+      </div>
+    </section>
     <nav v-if="pageCount > 1" class="pagination" aria-label="任务分页">
       <button type="button" class="secondary-button" :disabled="page === 1" @click="page--">上一页</button>
       <span>{{ page }} / {{ pageCount }}</span>

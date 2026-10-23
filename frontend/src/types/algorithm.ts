@@ -7,9 +7,16 @@ export type AlgorithmStatus =
   | 'disabled'
   | 'failed'
 
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
+export type JsonSchema = Record<string, unknown>
+
 type ParameterMetadata = {
   title?: string
   description?: string
+  group?: string
+  common?: boolean
+  status?: 'configurable' | 'managed' | 'unavailable'
+  reason?: string | null
 }
 
 export type NumberParameter = ParameterMetadata & {
@@ -30,14 +37,29 @@ export type IntegerParameter = ParameterMetadata & {
 
 export type BooleanParameter = ParameterMetadata & { type: 'boolean'; default: boolean }
 export type StringParameter = ParameterMetadata & { type: 'string'; default: string; options?: string[] }
-export type ParameterSpec = NumberParameter | IntegerParameter | BooleanParameter | StringParameter
+export type JsonParameter = ParameterMetadata & { type: 'json'; default: JsonValue; json_schema: JsonSchema }
+export type ParameterSpec = NumberParameter | IntegerParameter | BooleanParameter | StringParameter | JsonParameter
+
+export interface ParameterContract {
+  id: string
+  sha256: string
+  framework: string
+  framework_version: string
+  default_key_count: number
+  mode: string
+  task: string
+  parameters: Record<string, ParameterSpec>
+}
 
 /** 由训练结果发布的版本记录的来源 */
 export interface ModelLineage {
+  export_job_id?: string
+  export_name?: string
   training_run_id: string
   training_name: string
   dataset_id: string
   dataset_name: string | null
+  dataset?: { id: string; version: number; sha256: string; source_sha256: string | null; split_config: Record<string, unknown> } | null
   class_names: string[]
   base_model: string
   checkpoint: 'best' | 'last'

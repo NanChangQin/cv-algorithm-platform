@@ -28,6 +28,9 @@ def _where(criteria: TaskQuery) -> tuple[str, list[object]]:
     if criteria.algorithm_version_id is not None:
         clauses.append("algorithm_version_id = %s")
         params.append(criteria.algorithm_version_id)
+    if criteria.deployment_id is not None:
+        clauses.append("deployment_id = %s")
+        params.append(criteria.deployment_id)
     if criteria.asset_id is not None:
         clauses.append("asset_id = %s")
         params.append(criteria.asset_id)
@@ -93,6 +96,7 @@ class PostgresTaskRepository:
             retry_of=row["retry_of"],
             project_id=row["project_id"],
             node_id=row["node_id"],
+            deployment_id=row.get("deployment_id"),
             gpu_device_ids=tuple(row["gpu_device_ids"] or []),
             execution_node_id=row["execution_node_id"],
             execution_gpu_device_ids=tuple(row["execution_gpu_device_ids"] or []),
@@ -109,11 +113,12 @@ class PostgresTaskRepository:
                     result_type, result, error_code, error_message, retry_of,
                     cancelled_by, cancelled_by_label, created_at, updated_at,
                     started_at, completed_at, cancelled_at,
-                    node_id, gpu_device_ids, execution_node_id, execution_gpu_device_ids
+                    node_id, gpu_device_ids, execution_node_id, execution_gpu_device_ids,
+                    deployment_id
                 ) VALUES (
                     %s, %s, NULL, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, NULL, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s
                 )
                 """,
                 (
@@ -141,6 +146,7 @@ class PostgresTaskRepository:
                     Jsonb(list(task.gpu_device_ids)),
                     task.execution_node_id,
                     Jsonb(list(task.execution_gpu_device_ids)),
+                    task.deployment_id,
                 ),
             )
 
@@ -250,3 +256,4 @@ class PostgresTaskRepository:
             if not row or not row["samples"]:
                 return 0.0, 0
             return float(row["average"] or 0.0), int(row["samples"])
+

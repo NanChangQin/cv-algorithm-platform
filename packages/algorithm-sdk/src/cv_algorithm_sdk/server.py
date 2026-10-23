@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
+from threading import Lock
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from .algorithm import DetectionAlgorithm
 from .protocol import HealthResponse, MetadataResponse, PredictRequest
@@ -11,6 +12,7 @@ def create_algorithm_app(algorithm: DetectionAlgorithm) -> FastAPI:
     """Expose an algorithm through the platform's standard HTTP contract."""
 
     state = {"ready": False}
+    prediction_lock = Lock()
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
@@ -40,8 +42,20 @@ def create_algorithm_app(algorithm: DetectionAlgorithm) -> FastAPI:
             output_type=manifest.output.type,
         )
 
+    @app.get("/readiness")
+    def readiness() -> dict:
+        return {"ready": state["ready"], **getattr(algorithm, "readiness", {})}
+
     @app.post("/predict", response_model=AlgorithmResult)
     def predict(request: PredictRequest) -> AlgorithmResult:
-        return algorithm.predict(request)
+        # Fail fast rather than accumulating an unbounded queue inside the container.
+        if not prediction_lock.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail="算法实例忙，请稍后重试")
+        try:
+            return algorithm.predict(request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        finally:
+            prediction_lock.release()
 
     return app

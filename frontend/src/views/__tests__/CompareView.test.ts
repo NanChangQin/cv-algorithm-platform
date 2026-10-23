@@ -97,6 +97,19 @@ describe('comparison builder', () => {
     expect(wrapper.find('.asset-option.selected').text()).toContain('new.png')
   })
 
+  it('keeps dirty configuration blocking submission when the editor is collapsed', async () => {
+    calls.algorithms = [detector, classifier]
+    const wrapper = mount(CompareView, { global: { stubs } })
+    await flushPromises()
+    for (const toggle of wrapper.findAll('.compare-algorithm-toggle')) await toggle.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '调整参数')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === 'YAML / JSON')!.trigger('click')
+    await wrapper.find('textarea[aria-label="专家参数配置"]').setValue('confidence: 0.8')
+    await wrapper.findAll('button').find((button) => button.text() === '收起参数')!.trigger('click')
+    expect(wrapper.find('.compare-submit button').attributes('disabled')).toBeDefined()
+    expect(calls.create).not.toHaveBeenCalled()
+  })
+
   it('names the images of recent comparisons with a single lookup', async () => {
     calls.algorithms = [detector, classifier]
     calls.list.mockResolvedValue(['c1', 'c2'].map((id) => ({ id, asset_id: 'asset-9', tasks: [], created_at: '2026-10-22T08:00:00Z' })))

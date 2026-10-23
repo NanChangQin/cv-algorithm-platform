@@ -8,6 +8,7 @@ vi.mock('@/api/algorithms', () => ({ algorithmsApi: {} }))
 const lineage = (map50_95: number, checkpoint: string, dataset: string) => ({
   training_run_id: `run-${checkpoint}`, training_name: '安全帽 · yolo26n', dataset_id: 'ds', dataset_name: dataset,
   class_names: ['helmet', 'head'], base_model: 'yolo26n.pt', checkpoint, epoch: 40, epochs_trained: 50,
+  dataset: { id: 'ds', version: 2, sha256: 'dataset-normalized-hash', source_sha256: 'source-hash', split_config: { seed: 42 } },
   parameters: { epochs: 50, batch: 16, imgsz: 640, lr0: 0.01 },
   metrics: { precision: 0.8, recall: 0.7, map50: 0.75, map50_95 },
 })
@@ -29,7 +30,8 @@ describe('trained model versions', () => {
     const detail = wrapper.find('.algorithm-detail')
     expect(detail.find('h2').text()).toBe('安全帽检测')
     const lineageText = detail.find('.lineage-list').text()
-    expect(lineageText).toContain('安全帽 v2 · 2 类')
+    expect(lineageText).toContain('安全帽 v2 · v2 · 2 类')
+    expect(lineageText).toContain('dataset-normalized-hash')
     expect(lineageText).toContain('yolo26n 微调 · last.pt（第 40/50 轮）')
     expect(detail.find('.lineage-list a').attributes('data-to')).toBe('/training/run-last')
     const rows = detail.findAll('.version-compare tbody tr')

@@ -7,9 +7,11 @@ from threading import RLock
 from typing import Any
 from uuid import UUID
 
+from psycopg.errors import ForeignKeyViolation
 from psycopg.types.json import Jsonb
 
 from ...core.database import Database
+from ...core.errors import ApplicationError
 from .domain import ACTIVE_STATUSES, TrainingDataset, TrainingRun, TrainingStatus
 
 # update() 允许修改的字段；状态变化都走带预期状态的条件更新，避免和并发的停止请求互相覆盖
@@ -25,10 +27,20 @@ class InMemoryTrainingRepository:
         self._datasets: dict[UUID, TrainingDataset] = {}
         self._runs: dict[UUID, TrainingRun] = {}
         self._lock = RLock()
+        self._dataset_versions: dict[UUID, int] = {}
 
-    def add_dataset(self, dataset: TrainingDataset) -> None:
+    def add_dataset(self, dataset: TrainingDataset) -> TrainingDataset:
         with self._lock:
+            if dataset.id in self._datasets:
+                raise ApplicationError("DATASET_IMMUTABLE", "数据集版本不能覆盖", 409)
+            if dataset.parent_id and dataset.parent_id not in self._datasets:
+                raise ApplicationError("DATASET_NOT_FOUND", "父版本已被删除", 409)
+            family = dataset.family_id or dataset.id
+            version = self._dataset_versions.get(family, 0) + 1
+            self._dataset_versions[family] = version
+            dataset = replace(dataset, family_id=family, version=version)
             self._datasets[dataset.id] = dataset
+            return dataset
 
     def get_dataset(self, dataset_id: UUID) -> TrainingDataset | None:
         with self._lock:
@@ -41,6 +53,10 @@ class InMemoryTrainingRepository:
 
     def delete_dataset(self, dataset_id: UUID) -> None:
         with self._lock:
+            if any(item.parent_id == dataset_id for item in self._datasets.values()):
+                raise ApplicationError("DATASET_IN_USE", "已有后续版本引用此数据集", 409)
+            if self.count_runs_for_dataset(dataset_id):
+                raise ApplicationError("DATASET_IN_USE", "已有训练引用此数据集", 409)
             self._datasets.pop(dataset_id, None)
 
     def add_run(self, run: TrainingRun) -> None:
@@ -100,6 +116,8 @@ class PostgresTrainingRepository:
             created_by=str(row["created_by"]),
             created_at=row["created_at"],
             format=str(row["format"]),
+            family_id=row["family_id"], version=row["version"], parent_id=row["parent_id"],
+            source_sha256=row["source_sha256"], split_config=dict(row["split_config"]),
         )
 
     @staticmethod
@@ -127,21 +145,48 @@ class PostgresTrainingRepository:
             finished_at=row["finished_at"],
         )
 
-    def add_dataset(self, dataset: TrainingDataset) -> None:
+    def add_dataset(self, dataset: TrainingDataset) -> TrainingDataset:
         with self._database.connect() as connection, connection.cursor() as cursor:
+            family = dataset.family_id or dataset.id
+            cursor.execute(
+                "INSERT INTO training_dataset_series (id, project_id, next_version) "
+                "VALUES (%s, %s, 1) ON CONFLICT (id) DO NOTHING",
+                (family, dataset.project_id),
+            )
+            cursor.execute(
+                "UPDATE training_dataset_series SET next_version = next_version + 1 "
+                "WHERE id = %s AND project_id = %s RETURNING next_version - 1 AS version",
+                (family, dataset.project_id),
+            )
+            allocated = cursor.fetchone()
+            if not allocated:
+                raise ApplicationError("DATASET_NOT_FOUND", "数据集系列不存在", 404)
+            if dataset.parent_id:
+                cursor.execute(
+                    "SELECT id FROM training_datasets WHERE id=%s AND family_id=%s "
+                    "AND project_id=%s FOR KEY SHARE",
+                    (dataset.parent_id, family, dataset.project_id),
+                )
+                if not cursor.fetchone():
+                    raise ApplicationError("DATASET_NOT_FOUND", "父版本已被删除", 409)
+            dataset = replace(dataset, family_id=family, version=allocated["version"])
             cursor.execute(
                 """
                 INSERT INTO training_datasets (
                     id, project_id, name, format, class_names, stats, size_bytes, sha256,
-                    created_by, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    created_by, created_at, family_id, version, parent_id,
+                    source_sha256, split_config
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     dataset.id, dataset.project_id, dataset.name, dataset.format,
                     Jsonb(list(dataset.class_names)), Jsonb(dataset.stats), dataset.size_bytes,
                     dataset.sha256, dataset.created_by, dataset.created_at,
+                    dataset.family_id, dataset.version, dataset.parent_id,
+                    dataset.source_sha256, Jsonb(dataset.split_config),
                 ),
             )
+        return dataset
 
     def get_dataset(self, dataset_id: UUID) -> TrainingDataset | None:
         with self._database.connect() as connection, connection.cursor() as cursor:
@@ -158,8 +203,11 @@ class PostgresTrainingRepository:
             return [self._dataset(row) for row in cursor.fetchall()]
 
     def delete_dataset(self, dataset_id: UUID) -> None:
-        with self._database.connect() as connection, connection.cursor() as cursor:
-            cursor.execute("DELETE FROM training_datasets WHERE id = %s", (dataset_id,))
+        try:
+            with self._database.connect() as connection, connection.cursor() as cursor:
+                cursor.execute("DELETE FROM training_datasets WHERE id = %s", (dataset_id,))
+        except ForeignKeyViolation as exc:
+            raise ApplicationError("DATASET_IN_USE", "已有训练或后续版本引用此数据集", 409) from exc
 
     def add_run(self, run: TrainingRun) -> None:
         with self._database.connect() as connection, connection.cursor() as cursor:
@@ -167,13 +215,14 @@ class PostgresTrainingRepository:
                 """
                 INSERT INTO training_runs (
                     id, project_id, name, dataset_id, model, parameters, node_id,
-                    gpu_device_ids, status, created_by, created_at, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    gpu_device_ids, status, created_by, created_at, updated_at, progress
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     run.id, run.project_id, run.name, run.dataset_id, run.model,
                     Jsonb(run.parameters), run.node_id, Jsonb(list(run.gpu_device_ids)),
                     run.status.value, run.created_by, run.created_at, run.updated_at,
+                    Jsonb(run.progress),
                 ),
             )
 

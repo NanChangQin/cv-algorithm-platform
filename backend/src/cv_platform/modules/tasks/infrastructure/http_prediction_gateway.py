@@ -41,7 +41,7 @@ class HttpAlgorithmPredictionGateway:
                         data={"request_id": request_id, "parameters": json.dumps(parameters)},
                         files={"file": (source.name, stream, "application/octet-stream")},
                         headers=self._manager_headers,
-                        timeout=self._timeout,
+                        timeout=instance.prediction_timeout_seconds or self._timeout,
                     )
             else:
                 response = httpx.post(
@@ -51,7 +51,7 @@ class HttpAlgorithmPredictionGateway:
                         "input": {"asset_uri": asset_uri},
                         "parameters": parameters,
                     },
-                    timeout=self._timeout,
+                    timeout=instance.prediction_timeout_seconds or self._timeout,
                 )
         except httpx.TimeoutException as exc:
             raise ApplicationError("PREDICTION_TIMEOUT", "算法推理超时", 504) from exc

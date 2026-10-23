@@ -26,7 +26,9 @@ class LocalTaskQueue:
         instances: RuntimeInstanceService,
         predictions: AlgorithmPredictionGateway,
         worker_count: int,
+        deployments=None,
     ) -> None:
+        self._deployments = deployments
         self._tasks = tasks
         self._algorithms = algorithms
         self._assets = assets
@@ -78,12 +80,26 @@ class LocalTaskQueue:
 
             task = task.transition(TaskStatus.STARTING)
             self._tasks.save(task)
-            instance = self._instances.start_algorithm(
-                task.algorithm_version_id,
-                task.project_id,
-                node_id=task.node_id,
-                gpu_device_ids=task.gpu_device_ids,
-            )
+            if task.deployment_id is not None:
+                from ...deployments.policy import bound_deployment, resolve_parameters
+
+                deployment = bound_deployment(self._deployments, task.deployment_id,
+                                              task.project_id, task.algorithm_version_id,
+                                              allow_draining=True)
+                resolve_parameters(deployment, algorithm, task.parameters)
+                instance = self._instances.get_running(
+                    deployment.instance_id, task.project_id, deployment.node_id)
+                if (instance.algorithm_version_id != str(task.algorithm_version_id)
+                    or instance.runtime_scope not in {deployment.id.hex, ""}):
+                    raise ApplicationError(
+                        "DEPLOYMENT_INSTANCE_MISMATCH", "部署实例绑定不一致", 409)
+            else:
+                instance = self._instances.start_algorithm(
+                    task.algorithm_version_id,
+                    task.project_id,
+                    node_id=task.node_id,
+                    gpu_device_ids=task.gpu_device_ids,
+                )
             if self._cancelled(task_id):
                 return
 
@@ -150,3 +166,4 @@ class LocalTaskQueue:
         if task is None:
             raise ApplicationError("TASK_NOT_FOUND", "任务不存在", 404)
         return task
+

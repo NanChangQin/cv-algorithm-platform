@@ -38,6 +38,20 @@ class TrainingDataset:
     created_by: str
     created_at: datetime
     format: str = "yolo-detect"
+    family_id: UUID | None = None
+    version: int = 1
+    parent_id: UUID | None = None
+    source_sha256: str | None = None
+    split_config: dict[str, Any] = field(default_factory=dict)
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id), "name": self.name,
+            "family_id": str(self.family_id or self.id), "version": self.version,
+            "parent_id": str(self.parent_id) if self.parent_id else None,
+            "sha256": self.sha256, "source_sha256": self.source_sha256,
+            "split_config": self.split_config, "splits": self.stats.get("splits", {}),
+        }
 
     @classmethod
     def create(
