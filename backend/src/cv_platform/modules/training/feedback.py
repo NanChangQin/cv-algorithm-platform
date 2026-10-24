@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import io
+import hashlib
+import json
+import shutil
 import zipfile
 from pathlib import Path
+from tempfile import TemporaryFile
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
 from ...core.errors import ApplicationError
 from ..assets.domain.repositories import AssetRepository
@@ -20,7 +23,7 @@ from .service import TrainingService
 class FeedbackBox(BaseModel):
     model_config = ConfigDict(extra="forbid")
     label: str = Field(min_length=1, max_length=64)
-    bbox: tuple[float, float, float, float]
+    bbox: tuple[FiniteFloat, FiniteFloat, FiniteFloat, FiniteFloat]
 
 
 class FeedbackSample(BaseModel):
@@ -72,8 +75,13 @@ def feedback_to_dataset(
     # 始终基于当前数据集版本的规范化包追加样本，确保已有划分不漂移且路径统一在顶层 images/labels
     base_archive = training_service.dataset_archive(dataset.id, source=False)
 
+    if request.split_config.mode != "preserve":
+        raise ApplicationError(
+            "FEEDBACK_SPLIT", "回流版本必须保留原划分；需要重新划分请单独创建版本"
+        )
+    seen_assets: set[UUID] = set()
     seen_tasks: set[UUID] = set()
-    prepared: list[tuple[str, bytes, str]] = []
+    prepared = []
     for sample in request.samples:
         if sample.task_id in seen_tasks:
             continue
@@ -86,9 +94,12 @@ def feedback_to_dataset(
         asset = assets.get(task.asset_id)
         if asset is None or asset.project_id != project_id:
             raise ApplicationError("ASSET_NOT_FOUND", "回流任务对应的图片资源不存在", 404)
+        if asset.id in seen_assets:
+            raise ApplicationError("FEEDBACK_DUPLICATE", "同一图片请只提供一份审核标注")
+        seen_assets.add(asset.id)
         image_path = asset_storage.resolve(asset.storage_key)
         suffix = Path(asset.original_name).suffix.lower() or image_path.suffix.lower() or ".jpg"
-        stem = f"feedback_{task.id.hex[:12]}"
+        stem = f"feedback_{asset.sha256}"
 
         lines: list[str] = []
         if sample.boxes is not None:
@@ -116,7 +127,7 @@ def feedback_to_dataset(
                         "FEEDBACK_LABEL_UNKNOWN",
                         f"预测类别「{det.label}」不在目标数据集类别列表中：{list(dataset.class_names)}",
                     )
-                raw_bbox = getattr(det.bbox, 'root', det.bbox)
+                raw_bbox = getattr(det.bbox, "root", det.bbox)
                 bbox = tuple(float(v) for v in raw_bbox)
                 lines.append(
                     _yolo_line(
@@ -127,28 +138,68 @@ def feedback_to_dataset(
                     )
                 )
 
-        prepared.append((f"{stem}{suffix}", image_path.read_bytes(), "\n".join(lines)))
+        prepared.append((asset, f"{stem}{suffix}", image_path, "\n".join(lines)))
 
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(base_archive, "r") as src, zipfile.ZipFile(
-        buffer, "w", compression=zipfile.ZIP_DEFLATED
-    ) as dst:
-        for info in src.infolist():
-            dst.writestr(info, src.read(info.filename))
-        existing_names = set(dst.namelist())
-        for image_name, image_bytes, label_text in prepared:
-            img_arc = f"images/{request.target_split}/{image_name}"
-            lbl_arc = f"labels/{request.target_split}/{Path(image_name).stem}.txt"
-            if img_arc not in existing_names:
-                dst.writestr(img_arc, image_bytes)
-            if lbl_arc not in existing_names:
-                dst.writestr(lbl_arc, (label_text + "\n") if label_text else "")
-
-    buffer.seek(0)
-    return training_service.import_dataset(
-        buffer,
-        f"{dataset.name}-feedback.zip",
-        dataset.name,
-        request.split_config,
-        parent_id=dataset.id,
-    )
+    # Same-content images are corrected in place in the NEW archive, retaining their split.
+    with zipfile.ZipFile(base_archive, "r") as src, TemporaryFile() as buffer:
+        hashes = {}
+        for entry in training_service.dataset_report(dataset.id)["index"]["images"]:
+            digest = entry.get("sha256")
+            if not digest:
+                with src.open(entry["path"]) as image:
+                    digest = hashlib.file_digest(image, "sha256").hexdigest()
+            hashes.setdefault(digest, []).append(entry["path"])
+        replacements, additions, provenance = {}, [], []
+        for asset, image_name, image_path, labels in prepared:
+            paths = hashes.get(asset.sha256, [])
+            if paths:
+                for image_name in paths:
+                    label_name = str(
+                        Path(image_name.replace("images/", "labels/", 1)).with_suffix(".txt")
+                    )
+                    replacements[label_name] = labels + ("\n" if labels else "")
+            else:
+                additions.append(
+                    (f"images/{request.target_split}/{image_name}", image_path, labels)
+                )
+            provenance.append(
+                {
+                    "asset_id": str(asset.id),
+                    "sha256": asset.sha256,
+                    "replaced_paths": paths,
+                    "target_split": request.target_split,
+                }
+            )
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as dst:
+            for entry in src.infolist():
+                if entry.filename in replacements or entry.filename == "feedback-manifest.json":
+                    continue
+                with src.open(entry) as reader, dst.open(entry, "w") as writer:
+                    shutil.copyfileobj(reader, writer)
+            for name, content in replacements.items():
+                dst.writestr(name, content)
+            for image_name, image_path, labels in additions:
+                dst.write(image_path, image_name)
+                dst.writestr(
+                    str(Path(image_name.replace("images/", "labels/", 1)).with_suffix(".txt")),
+                    labels + ("\n" if labels else ""),
+                )
+            dst.writestr(
+                "feedback-manifest.json",
+                json.dumps(
+                    {
+                        "parent_dataset_id": str(dataset.id),
+                        "samples": provenance,
+                        "task_ids": [str(s.task_id) for s in request.samples],
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+        buffer.seek(0)
+        return training_service.import_dataset(
+            buffer,
+            f"{dataset.name}-feedback.zip",
+            dataset.name,
+            request.split_config,
+            parent_id=dataset.id,
+        )

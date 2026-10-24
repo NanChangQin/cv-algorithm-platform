@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import { assetsApi } from '@/api/assets'
 import { evaluationsApi, type AlgorithmScore, type EvaluationReport, type EvaluationRun } from '@/api/evaluations'
+import EvaluationSamples from '@/components/training/EvaluationSamples.vue'
 import TaskDrawer from '@/components/tasks/TaskDrawer.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
 import { errorMessage } from '@/utils/errors'
@@ -11,7 +12,7 @@ import { bestValue, formatMetric, metricColumns, metricLabel } from '@/utils/met
 import { formatDateTime, taskTypeLabel } from '@/utils/presentation'
 
 const route = useRoute()
-const { algorithms } = useAlgorithms()
+const { algorithms, error: algorithmError } = useAlgorithms()
 const run = ref<EvaluationRun | null>(null)
 const report = ref<EvaluationReport | null>(null)
 const error = ref('')
@@ -34,7 +35,7 @@ function imperfect(samples: AlgorithmScore['worst']) {
 }
 function algorithmName(id: string) {
   const algorithm = algorithms.value.find((item) => item.id === id)
-  return algorithm ? `${algorithm.name} v${algorithm.version}` : '已删除的算法'
+  return algorithm ? `${algorithm.name} v${algorithm.version}` : `模型 ${id.slice(0, 8)}`
 }
 
 async function load() {
@@ -54,11 +55,12 @@ onUnmounted(() => window.clearInterval(poller))
 </script>
 
 <template>
-  <RouterLink class="back-link" to="/evaluations">← 返回数据集评测</RouterLink>
+  <RouterLink class="back-link" to="/evaluations">← 返回评测中心</RouterLink>
   <header class="page-heading">
     <h1>{{ run?.dataset_name ?? '评测报告' }}</h1>
     <p v-if="run">{{ taskTypeLabel[run.task_type] ?? '' }} · {{ run.task_count }} 个推理任务 · {{ formatDateTime(run.created_at) }}</p>
   </header>
+  <p v-if="algorithmError" class="alert" role="alert">{{ algorithmError }}</p>
   <p v-if="error" class="alert" role="alert">{{ error }}</p>
   <div v-if="!report" class="empty-state">{{ error ? '暂时无法读取报告。' : '正在计算指标…' }}</div>
   <template v-else>
@@ -95,6 +97,7 @@ onUnmounted(() => window.clearInterval(poller))
       </p>
     </section>
 
+    <EvaluationSamples v-if="report.task_type === 'object_detection'" :run-id="runId" :algorithms="report.algorithms.map(item=>({id:item.algorithm_version_id,name:algorithmName(item.algorithm_version_id)}))" />
     <section v-for="item in report.algorithms.filter((entry) => entry.completed)" :key="`worst-${item.algorithm_version_id}`" class="section-block">
       <header class="section-heading">
         <div><h2>{{ algorithmName(item.algorithm_version_id) }} · 表现最差的图片</h2></div>

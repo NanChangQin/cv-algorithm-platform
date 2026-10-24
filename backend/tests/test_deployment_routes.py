@@ -356,10 +356,17 @@ def test_operations_metrics_percentiles_and_dataset_feedback_create_new_version(
             "min_confidence": 0.5,
         },
     )
+    assert fb_resp.status_code == 400
+    assert fb_resp.json()['code'] == 'FEEDBACK_DUPLICATE'
+    fb_resp = client.post(f"/api/v1/training/datasets/{ds_v1['id']}/feedback", json={
+        'samples': [{'task_id': created_task_ids[1],
+                     'boxes': [{'label': 'helmet', 'bbox': [1, 1, 10, 10]}]}],
+        'target_split': 'train',
+    })
     assert fb_resp.status_code == 201, fb_resp.text
     ds_v2 = fb_resp.json()
     assert ds_v2["family_id"] == ds_v1["family_id"]
     assert ds_v2["parent_id"] == ds_v1["id"]
     assert ds_v2["version"] == 2
-    assert ds_v2["stats"]["splits"]["train"]["images"] == 3
-    assert ds_v2["stats"]["splits"]["train"]["boxes"] == 3
+    assert ds_v2["stats"]["splits"]["train"]["images"] == 1
+    assert ds_v2["stats"]["splits"]["train"]["boxes"] == 1

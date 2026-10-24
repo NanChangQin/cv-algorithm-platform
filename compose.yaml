@@ -82,7 +82,7 @@ services:
     profiles: ["algorithm-images"]
     build:
       context: .
-      dockerfile: examples/faster-rcnn/Dockerfile
+      dockerfile: examples/faster-rcnn/Dockerfile.platform
     image: cv-platform/faster-rcnn:dev
 
   yolo:
@@ -91,6 +91,13 @@ services:
       context: .
       dockerfile: examples/yolo/Dockerfile
     image: cv-platform/yolo:dev
+
+  faster-rcnn-trainer:
+    profiles: ["algorithm-images"]
+    build:
+      context: .
+      dockerfile: runtimes/faster-rcnn-trainer/Dockerfile
+    image: cv-platform/faster-rcnn-trainer:dev
 
   yolo-trainer:
     profiles: ["algorithm-images"]

@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import TaskDrawer from '@/components/tasks/TaskDrawer.vue'
 import TaskTable from '@/components/tasks/TaskTable.vue'
 
-const calls = vi.hoisted(() => ({ archive: vi.fn(), resources: vi.fn(), page: vi.fn(), summary: vi.fn(), byIds: vi.fn(), replace: vi.fn(), datasets: vi.fn(), datasetFeedback: vi.fn() }))
-vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ replace: calls.replace }) }))
+const calls = vi.hoisted(() => ({ collect: vi.fn(), push: vi.fn(), archive: vi.fn(), resources: vi.fn(), page: vi.fn(), summary: vi.fn(), byIds: vi.fn(), replace: vi.fn(), datasets: vi.fn(), datasetFeedback: vi.fn() }))
+vi.mock('vue-router', () => ({ useRoute: () => ({ query: {} }), useRouter: () => ({ replace: calls.replace, push: calls.push }) }))
+vi.mock('@/api/reviews', () => ({ reviewsApi: { collect: calls.collect } }))
 vi.mock('@/api/tasks', () => ({ tasksApi: { archive: calls.archive, page: calls.page, summary: calls.summary, byIds: calls.byIds } }))
 vi.mock('@/api/training', () => ({ trainingApi: { datasets: calls.datasets, datasetFeedback: calls.datasetFeedback } }))
 vi.mock('@/api/assets', () => ({ assetsApi: { byIds: vi.fn().mockResolvedValue([{ id: 'asset-1', original_name: 'bear.jpg' }]), thumbnailUrl: () => '' } }))
@@ -148,30 +149,16 @@ describe('task center', () => {
     wrapper.unmount()
   })
 
-  it('feeds selected completed tasks back into a training dataset to create a new version', async () => {
-    calls.datasets.mockResolvedValue([
-      { id: 'ds-1', name: '安全帽数据集', version: 1, class_names: ['helmet', 'person'] },
-    ])
-    calls.datasetFeedback.mockResolvedValue({
-      id: 'ds-2',
-      name: '安全帽数据集',
-      version: 2,
-      class_names: ['helmet', 'person'],
-    })
+  it('collects selected completed tasks for human review without publishing predictions', async () => {
+    calls.collect.mockResolvedValue({ id: 'review-1' })
     const wrapper = shallowMount(TasksView, { global: { stubs: { RouterLink: true } } })
     await flushPromises()
-    await wrapper.findAll('button').find((button) => button.text() === '选择本页已完成结果')!.trigger('click')
-    await wrapper.findAll('button').find((button) => button.text() === '回流至数据集')!.trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === '选择本页已完成结果')!.trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === '收集并审核')!.trigger('click')
     await flushPromises()
-    expect(calls.datasets).toHaveBeenCalled()
-    await wrapper.find('[aria-label="回流目标划分"]').setValue('val')
-    await wrapper.findAll('button').find((button) => button.text().includes('确认回流'))!.trigger('click')
-    await flushPromises()
-    expect(calls.datasetFeedback).toHaveBeenCalledWith('ds-1', {
-      samples: [{ task_id: 'task-1' }],
-      target_split: 'val',
-      min_confidence: 0.25,
-    })
+    expect(calls.collect).toHaveBeenCalledWith('task-1')
+    expect(calls.datasetFeedback).not.toHaveBeenCalled()
+    expect(calls.push).toHaveBeenCalledWith('/training/reviews')
     wrapper.unmount()
   })
 })

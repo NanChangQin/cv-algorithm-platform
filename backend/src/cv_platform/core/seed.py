@@ -11,11 +11,11 @@ def seed_demo_data(container: ApplicationContainer) -> None:
     definitions = [
         ({
             "id": "faster-rcnn-resnet50",
-            "name": "Faster R-CNN ResNet50",
+            "name": "Faster R-CNN ResNet50-FPN",
             "version": "1.0.0",
-            "description": "现有原型迁移目标算法",
+            "description": "TorchVision Faster R-CNN ResNet50-FPN 目标检测",
             "task_type": "object_detection",
-            "runtime": {"framework": "pytorch", "device": "gpu", "min_memory_mb": 4096},
+            "runtime": {"framework": "pytorch", "device": "auto", "min_memory_mb": 4096},
             "input": {"media_types": ["image/jpeg", "image/png"]},
             "output": {"type": "object_detection"},
             "parameters": {

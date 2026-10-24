@@ -16,29 +16,39 @@ const menuButton = ref<HTMLButtonElement | null>(null)
 const projects = ref<Project[]>([])
 const authenticationEnabled = computed(() => authenticationMode.get())
 const navigation = [
-  { label: '工作台', to: '/', icon: 'play', group: '工作' },
-  { label: '任务中心', to: '/tasks', icon: 'tasks', group: '工作' },
-  { label: '结果对比', to: '/compare', icon: 'compare', group: '工作' },
-  { label: '数据集评测', to: '/evaluations', icon: 'chart', group: '工作' },
-  { label: '图片库', to: '/assets', icon: 'image', group: '资源' },
-  { label: '算法库', to: '/algorithms', icon: 'layers', group: '资源' },
-  { label: '训练中心', to: '/training', icon: 'training', group: '模型', roles: ['admin', 'developer'] },
-  { label: '模型导出', to: '/exports', icon: 'deploy', group: '模型', roles: ['admin', 'developer'] },
-  { label: '模型部署', to: '/deployments', icon: 'deploy', group: '模型', roles: ['admin', 'developer'] },
-  { label: '项目成员', to: '/projects', icon: 'folder', group: '管理' },
-  { label: '运行实例', to: '/instances', icon: 'server', group: '管理', roles: ['admin'] },
-  { label: '高级编排', to: '/advanced', icon: 'workflow', group: '管理', roles: ['admin'] },
-  { label: '用户角色', to: '/users', icon: 'users', group: '管理', roles: ['admin'] },
-  { label: '系统管理', to: '/system', icon: 'settings', group: '管理', roles: ['admin'] },
+  { label: '训练中心', to: '/training', icon: 'training', group: '模型训练', roles: ['admin', 'developer'] },
+  { label: '训练任务', to: '/training/tasks', icon: 'tasks', group: '模型训练', roles: ['admin', 'developer'] },
+  { label: '评测中心', to: '/evaluations', icon: 'chart', group: '模型训练' },
+  { label: '模型导出', to: '/exports', icon: 'deploy', group: '模型训练', roles: ['admin', 'developer'] },
+  { label: '推理中心', to: '/', icon: 'play', group: '模型推理' },
+  { label: '推理任务', to: '/inference/tasks', icon: 'tasks', group: '模型推理' },
+  { label: '结果对比', to: '/compare', icon: 'compare', group: '模型推理' },
+  { label: '模型部署', to: '/deployments', icon: 'deploy', group: '模型推理', roles: ['admin', 'developer'] },
+  { label: '训练数据集', to: '/training/datasets', icon: 'folder', group: '资源库', roles: ['admin', 'developer'] },
+  { label: '问题样本', to: '/training/reviews', icon: 'image', group: '资源库', roles: ['admin', 'developer'] },
+  { label: '图片库', to: '/assets', icon: 'image', group: '资源库' },
+  { label: '算法库', to: '/algorithms', icon: 'layers', group: '资源库' },
+  { label: '项目成员', to: '/projects', icon: 'folder', group: '平台管理' },
+  { label: '运行实例', to: '/instances', icon: 'server', group: '平台管理', roles: ['admin'] },
+  { label: '高级编排', to: '/advanced', icon: 'workflow', group: '平台管理', roles: ['admin'] },
+  { label: '用户角色', to: '/users', icon: 'users', group: '平台管理', roles: ['admin'] },
+  { label: '系统管理', to: '/system', icon: 'settings', group: '平台管理', roles: ['admin'] },
 ]
-const groups = ['工作', '资源', '模型', '管理']
+const groups = ['模型训练', '模型推理', '资源库', '平台管理']
 const visibleNavigation = computed(() => navigation.filter((item) => !item.roles || item.roles.includes(sessionRole.get() ?? 'user')))
 const visibleGroups = computed(() => groups.filter((group) => visibleNavigation.value.some((item) => item.group === group)))
-const currentPage = computed(() => {
-  if (route.name === 'task-detail') return '任务详情'
-  // /compare/<id> 等子路径归到对应的导航项；首页只做精确匹配
+const activeNavigation = computed(() => {
+  if (route.path.startsWith('/tasks')) return navigation.find((item) => item.to === '/inference/tasks')
+  if (route.name === 'training-run' || route.name === 'training-report') return navigation.find((item) => item.to === '/training/tasks')
   const matches = navigation.filter((item) => item.to === route.path || (item.to !== '/' && route.path.startsWith(`${item.to}/`)))
-  return matches.sort((a, b) => b.to.length - a.to.length)[0]?.label ?? '工作台'
+  return matches.sort((a, b) => b.to.length - a.to.length)[0]
+})
+const currentPage = computed(() => {
+  if (route.name === 'training-run') return '训练任务详情'
+  if (route.name === 'training-report') return '训练报告'
+  if (route.name === 'training-create') return route.query.operation === 'val' || route.query.validate ? '独立验证' : route.query.resume ? '断点续训' : '新建训练'
+  if (route.name === 'task-detail') return '任务详情'
+  return activeNavigation.value?.label ?? '推理中心'
 })
 const currentProject = computed(() => projects.value.find((project) => project.id === projectContext.get()) ?? projects.value[0])
 const themeIcon = computed(() => ({ system: 'monitor', light: 'sun', dark: 'moon' })[themePreference.value])
@@ -94,6 +104,9 @@ async function logout() {
             :key="item.to"
             :to="item.to"
             class="nav-item"
+            active-class="route-match"
+            exact-active-class="route-exact-match"
+            :class="{ 'router-link-active': activeNavigation?.to === item.to }"
             @click="menuOpen = false"
           >
             <AppIcon :name="item.icon" />{{ item.label }}
@@ -125,7 +138,7 @@ async function logout() {
           <strong>{{ currentPage }}</strong>
         </div>
         <div class="topbar-actions">
-          <RouterLink v-if="route.path !== '/'" class="secondary-button" to="/"><AppIcon name="play" />新建推理</RouterLink>
+          <RouterLink v-if="route.path !== '/' && !route.path.startsWith('/training')" class="secondary-button" to="/"><AppIcon name="play" />新建推理</RouterLink>
           <button
             type="button"
             class="icon-button"

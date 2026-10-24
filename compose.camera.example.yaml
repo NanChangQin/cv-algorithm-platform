@@ -1,0 +1,6 @@
+# Optional: explicitly map a server camera into Media Worker when hardware is available.
+# Include AFTER compose.local.yaml. Does not enable autostart or privileged mode.
+services:
+  media-worker:
+    devices:
+      - ${CV_PLATFORM_CAMERA_DEVICE:-/dev/video0}:/dev/video0

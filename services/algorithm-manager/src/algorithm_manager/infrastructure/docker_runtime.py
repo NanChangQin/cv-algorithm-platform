@@ -25,6 +25,7 @@ class DockerContainerRuntime:
         health_timeout_seconds: float = 60,
         health_interval_seconds: float = 1,
         gpu_access_mode: str = "device-request",
+        restart_policy: str = "unless-stopped",
     ) -> None:
         self._client = client
         self._network = network
@@ -33,6 +34,7 @@ class DockerContainerRuntime:
         self._health_timeout = health_timeout_seconds
         self._health_interval = health_interval_seconds
         self._gpu_access_mode = gpu_access_mode
+        self._restart_policy = restart_policy
 
     @classmethod
     def from_environment(
@@ -42,6 +44,7 @@ class DockerContainerRuntime:
         host_model_root: Path,
         health_timeout_seconds: float = 60,
         gpu_access_mode: str = "device-request",
+        restart_policy: str = "unless-stopped",
     ) -> "DockerContainerRuntime":
         import docker
 
@@ -52,6 +55,7 @@ class DockerContainerRuntime:
             host_model_root,
             health_timeout_seconds,
             gpu_access_mode=gpu_access_mode,
+            restart_policy=restart_policy,
         )
 
     def create(self, spec: ContainerSpec) -> tuple[str, str]:
@@ -102,7 +106,7 @@ class DockerContainerRuntime:
             tmpfs={
                 "/tmp": "rw,noexec,nosuid,nodev,size=512m,uid=10001,gid=10001,mode=1777"
             },
-            restart_policy={"Name": "unless-stopped"},
+            restart_policy={"Name": self._restart_policy},
         )
         return container.id, f"http://{spec.container_name}:{spec.internal_port}"
 
@@ -163,7 +167,12 @@ class DockerContainerRuntime:
         return discovered
 
     def start(self, instance_id: str) -> None:
-        self._managed_container(instance_id).start()
+        from docker.errors import NotFound
+
+        try:
+            self._managed_container(instance_id).start()
+        except NotFound as exc:
+            raise FileNotFoundError(instance_id) from exc
 
     def stop(self, instance_id: str) -> None:
         self._managed_container(instance_id).stop(timeout=10)

@@ -157,3 +157,34 @@ def summarize(task_type: str, samples: Sequence[dict[str, float]]) -> dict[str, 
             false_negative=false_negative,
         )
     return summary
+
+
+def detection_details(predictions, expected, threshold=0.5):
+    """Confidence-ordered, class-aware IoU matching, identical to summary metrics."""
+    truth = [dict(item) for item in expected]
+    predicted = [item.model_dump(mode="json") for item in predictions]
+    unmatched = set(range(len(truth)))
+    matches, fp = [], []
+    for index in sorted(range(len(predicted)), key=lambda i: predicted[i]["score"], reverse=True):
+        item = predicted[index]
+        candidates = [
+            (i, _iou(item["bbox"], truth[i]["bbox"]))
+            for i in unmatched
+            if item["label"] == truth[i]["label"]
+        ]
+        best = max(candidates, key=lambda pair: pair[1]) if candidates else None
+        if best and best[1] >= threshold:
+            unmatched.remove(best[0])
+            matches.append({"prediction": index, "truth": best[0], "iou": best[1]})
+        else:
+            fp.append(index)
+    return {
+        "predictions": predicted,
+        "ground_truth": truth,
+        "matches": matches,
+        "false_positives": fp,
+        "false_negatives": sorted(unmatched),
+        "tp": len(matches),
+        "fp": len(fp),
+        "fn": len(unmatched),
+    }

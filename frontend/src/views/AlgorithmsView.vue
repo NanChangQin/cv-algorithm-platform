@@ -279,14 +279,20 @@ weights/</pre>
         </div>
       </div>
 
-      <template v-if="selected.lineage?.export_job_id">
+      <template v-if="selected.pretrained">
+        <h3 class="detail-subheading">官方预训练来源</h3>
+        <p>{{ selected.pretrained.base_model }} · COCO 目标检测（80 类）</p>
+        <a class="text-link" :href="selected.pretrained.source_url" target="_blank" rel="noopener noreferrer">Ultralytics 官方权重</a>
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/training/new', query: { model: selected.id } }">用此模型微调</RouterLink>
+      </template>
+      <template v-else-if="selected.lineage?.export_job_id">
         <h3 class="detail-subheading">ONNX 导出来源</h3>
         <RouterLink :to="`/exports/${selected.lineage.export_job_id}`">{{ selected.lineage.export_name }} · 转换与精度报告</RouterLink>
         <p class="muted-copy">FP32 · ORT CPU · 单图推理。参数能力和输入尺寸由导出产物固定。</p>
       </template>
       <template v-else-if="selected.lineage">
-        <RouterLink class="secondary-button compact-button" :to="{ path: '/training', query: { model: selected.id } }">用此模型微调</RouterLink>
-        <RouterLink class="secondary-button compact-button" :to="{ path: '/training', query: { model: selected.id, operation: 'val' } }">独立验证此模型</RouterLink>
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/training/new', query: { model: selected.id } }">用此模型微调</RouterLink>
+        <RouterLink class="secondary-button compact-button" :to="{ path: '/training/new', query: { model: selected.id, operation: 'val' } }">独立验证此模型</RouterLink>
         <RouterLink class="secondary-button compact-button" :to="{ path: '/exports', query: { model: selected.id } }">导出 ONNX</RouterLink>
         <h3 class="detail-subheading">训练来源</h3>
         <dl class="lineage-list">

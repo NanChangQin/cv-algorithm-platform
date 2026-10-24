@@ -170,7 +170,9 @@ class EvaluationService:
                     continue
                 task = tasks.get(UUID(task_id))
                 if task is not None and task.status not in {
-                    TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED,
+                    TaskStatus.COMPLETED,
+                    TaskStatus.FAILED,
+                    TaskStatus.CANCELLED,
                 }:
                     counts["active"] += 1
                     continue
@@ -190,13 +192,15 @@ class EvaluationService:
             if counts["active"]:
                 finished = False
             worst.sort(key=lambda item: item["value"])
-            algorithms.append({
-                "algorithm_version_id": str(algorithm_id),
-                "total": sum(counts.values()),
-                **counts,
-                "metrics": summarize(task_type, samples),
-                "worst": worst[:12],
-            })
+            algorithms.append(
+                {
+                    "algorithm_version_id": str(algorithm_id),
+                    "total": sum(counts.values()),
+                    **counts,
+                    "metrics": summarize(task_type, samples),
+                    "worst": worst[:12],
+                }
+            )
         report = {
             "task_type": task_type,
             "primary_metric": metric,
@@ -206,3 +210,63 @@ class EvaluationService:
         if finished:
             self._repository.save_report(run.id, report)
         return report
+
+    def samples(self, run_id, algorithm_id, error_type="all", label="", offset=0, limit=24):
+        from .metrics import detection_details
+
+        run = self.get_run(run_id)
+        dataset = self.get_dataset(run.dataset_id)
+        if dataset.task_type != "object_detection":
+            raise ApplicationError("EVALUATION_INVALID", "错误样本筛选当前支持目标检测", 400)
+        if algorithm_id not in run.algorithm_version_ids:
+            raise ApplicationError("ALGORITHM_NOT_FOUND", "此评测没有该模型", 404)
+        truths = {str(item.asset_id): item.ground_truth for item in dataset.items}
+        tasks = {
+            str(task.id): task
+            for task in self._task_repository.query(
+                TaskQuery(
+                    project_id=self._project_id, ids=tuple(UUID(v) for v in run.task_ids.values())
+                )
+            )
+        }
+        items, labels = [], set()
+        for key, task_id in run.task_ids.items():
+            prefix, _, asset_id = key.partition(":")
+            if prefix != str(algorithm_id):
+                continue
+            task = tasks.get(task_id)
+            if (
+                not task
+                or task.project_id != self._project_id
+                or task.status != TaskStatus.COMPLETED
+                or not task.result
+                or task.result.type != "object_detection"
+            ):
+                continue
+            detail = detection_details(
+                task.result.data.detections, truths.get(asset_id, {}).get("detections", [])
+            )
+            labels.update(b["label"] for b in detail["ground_truth"] + detail["predictions"])
+            relevant = (
+                detail["predictions"]
+                if error_type == "all"
+                else [detail["predictions"][i] for i in detail["false_positives"]]
+                if error_type == "fp"
+                else [detail["ground_truth"][i] for i in detail["false_negatives"]]
+                if error_type == "fn"
+                else [detail["predictions"][m["prediction"]] for m in detail["matches"]]
+            )
+            if error_type == "all":
+                relevant = detail["predictions"] + detail["ground_truth"]
+            if (error_type != "all" and not detail[error_type]) or (
+                label and not any(b["label"] == label for b in relevant)
+            ):
+                continue
+            items.append({"task_id": task_id, "asset_id": asset_id, **detail})
+        items.sort(key=lambda item: (-(item["fp"] + item["fn"]), item["task_id"]))
+        return {
+            "items": items[offset : offset + limit],
+            "total": len(items),
+            "labels": sorted(labels),
+            "iou_threshold": 0.5,
+        }

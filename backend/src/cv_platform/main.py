@@ -41,10 +41,16 @@ def create_app() -> FastAPI:
                         error_message="平台重启导致任务中断",
                     )
                 )
+        container.inference.recover()
         container.media_runs.recover_incomplete()
         container.workflows.recover_incomplete()
         seed_demo_data(container)
         restore_manifest_order(container.algorithms)
+        async def clean_inference_artifacts():
+            while True:
+                await asyncio.to_thread(container.inference.cleanup)
+                await asyncio.sleep(300)
+
         async def reconcile_autoscaling() -> None:
             while True:
                 await asyncio.to_thread(container.operations.reconcile)
@@ -70,6 +76,7 @@ def create_app() -> FastAPI:
 
         background_tasks = [
             asyncio.create_task(reconcile_autoscaling()),
+            asyncio.create_task(clean_inference_artifacts()),
             asyncio.create_task(coordinate_background_work()),
         ]
         try:
@@ -82,6 +89,7 @@ def create_app() -> FastAPI:
             container.training_orchestrator.shutdown()
             container.deployment_orchestrator.shutdown()
             container.coordinator_lock.release()
+            container.inference.shutdown()
             container.task_queue.shutdown()
             container.build_queue.shutdown()
             if container.task_executor is not container.task_queue:
@@ -117,6 +125,7 @@ def create_app() -> FastAPI:
         f"{settings.api_prefix}/training/datasets",
         f"{settings.api_prefix}/training/runs",
         f"{settings.api_prefix}/tasks",
+        f"{settings.api_prefix}/inference/sessions",
         f"{settings.api_prefix}/comparisons",
         f"{settings.api_prefix}/evaluations/runs",
         f"{settings.api_prefix}/auth/login",

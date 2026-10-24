@@ -22,7 +22,9 @@ class TrainingSource(BaseModel):
     def check_source(self):
         if (self.kind == "builtin") != (self.reference is None):
             raise ValueError("非内置模型必须指定来源 ID")
-        if self.mode == "resume" and (self.kind != "run" or self.checkpoint != "resume"):
+        if self.mode == "resume" and (
+            self.kind != "run" or self.checkpoint != "resume"
+        ):
             raise ValueError("断点续训必须选择历史训练的完整恢复 checkpoint")
         if self.checkpoint == "resume" and self.mode != "resume":
             raise ValueError("微调请选择 best 或 last 权重")
@@ -34,6 +36,9 @@ class TrainingInput(BaseModel):
 
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     dataset_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expected_model: str | None = Field(
+        default=None, pattern=r"^(?:yolo(?:11|26)[nsmlx]|fasterrcnn_resnet50_fpn)\.pt$"
+    )
     resume: bool = False
     epoch: int = Field(default=0, ge=0)
     epochs: int = Field(default=0, ge=0)

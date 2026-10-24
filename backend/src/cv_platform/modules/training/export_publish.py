@@ -64,7 +64,7 @@ def publish_export(container, project_id, actor, job_id, payload, image):
             raise ValueError("模型 ID 需要 3～64 位小写字母、数字和连字符")
         family = [a for a in container.algorithms.list()
                   if a.project_id == project_id and a.manifest.id == payload.key]
-        if any(a.lineage is None for a in family):
+        if any(a.lineage is None or a.lineage.get("source_kind") == "pretrained" for a in family):
             raise ValueError("模型 ID 已被导入的算法使用")
         version = payload.version.strip() or next_version(a.manifest.version for a in family)
         manifest = onnx_manifest(payload.key, payload.name.strip(), version,

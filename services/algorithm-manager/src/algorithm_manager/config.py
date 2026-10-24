@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     max_input_bytes: int = 25 * 1024 * 1024
     prediction_timeout_seconds: float = 120
     gpu_access_mode: Literal["device-request", "runtime"] = "device-request"
+    container_restart_policy: Literal["no", "unless-stopped"] = "unless-stopped"
     # 与主平台共享的访问令牌。设置后，除 /health 外的接口都要求 Authorization: Bearer <令牌>。
     # 节点端口暴露在局域网时务必设置，否则局域网内任何主机都能启停算法容器。
     api_token: SecretStr | None = None

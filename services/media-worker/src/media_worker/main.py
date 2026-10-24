@@ -92,3 +92,6 @@ def extract(payload: ExtractFramesRequest) -> list[FrameInfo]:
     finally:
         capture.release()
     return frames
+
+from .sessions import router as sessions_router
+app.include_router(sessions_router)

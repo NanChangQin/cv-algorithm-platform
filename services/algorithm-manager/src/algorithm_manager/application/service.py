@@ -78,7 +78,16 @@ class InstanceService:
             current = current.transition(InstanceStatus.STARTING)
             self._repository.save(current)
             try:
-                self._runtime.start(current.id)
+                try:
+                    self._runtime.start(current.id)
+                except FileNotFoundError:
+                    self._repository.delete(current.id)
+                    instance_id, endpoint = self._runtime.create(spec)
+                    current = AlgorithmInstance.created(instance_id, spec, endpoint).transition(
+                        InstanceStatus.STARTING
+                    )
+                    self._repository.save(current)
+                    self._runtime.start(current.id)
                 if not self._runtime.is_healthy(current):
                     raise RuntimeError("algorithm container did not become healthy")
             except Exception as exc:

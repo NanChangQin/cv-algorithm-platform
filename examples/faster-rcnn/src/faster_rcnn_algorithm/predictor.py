@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -90,8 +91,17 @@ class TorchvisionPredictor:
         with self._config_path.open("r", encoding="utf-8") as stream:
             config = yaml.safe_load(stream) or {}
         self._device = self._resolve_device(torch)
+        if self._device == "cpu":
+            torch.set_num_threads(
+                max(1, int(os.getenv("CV_FASTER_RCNN_CPU_THREADS", "2")))
+            )
         self._model = self._build_model(config.get("model", config))
-        state = torch.load(self._weights_path, map_location=self._device, weights_only=True)
+        state = torch.load(
+            self._weights_path, map_location=self._device, weights_only=True
+        )
+        from cv_algorithm_sdk.faster_rcnn import check_metadata
+
+        check_metadata(state, config)
         if isinstance(state, dict) and "state_dict" in state:
             state = state["state_dict"]
         strict = not self._allow_partial_weights
@@ -104,9 +114,7 @@ class TorchvisionPredictor:
 
             categories = FasterRCNN_ResNet50_FPN_Weights.COCO_V1.meta["categories"]
             self._labels = {
-                index: name
-                for index, name in enumerate(categories)
-                if name != "N/A"
+                index: name for index, name in enumerate(categories) if name != "N/A"
             }
         else:
             category_map = config.get("_dataproc", {}).get("category_map", {})
@@ -138,9 +146,14 @@ class TorchvisionPredictor:
 
         predictions = output[1] if isinstance(output, tuple) else output
         prediction = predictions[0]
-        from torchvision.ops import nms
+        from torchvision.ops import batched_nms
 
-        keep = nms(prediction["boxes"], prediction["scores"], nms_threshold)
+        keep = batched_nms(
+            prediction["boxes"],
+            prediction["scores"],
+            prediction["labels"],
+            nms_threshold,
+        )
         boxes = prediction["boxes"][keep].detach().cpu()
         scores = prediction["scores"][keep].detach().cpu()
         labels = prediction["labels"][keep].detach().cpu()
@@ -199,18 +212,9 @@ class TorchvisionPredictor:
         if torchvision_model:
             if torchvision_model != "fasterrcnn_resnet50_fpn":
                 raise ValueError(f"unsupported torchvision model: {torchvision_model}")
-            from torchvision.models.detection import fasterrcnn_resnet50_fpn
+            from cv_algorithm_sdk.faster_rcnn import build_model
 
-            return fasterrcnn_resnet50_fpn(
-                weights=None,
-                weights_backbone=None,
-                num_classes=int(config.get("num_classes", 91)),
-                min_size=int(config.get("min_size", 600)),
-                max_size=int(config.get("max_size", 800)),
-                box_score_thresh=float(config.get("box_score_thresh", 0.0)),
-                box_nms_thresh=float(config.get("box_nms_thresh", 1.0)),
-                box_detections_per_img=int(config.get("box_detections_per_img", 300)),
-            )
+            return build_model(config)
 
         from torch import nn
         from torchvision.models import get_weight
@@ -261,7 +265,9 @@ class TorchvisionPredictor:
             "box_roi_pool",
             "box_head",
         }
-        model_kwargs = {key: value for key, value in config.items() if key not in ignored}
+        model_kwargs = {
+            key: value for key, value in config.items() if key not in ignored
+        }
         return FasterRCNN(
             backbone,
             rpn_anchor_generator=anchor_generator,

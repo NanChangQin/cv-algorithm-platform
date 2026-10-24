@@ -16,8 +16,7 @@ from uuid import UUID
 
 from cv_algorithm_sdk.export_artifacts import registered_artifacts
 from cv_algorithm_sdk.exports import EXPORT_PROTOCOL
-from cv_algorithm_sdk.runtime_contract import CONTRACT_ID, get_contract
-from cv_algorithm_sdk.training_sources import TRAINING_PROTOCOL
+from cv_algorithm_sdk.training_contract import contract_for, is_faster, protocol_for
 
 from ...core.database import Database
 from ...core.errors import ApplicationError
@@ -80,11 +79,13 @@ class TrainingOrchestrator:
         storage: TrainingDatasetStorage,
         cluster: ClusterAlgorithmManagerGateway,
         training_image: str,
+        faster_training_image: str = "cv-platform/faster-rcnn-trainer:dev",
     ) -> None:
         self._repository = repository
         self._storage = storage
         self._cluster = cluster
         self._image = training_image
+        self._faster_image = faster_training_image
         self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cv-training")
         self._busy: set[UUID] = set()
         self._busy_lock = Lock()
@@ -127,14 +128,21 @@ class TrainingOrchestrator:
         try:
             client = self._cluster.node_client(run.node_id)
             operation = (run.progress or {}).get("operation", "train")
+            model = (run.progress or {}).get("architecture") or run.model
+            expected_contract = contract_for(model, operation)
+            protocol = protocol_for(model)
+            training_image = self._faster_image if is_faster(model) else self._image
+            cpu = is_faster(model) and run.parameters.get("device") == "cpu"
             contract = client.request(
-                "GET", "/training/parameter-contract", params={"mode": operation}
+                "GET",
+                "/training/parameter-contract",
+                params={"mode": operation, **({"model": model} if is_faster(model) else {})},
             )
-            if contract.get("sha256") != get_contract(operation)["sha256"]:
+            if contract.get("sha256") != expected_contract["sha256"]:
                 raise ApplicationError(
                     "PARAMETER_CONTRACT_MISMATCH", "训练节点参数契约不匹配，请更新节点 Manager", 409
                 )
-            if operation == "val" and contract.get("training_protocol") != TRAINING_PROTOCOL:
+            if operation == "val" and contract.get("training_protocol") != protocol:
                 raise ApplicationError(
                     "TRAINING_PROTOCOL_MISMATCH", "节点不支持独立验证，请更新节点", 409
                 )
@@ -143,13 +151,13 @@ class TrainingOrchestrator:
                     raise ApplicationError(
                         "EXPORT_PROTOCOL_MISMATCH", "节点不支持 ONNX 导出，请更新节点", 409
                     )
-            else:
+            elif not cpu:
                 self._check_gpus(client, run)
             self._stage(run_id, "检查训练镜像")
-            if not client.image_exists(self._image):
+            if not client.image_exists(training_image):
                 raise ApplicationError(
                     "TRAINING_IMAGE_MISSING",
-                    f"服务器「{client.node_name}」上没有训练镜像 {self._image}，"
+                    f"服务器「{client.node_name}」上没有训练镜像 {training_image}，"
                     "请先在该服务器构建训练镜像（见 docs/TRAINING.md）",
                     409,
                 )
@@ -157,7 +165,7 @@ class TrainingOrchestrator:
             source = (run.progress or {}).get("source") or {}
             training_input = None
             if source.get("sha256"):
-                if contract.get("training_protocol") != TRAINING_PROTOCOL:
+                if contract.get("training_protocol") != protocol:
                     raise ApplicationError(
                         "TRAINING_PROTOCOL_MISMATCH", "节点不支持受管权重，请更新 Manager", 409
                     )
@@ -167,6 +175,11 @@ class TrainingOrchestrator:
                 checkpoint = source.get("checkpoint_state") or {}
                 training_input = {
                     "sha256": source["sha256"],
+                    **(
+                        {"expected_model": source["expected_model"]}
+                        if source.get("expected_model")
+                        else {}
+                    ),
                     "resume": source.get("mode") == "resume",
                     "dataset_sha256": run.progress["dataset"]["sha256"],
                     "epoch": checkpoint.get("epoch", 0),
@@ -195,9 +208,9 @@ class TrainingOrchestrator:
                     **({"training_input": training_input} if training_input else {}),
                     "training_id": str(run.id),
                     "dataset_id": str(run.dataset_id),
-                    "image": self._image,
+                    "image": training_image,
                     "parameters": {"model": run.model, **run.parameters},
-                    "parameter_contract_id": CONTRACT_ID,
+                    "parameter_contract_id": expected_contract["id"],
                     "submitted_parameters": (run.progress or {})
                     .get("configuration", {})
                     .get("submitted", run.parameters),
@@ -307,7 +320,7 @@ class TrainingOrchestrator:
             return
         metrics = tuple(state.get("metrics") or ())
         progress = state.get("progress") or {}
-        for key in ("dataset", "source", "operation", "export_verification"):
+        for key in ("dataset", "source", "architecture", "operation", "export_verification"):
             if (run.progress or {}).get(key):
                 progress = {**progress, key: run.progress[key]}
         if "configuration" not in progress and (run.progress or {}).get("configuration"):

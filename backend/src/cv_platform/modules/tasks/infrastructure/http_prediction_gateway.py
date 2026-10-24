@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
@@ -32,27 +33,43 @@ class HttpAlgorithmPredictionGateway:
         asset_uri: str,
         parameters: dict[str, object],
     ) -> AlgorithmResult:
+        timeout = instance.prediction_timeout_seconds or self._timeout
+        deadline = time.monotonic() + timeout
+        delay = 0.25
         try:
-            if instance.node_id != "local":
-                source = self._resolve_input(asset_uri)
-                with source.open("rb") as stream:
+            while True:
+                remaining = max(0.001, deadline - time.monotonic())
+                if instance.node_id != "local":
+                    source = self._resolve_input(asset_uri)
+                    with source.open("rb") as stream:
+                        response = httpx.post(
+                            f"{instance.endpoint}/predict",
+                            data={"request_id": request_id, "parameters": json.dumps(parameters)},
+                            files={"file": (source.name, stream, "application/octet-stream")},
+                            headers=self._manager_headers,
+                            timeout=remaining,
+                        )
+                else:
                     response = httpx.post(
                         f"{instance.endpoint}/predict",
-                        data={"request_id": request_id, "parameters": json.dumps(parameters)},
-                        files={"file": (source.name, stream, "application/octet-stream")},
-                        headers=self._manager_headers,
-                        timeout=instance.prediction_timeout_seconds or self._timeout,
+                        json={
+                            "request_id": request_id,
+                            "input": {"asset_uri": asset_uri},
+                            "parameters": parameters,
+                        },
+                        timeout=remaining,
                     )
-            else:
-                response = httpx.post(
-                    f"{instance.endpoint}/predict",
-                    json={
-                        "request_id": request_id,
-                        "input": {"asset_uri": asset_uri},
-                        "parameters": parameters,
-                    },
-                    timeout=instance.prediction_timeout_seconds or self._timeout,
-                )
+                if response.status_code != 429:
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= delay:
+                    raise ApplicationError(
+                        "ALGORITHM_BUSY", "算法实例持续繁忙，等待超时，请稍后重试", 503
+                    )
+                # A 429 rejects the request before inference. Only this response is
+                # safe to retry; never replay an ambiguous timeout or server error.
+                time.sleep(delay)
+                delay = min(delay * 2, 2.0)
         except httpx.TimeoutException as exc:
             raise ApplicationError("PREDICTION_TIMEOUT", "算法推理超时", 504) from exc
         except httpx.HTTPError as exc:

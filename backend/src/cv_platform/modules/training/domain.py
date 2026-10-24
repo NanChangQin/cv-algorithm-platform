@@ -12,16 +12,27 @@ class TrainingModel:
     key: str
     label: str
     description: str
+    algorithm: str
+    scale: str
+    task: str = "detect"
 
 
 # 训练镜像里预置了这些预训练权重（runtimes/yolo-trainer/Dockerfile）
 TRAINING_MODELS: tuple[TrainingModel, ...] = (
-    TrainingModel("yolo26n.pt", "YOLO26n", "最快，适合边缘设备和快速验证"),
-    TrainingModel("yolo26s.pt", "YOLO26s", "速度和精度均衡"),
-    TrainingModel("yolo26m.pt", "YOLO26m", "精度更高，显存和时间约为 s 的两倍"),
-    TrainingModel("yolo11n.pt", "YOLO11n", "上一代轻量模型"),
-    TrainingModel("yolo11s.pt", "YOLO11s", "上一代均衡模型"),
-    TrainingModel("yolo11m.pt", "YOLO11m", "上一代高精度模型"),
+    TrainingModel(
+        "fasterrcnn_resnet50_fpn.pt", "Faster R-CNN ResNet50-FPN",
+        "两阶段目标检测，与推理中心 ResNet50-FPN 匹配", "fasterrcnn", "resnet50-fpn",
+    ),
+    TrainingModel("yolo11n.pt", "YOLO11n", "轻量，快速验证流程", "yolo11", "n"),
+    TrainingModel("yolo11s.pt", "YOLO11s", "推荐起点，兼顾资源与效果", "yolo11", "s"),
+    TrainingModel("yolo11m.pt", "YOLO11m", "中等规模，用于进一步比较效果", "yolo11", "m"),
+    TrainingModel("yolo11l.pt", "YOLO11l", "较大规模，适合资源充足的设备", "yolo11", "l"),
+    TrainingModel("yolo11x.pt", "YOLO11x", "最大规模，适合高资源环境", "yolo11", "x"),
+    TrainingModel("yolo26n.pt", "YOLO26n", "轻量，快速验证流程", "yolo26", "n"),
+    TrainingModel("yolo26s.pt", "YOLO26s", "推荐起点，兼顾资源与效果", "yolo26", "s"),
+    TrainingModel("yolo26m.pt", "YOLO26m", "中等规模，用于进一步比较效果", "yolo26", "m"),
+    TrainingModel("yolo26l.pt", "YOLO26l", "较大规模，适合资源充足的设备", "yolo26", "l"),
+    TrainingModel("yolo26x.pt", "YOLO26x", "最大规模，适合高资源环境", "yolo26", "x"),
 )
 
 
