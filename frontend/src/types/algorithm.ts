@@ -90,6 +90,7 @@ export interface Algorithm {
   last_called_at: string | null
   project_id: string
   /** 由训练发布的版本才有 */
+  pretrained?: { source_kind: 'pretrained'; base_model: string; source_url: string } | null
   lineage?: ModelLineage | null
 }
 

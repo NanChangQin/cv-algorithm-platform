@@ -1,12 +1,12 @@
 schema_version: "1.0"
 id: faster-rcnn-resnet50
-name: Faster R-CNN ResNet50
+name: Faster R-CNN ResNet50-FPN
 version: 1.0.0
-description: 从旧训练项目迁移的可独立部署目标检测算法
+description: TorchVision Faster R-CNN ResNet50-FPN 目标检测
 task_type: object_detection
 runtime:
   framework: pytorch
-  device: gpu
+  device: auto
   min_memory_mb: 4096
 input:
   media_types: [image/jpeg, image/png]

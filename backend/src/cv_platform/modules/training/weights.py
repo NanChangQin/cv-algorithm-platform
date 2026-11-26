@@ -51,8 +51,8 @@ class WeightStorage:
 
     def upload(self, stream: BinaryIO, filename: str, actor: str) -> dict:
         filename = Path(filename.replace("\\", "/")).name
-        if not filename.lower().endswith(".pt"):
-            raise ApplicationError("WEIGHT_INVALID", "请选择 Ultralytics 目标检测 .pt 权重", 422)
+        if not filename.lower().endswith((".pt", ".pth")):
+            raise ApplicationError("WEIGHT_INVALID", "请选择目标检测 .pt / .pth 权重", 422)
         weight_id = uuid4()
         path = self.path(weight_id)
         path.parent.mkdir(parents=True)

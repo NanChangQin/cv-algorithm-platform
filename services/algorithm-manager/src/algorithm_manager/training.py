@@ -28,11 +28,10 @@ from cv_algorithm_sdk.export_artifacts import registered_artifacts
 from cv_algorithm_sdk.exports import EXPORT_PROTOCOL, ExportVerification, verification_parameters
 from cv_algorithm_sdk.runtime_contract import (
     CONTRACT_ID,
-    get_contract,
-    normalize_parameters,
     validate_placement,
 )
-from cv_algorithm_sdk.training_sources import TRAINING_PROTOCOL, TrainingInput
+from cv_algorithm_sdk.training_contract import contract_for, is_faster, normalize_for, protocol_for
+from cv_algorithm_sdk.training_sources import TrainingInput
 from docker.types import Mount
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse
@@ -75,7 +74,8 @@ class StartTrainingRequest(BaseModel):
             raise ValueError("model 必须是预置权重文件名")
         return {
             "model": model,
-            **normalize_parameters(
+            **normalize_for(
+                model,
                 info.data.get("operation", "train"),
                 {key: item for key, item in value.items() if key != "model"},
             ),
@@ -90,18 +90,40 @@ class StartTrainingRequest(BaseModel):
             verification_parameters(self.parameters, self.export_verification)
         elif self.export_verification is not None:
             raise ValueError("只有导出任务可指定验证策略")
-        if self.parameter_contract_id != CONTRACT_ID:
-            raise ValueError("训练参数契约不匹配，请更新平台和节点")
-        validate_placement(self.parameters, len(self.gpu_device_ids))
-        if self.operation == "val" and (
-            len(self.gpu_device_ids) != 1 or (self.training_input and self.training_input.resume)
+        faster = is_faster(self.parameters["model"])
+        cpu = faster and self.parameters.get("device") == "cpu"
+        if (
+            self.training_input
+            and self.training_input.expected_model
+            and faster != is_faster(self.training_input.expected_model)
         ):
-            raise ValueError("独立验证需要一张 GPU，不能使用 resume")
-        if self.operation != "export" and self.training_input and len(self.gpu_device_ids) != 1:
+            raise ValueError("训练引擎与来源权重模型结构不一致")
+        if faster and (len(self.gpu_device_ids) > 1 or (cpu and self.gpu_device_ids)):
+            raise ValueError("Faster R-CNN 仅支持单 GPU 或 CPU，不能混用")
+        if (
+            self.parameter_contract_id
+            != contract_for(self.parameters["model"], self.operation)["id"]
+        ):
+            raise ValueError("训练参数契约不匹配，请更新平台和节点")
+        if not faster:
+            validate_placement(self.parameters, len(self.gpu_device_ids))
+        if self.operation == "val" and self.training_input and self.training_input.resume:
+            raise ValueError("独立验证不能使用 resume")
+        if self.operation == "val" and not cpu and len(self.gpu_device_ids) != 1:
+            raise ValueError("独立验证需要一张 GPU")
+        if (
+            self.operation != "export"
+            and not cpu
+            and self.training_input
+            and len(self.gpu_device_ids) != 1
+        ):
             raise ValueError("自定义权重与断点续训当前需要选择一张 GPU")
         if self.submitted_parameters is not None:
             expected = {key: value for key, value in self.parameters.items() if key != "model"}
-            if normalize_parameters(self.operation, self.submitted_parameters) != expected:
+            if (
+                normalize_for(self.parameters["model"], self.operation, self.submitted_parameters)
+                != expected
+            ):
                 raise ValueError("submitted_parameters 与规范化配置不一致")
         return self
 
@@ -244,15 +266,26 @@ class TrainingService:
             image = self._client.images.get(request.image)
         except Exception as exc:
             raise ManagerError("IMAGE_MISSING", f"节点上没有训练镜像 {request.image}", 409) from exc
-        if (image.labels or {}).get("cv.platform.parameter-contract") != CONTRACT_ID:
+        if (image.labels or {}).get(
+            "cv.platform.parameter-contract"
+        ) != request.parameter_contract_id:
             raise ManagerError(
                 "PARAMETER_CONTRACT_MISMATCH", "训练镜像未声明当前参数契约，请重建训练镜像", 409
             )
         if (request.training_input or request.operation == "val") and (
-            (image.labels or {}).get("cv.platform.training-protocol") != TRAINING_PROTOCOL
+            (image.labels or {}).get("cv.platform.training-protocol")
+            != protocol_for(request.parameters["model"])
         ):
             raise ManagerError(
                 "TRAINING_PROTOCOL_MISMATCH", "训练镜像不支持受管权重与验证，请更新镜像", 409
+            )
+        if (
+            request.training_input
+            and request.training_input.expected_model
+            and ((image.labels or {}).get("cv.platform.model-selection") != "v1")
+        ):
+            raise ManagerError(
+                "MODEL_SELECTION_UNSUPPORTED", "镜像不支持算法规格校验，请重建训练镜像", 409
             )
         if request.operation == "export" and (
             (image.labels or {}).get("cv.platform.export-protocol") != EXPORT_PROTOCOL
@@ -275,6 +308,9 @@ class TrainingService:
         shutil.rmtree(run, ignore_errors=True)
         run.mkdir(parents=True)
         gpu_ids = tuple(request.gpu_device_ids)
+        cpu = request.operation == "export" or (
+            is_faster(request.parameters["model"]) and request.parameters.get("device") == "cpu"
+        )
         config = {
             **request.parameters,
             "operation": request.operation,
@@ -284,10 +320,12 @@ class TrainingService:
                 else {}
             ),
             "parameter_contract_id": request.parameter_contract_id,
-            "submitted_parameters": request.submitted_parameters,
+            "submitted_parameters": request.submitted_parameters
+            if request.submitted_parameters is not None
+            else {k: v for k, v in request.parameters.items() if k != "model"},
             # 容器只看得到分配给它的 GPU，编号从 0 开始
             "device": "cpu"
-            if request.operation == "export"
+            if cpu
             else (",".join(str(index) for index in range(len(gpu_ids))) if gpu_ids else "0"),
             "dataset": "/dataset",
             "dataset_sha256": self.dataset_info(request.dataset_id)["sha256"],
@@ -305,9 +343,7 @@ class TrainingService:
             run.chmod(0o777)
         (run / "config.json").chmod(0o644)
 
-        options = (
-            {} if request.operation == "export" else gpu_options(self._gpu_access_mode, gpu_ids)
-        )
+        options = {} if cpu else gpu_options(self._gpu_access_mode, gpu_ids)
         environment = {
             "PYTHONUNBUFFERED": "1",
             "HOME": "/workspace",
@@ -537,10 +573,16 @@ def build_training_router(get_training: object) -> APIRouter:
     router = APIRouter(tags=["training"])
 
     @router.get("/training/parameter-contract")
-    def parameter_contract(mode: Literal["train", "val", "export"] = "train"):
+    def parameter_contract(
+        mode: Literal["train", "val", "export"] = "train", model: str = "yolo11s.pt"
+    ):
+        try:
+            contract = contract_for(model, mode)
+        except ValueError as exc:
+            raise ManagerError("TRAINING_MODE_INVALID", str(exc), 422) from exc
         return {
-            **get_contract(mode),
-            "training_protocol": TRAINING_PROTOCOL,
+            **contract,
+            "training_protocol": protocol_for(model),
             "export_protocol": EXPORT_PROTOCOL,
         }
 

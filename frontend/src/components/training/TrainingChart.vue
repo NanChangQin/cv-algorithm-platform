@@ -10,6 +10,7 @@ export interface ChartSeries {
 
 const props = withDefaults(defineProps<{
   title: string
+  downloadUrl?: string
   series: ChartSeries[]
   /** 横轴总轮数：训练进行中也按全部轮数画横轴 */
   epochs: number
@@ -17,7 +18,7 @@ const props = withDefaults(defineProps<{
   yMax?: number
   format?: (value: number) => string
   height?: number
-}>(), { yMax: undefined, format: (value: number) => value.toFixed(3), height: 180 })
+}>(), { downloadUrl: undefined, yMax: undefined, format: (value: number) => value.toFixed(3), height: 180 })
 
 const root = ref<HTMLElement | null>(null)
 const width = ref(480)
@@ -87,6 +88,7 @@ function onPointer(event: PointerEvent) {
   <figure ref="root" class="training-chart">
     <figcaption>
       <strong>{{ title }}</strong>
+      <a v-if="downloadUrl && hasData" :href="downloadUrl" :download="`${title}.png`" class="text-button">PNG</a>
       <span v-if="series.length > 1" class="chart-legend">
         <span v-for="item in series" :key="item.label"><i :style="{ background: `var(--series-${item.slot})` }" />{{ item.label }}</span>
       </span>

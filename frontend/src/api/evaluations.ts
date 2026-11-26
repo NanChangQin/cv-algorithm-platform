@@ -52,3 +52,14 @@ export const evaluationsApi = {
     request<EvaluationRun>('/evaluations/runs', { method: 'POST', body: JSON.stringify(payload) }),
   report: (id: string) => request<{ run: EvaluationRun; report: EvaluationReport }>(`/evaluations/runs/${id}`),
 }
+
+export interface DetectionBox { label: string; bbox: [number, number, number, number]; score?: number }
+export interface ErrorSample {
+  task_id: string; asset_id: string; predictions: DetectionBox[]; ground_truth: DetectionBox[]
+  tp: number; fp: number; fn: number; false_positives: number[]; false_negatives: number[]
+  matches: Array<{ prediction: number; truth: number; iou: number }>
+}
+export const evaluationAnalysisApi = {
+  fromTraining: (dataset_id: string, split: string) => request<EvaluationDataset>('/evaluations/datasets/from-training', { method: 'POST', body: JSON.stringify({ dataset_id, split }) }),
+  samples: (id: string, algorithm: string, errorType: string, label: string, offset: number) => request<{ items: ErrorSample[]; total: number; labels: string[] }>(`/evaluations/runs/${id}/samples?${new URLSearchParams({ algorithm_version_id: algorithm, error_type: errorType, label, offset: String(offset) })}`),
+}

@@ -166,3 +166,47 @@ docker compose -f compose.yaml -f compose.database.yaml --profile database run -
 - Docker Compose：单算法容器定义。
 
 生成动作不自动连接外部 BentoCloud/Kubernetes，管理员审查文件后再在目标环境执行。
+
+## 13. Ubuntu 本机部署（手动启动）
+
+本机需要保持 Docker 和平台不随开机启动时，使用 `compose.local.yaml` 覆盖全部平台服务的重启策略为 `no`。
+该配置也设置 `ALGORITHM_MANAGER_CONTAINER_RESTART_POLICY=no`，使后续创建的算法推理容器采用相同策略。
+
+第一次安装 Docker Engine、Compose 和 NVIDIA Container Toolkit：
+
+```bash
+sudo bash scripts/install-local-runtime.sh "$USER"
+```
+
+该脚本使用 Docker 和 NVIDIA 官方软件源，保留已安装的显卡驱动，将指定用户加入 Docker 管理组（具有管理宿主机容器的权限），创建 `/srv/cv-platform/{data,models,packages}`。它会禁用 `docker.service`、`docker.socket` 和 `containerd.service` 的开机启动，只在本次安装结束时手动启动 Docker。安装失败时服务可能仍处于 masked 状态，修复错误后重新运行脚本。
+
+准备 `.env`，设置独立的管理员、数据库密码及 Manager 令牌；仅本机访问时设置 `CV_PLATFORM_HTTP_PORT=127.0.0.1:8080`。可加入以下两行，让直接使用 `docker compose` 时也加载手动启动配置：
+
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.database.yaml:compose.local.yaml
+COMPOSE_PROFILES=database
+```
+
+已具备 Docker 组权限时：
+
+```bash
+bash scripts/platform-local.sh config-check
+bash scripts/platform-local.sh up
+bash scripts/platform-local.sh build-models
+bash scripts/platform-local.sh status
+```
+
+新加入 Docker 组后，可重新登录，或在当前登录期间使用 `sg docker -c 'bash scripts/platform-local.sh up'`。平台访问地址为 `http://localhost:8080`。
+
+本机代理位于 `127.0.0.1:7897` 时，可执行 `sudo bash scripts/configure-local-docker-proxy.sh`，让 Docker 后台服务通过该代理下载镜像。在 `.env` 中设置 `CV_PLATFORM_BUILD_PROXY=http://127.0.0.1:7897`，让镜像构建步骤使用同一代理。`compose.local.yaml` 使用宿主网络进行构建，启动脚本会明确授予构建所需的 `network.host` 权限；运行中的平台和算法容器仍使用原有的 Compose 网络。
+
+`up` 只在平台镜像缺失时构建。代码更新后先执行 `bash scripts/platform-local.sh build`，再执行 `up`；训练或推理镜像更新使用 `build-models`。
+
+电脑重启后按需启动：
+
+```bash
+sudo systemctl start docker
+bash scripts/platform-local.sh up
+```
+
+停止平台使用 `bash scripts/platform-local.sh stop`；移除平台容器但保留数据库卷使用 `bash scripts/platform-local.sh down`。查看日志使用 `bash scripts/platform-local.sh logs`。如需连 Docker 一起停止，在停止平台后执行 `sudo systemctl stop docker.service docker.socket containerd.service`。

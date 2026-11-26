@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 
 ARG ULTRALYTICS_VERSION=8.4.183
 LABEL cv.platform.parameter-contract="ultralytics:8.4.183:parameters-v1"
+LABEL cv.platform.model-selection="v1"
 LABEL cv.platform.training-protocol="ultralytics:8.4.183:sources-v1"
 LABEL cv.platform.export-protocol="ultralytics:8.4.183:onnx-v1"
 # 国内网络可传入镜像源，例如 --build-arg PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
@@ -30,7 +31,7 @@ RUN cp /opt/prefetched/*.pt /opt/weights/ 2>/dev/null || true \
 RUN YOLO_CONFIG_DIR=/opt/ultralytics-assets python -c "\
 from ultralytics import YOLO; \
 from ultralytics.utils.checks import check_font; \
-[YOLO(name) for name in ('yolo26n.pt', 'yolo26s.pt', 'yolo26m.pt', 'yolo11n.pt', 'yolo11s.pt', 'yolo11m.pt')]; \
+[YOLO(name) for name in ('yolo26n.pt', 'yolo26s.pt', 'yolo26m.pt', 'yolo26l.pt', 'yolo26x.pt', 'yolo11n.pt', 'yolo11s.pt', 'yolo11m.pt', 'yolo11l.pt', 'yolo11x.pt')]; \
 check_font('Arial.ttf'); check_font('Arial.Unicode.ttf')" \
     && rm -rf /opt/prefetched \
     && chmod -R a+rX /opt/weights /opt/ultralytics-assets

@@ -21,16 +21,26 @@ class ModelStore:
         return self._root / str(version_id)
 
     def publish(
-        self, version_id: UUID, weights: Path, manifest_yaml: str
+        self,
+        version_id: UUID,
+        weights: Path,
+        manifest_yaml: str,
+        *,
+        weight_name: str = "model.pt",
+        model_config: str | None = None,
     ) -> dict[str, dict[str, Any]]:
         """复制权重、写入 manifest，返回每个文件的大小和 SHA-256。"""
         target = self.directory(version_id)
         target.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(weights, target / "model.pt")
+        shutil.copyfile(weights, target / weight_name)
         (target / "manifest.yaml").write_text(manifest_yaml, encoding="utf-8")
+        names = [weight_name, "manifest.yaml"]
+        if model_config is not None:
+            (target / "model-config.yaml").write_text(model_config, encoding="utf-8")
+            names.append("model-config.yaml")
         return {
             name: {"size": (target / name).stat().st_size, "sha256": _sha256(target / name)}
-            for name in ("model.pt", "manifest.yaml")
+            for name in names
         }
 
     def publish_export(self, version_id, root, entries, manifest_yaml):
@@ -48,17 +58,21 @@ class ModelStore:
         shutil.copyfile(root / "artifact-manifest.json", target / "artifact-manifest.json")
         result["artifact-manifest.json"] = {
             "size": (target / "artifact-manifest.json").stat().st_size,
-            "sha256": _sha256(target / "artifact-manifest.json")}
+            "sha256": _sha256(target / "artifact-manifest.json"),
+        }
         (target / "manifest.yaml").write_text(manifest_yaml, encoding="utf-8")
-        result["manifest.yaml"] = {"size": (target / "manifest.yaml").stat().st_size,
-                                   "sha256": _sha256(target / "manifest.yaml")}
+        result["manifest.yaml"] = {
+            "size": (target / "manifest.yaml").stat().st_size,
+            "sha256": _sha256(target / "manifest.yaml"),
+        }
         return result
 
     def files(self, algorithm: AlgorithmVersion) -> tuple[ModelFile, ...]:
         recorded = (algorithm.lineage or {}).get("files") or {}
         return tuple(
-            ModelFile(name, self.directory(algorithm.id) / name, str(item["sha256"]),
-                      int(item["size"]))
+            ModelFile(
+                name, self.directory(algorithm.id) / name, str(item["sha256"]), int(item["size"])
+            )
             for name, item in recorded.items()
         )
 

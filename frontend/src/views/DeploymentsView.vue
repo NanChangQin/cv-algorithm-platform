@@ -304,7 +304,7 @@ function deploymentSummary(id: string | null) {
         </header>
         <p v-if="item.last_error" class="alert" role="alert">{{ item.last_error }}</p>
         <div class="toolbar-actions">
-          <RouterLink class="primary-button compact-button" :to="{ path: '/', query: { algorithm: item.active_algorithm_version_id ?? undefined, service: item.key } }">去工作台调用</RouterLink>
+          <RouterLink class="primary-button compact-button" :to="{ path: '/', query: { algorithm: item.active_algorithm_version_id ?? undefined, service: item.key } }">去推理中心调用</RouterLink>
           <button type="button" class="secondary-button compact-button" :disabled="pendingRouteKey === item.key" @click="openRouteEditor(item)">切换版本</button>
           <button v-if="item.previous_deployment_id" type="button" class="secondary-button compact-button" :disabled="pendingRouteKey === item.key" @click="rollbackRoute(item)">回滚上一版本</button>
           <button type="button" class="text-button" :disabled="pendingRouteKey === item.key" @click="removeRoute(item)">删除路由</button>
@@ -380,7 +380,7 @@ function deploymentSummary(id: string | null) {
         <details v-if="item.runtime_profile || item.readiness"><summary>运行配置与模型验证证据</summary><pre class="annotation-example">{{ JSON.stringify({ runtime_profile: item.runtime_profile, readiness: item.readiness }, null, 2) }}</pre></details>
         <p v-if="item.status === 'failed' && item.error" class="alert" role="alert">{{ item.error }}</p>
         <div class="toolbar-actions">
-          <RouterLink v-if="item.status === 'running'" class="primary-button compact-button" :to="{ path: '/', query: { algorithm: item.algorithm_version_id, deployment: item.id } }">去工作台测试</RouterLink>
+          <RouterLink v-if="item.status === 'running'" class="primary-button compact-button" :to="{ path: '/', query: { algorithm: item.algorithm_version_id, deployment: item.id } }">去推理中心测试</RouterLink>
           <button v-if="item.status === 'running' || item.status === 'queued' || item.status === 'preparing' || item.status === 'draining'" type="button" class="secondary-button compact-button" :disabled="pendingId === item.id" @click="act(item, 'stop')">{{ item.status === 'draining' ? '立即停止' : '停止' }}</button>
           <button v-if="item.status === 'stopped' || item.status === 'failed'" type="button" class="secondary-button compact-button" :disabled="pendingId === item.id" @click="act(item, 'start')">启动</button>
           <button v-if="item.status !== 'preparing' && item.status !== 'stopping' && item.status !== 'draining'" type="button" class="secondary-button compact-button" :disabled="pendingId === item.id" @click="act(item, 'redeploy')">重新部署</button>

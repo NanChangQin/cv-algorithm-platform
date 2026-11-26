@@ -1,0 +1,16 @@
+# Reuse the pinned torch 2.10.0 / torchvision 0.25.0 environment of the trainer.
+ARG TRAINING_BASE_IMAGE=cv-platform/faster-rcnn-trainer:dev
+FROM ${TRAINING_BASE_IMAGE}
+USER root
+RUN python -m pip install --no-cache-dir "fastapi>=0.115,<1" "uvicorn>=0.35,<1"
+COPY examples/faster-rcnn /workspace/examples/faster-rcnn
+COPY examples/faster-rcnn/manifest.yaml /app/manifest.yaml
+COPY examples/faster-rcnn/service.py /app/service.py
+ENV PYTHONPATH=/workspace/packages/algorithm-sdk/src:/workspace/examples/faster-rcnn/src \
+    CV_FASTER_RCNN_MODE=torchvision CV_FASTER_RCNN_CONFIG=/models/model-config.yaml \
+    CV_FASTER_RCNN_WEIGHTS=/models/model.pth CV_FASTER_RCNN_DATA_ROOT=/data CV_FASTER_RCNN_DEVICE=auto
+WORKDIR /app
+USER 10001
+EXPOSE 8000
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+ENTRYPOINT ["python", "-m", "uvicorn", "service:app", "--host", "0.0.0.0", "--port", "8000"]

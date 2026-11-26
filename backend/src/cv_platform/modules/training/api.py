@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from cv_algorithm_sdk.runtime_contract import get_contract, normalize_parameters
+from cv_algorithm_sdk.training_contract import contract_for, normalize_for
 from cv_algorithm_sdk.training_sources import TrainingSource
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
@@ -50,6 +50,9 @@ class ModelResponse(BaseModel):
     key: str
     label: str
     description: str
+    algorithm: str
+    scale: str
+    task: str
 
 
 class DatasetResponse(BaseModel):
@@ -71,23 +74,32 @@ class DatasetResponse(BaseModel):
     @classmethod
     def of(cls, dataset: TrainingDataset) -> DatasetResponse:
         return cls(
-            id=dataset.id, name=dataset.name, format=dataset.format,
-            class_names=list(dataset.class_names), stats=dataset.stats,
-            size_bytes=dataset.size_bytes, created_by=dataset.created_by,
+            id=dataset.id,
+            name=dataset.name,
+            format=dataset.format,
+            class_names=list(dataset.class_names),
+            stats=dataset.stats,
+            size_bytes=dataset.size_bytes,
+            created_by=dataset.created_by,
             created_at=dataset.created_at,
-            family_id=dataset.family_id or dataset.id, version=dataset.version,
-            parent_id=dataset.parent_id, sha256=dataset.sha256,
-            source_sha256=dataset.source_sha256, split_config=dataset.split_config,
+            family_id=dataset.family_id or dataset.id,
+            version=dataset.version,
+            parent_id=dataset.parent_id,
+            sha256=dataset.sha256,
+            source_sha256=dataset.source_sha256,
+            split_config=dataset.split_config,
         )
 
 
 class CreateRunRequest(BaseModel):
+    task_type: Literal["object_detection"] = "object_detection"
     model_config = ConfigDict(extra="forbid")
     operation: Literal["train", "val"] = "train"
 
     name: str = Field(default="", max_length=120)
     dataset_id: UUID
     model: str = Field(default="custom.pt", min_length=1, max_length=64)
+    architecture: str | None = Field(default=None, max_length=64)
     source: TrainingSource = Field(default_factory=TrainingSource)
     node_id: str = Field(min_length=1, max_length=64)
     gpu_device_ids: list[str] = Field(default_factory=list, max_length=8)
@@ -102,7 +114,8 @@ class CreateRunRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_parameters(self):
-        normalize_parameters(self.operation, self.parameters)
+        if self.architecture or self.model != "custom.pt" or self.source.kind == "builtin":
+            normalize_for(self.architecture or self.model, self.operation, self.parameters)
         if self.operation == "val" and self.source.mode == "resume":
             raise ValueError("独立验证使用模型权重，不支持断点续训")
         return self
@@ -117,6 +130,7 @@ class BestMetrics(BaseModel):
 
 
 class RunSummaryResponse(BaseModel):
+    task_type: Literal["object_detection"] = "object_detection"
     id: UUID
     name: str
     dataset_id: UUID
@@ -138,12 +152,24 @@ class RunSummaryResponse(BaseModel):
     @classmethod
     def of(cls, run: TrainingRun, **extra: Any) -> Any:
         return cls(
-            id=run.id, name=run.name, dataset_id=run.dataset_id, model=run.model,
-            parameters=run.parameters, node_id=run.node_id,
-            gpu_device_ids=list(run.gpu_device_ids), status=run.status, stage=run.stage,
-            progress=run.progress, best=best_metrics(run.metrics), error=run.error,
-            created_by=run.created_by, created_at=run.created_at, updated_at=run.updated_at,
-            started_at=run.started_at, finished_at=run.finished_at, **extra,
+            id=run.id,
+            name=run.name,
+            dataset_id=run.dataset_id,
+            model=run.model,
+            parameters=run.parameters,
+            node_id=run.node_id,
+            gpu_device_ids=list(run.gpu_device_ids),
+            status=run.status,
+            stage=run.stage,
+            progress=run.progress,
+            best=best_metrics(run.metrics),
+            error=run.error,
+            created_by=run.created_by,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
+            started_at=run.started_at,
+            finished_at=run.finished_at,
+            **extra,
         )
 
 
@@ -168,8 +194,17 @@ def best_metrics(rows: tuple[dict[str, float], ...]) -> BestMetrics | None:
 
 @router.get("/models", response_model=list[ModelResponse])
 def list_models() -> list[ModelResponse]:
-    return [ModelResponse(key=item.key, label=item.label, description=item.description)
-            for item in TRAINING_MODELS]
+    return [
+        ModelResponse(
+            key=item.key,
+            label=item.label,
+            description=item.description,
+            algorithm=item.algorithm,
+            scale=item.scale,
+            task=item.task,
+        )
+        for item in TRAINING_MODELS
+    ]
 
 
 @router.get("/sources")
@@ -195,9 +230,13 @@ def delete_weight(weight_id: UUID, service: TrainingService = Depends(get_servic
 
 @router.get("/parameter-contract")
 def parameter_contract(
+    model: str = "yolo11s.pt",
     mode: Literal["train", "val", "predict", "export", "track", "benchmark", "tune"] = "train",
 ) -> dict[str, Any]:
-    return get_contract(mode)
+    try:
+        return contract_for(model, mode)
+    except ValueError as exc:
+        raise ApplicationError("INPUT_INVALID", str(exc), 422) from exc
 
 
 @router.get("/datasets", response_model=list[DatasetResponse])
@@ -217,14 +256,22 @@ def import_dataset(
         config = SplitConfig.model_validate_json(split_config)
     except ValidationError as exc:
         raise ApplicationError("INPUT_INVALID", f"划分配置不合法：{exc}", 422) from exc
-    return DatasetResponse.of(service.import_dataset(
-        file.file, file.filename or "", name, config, parent_id,
-    ))
+    return DatasetResponse.of(
+        service.import_dataset(
+            file.file,
+            file.filename or "",
+            name,
+            config,
+            parent_id,
+        )
+    )
 
 
 @router.post("/datasets/{dataset_id}/versions", response_model=DatasetResponse, status_code=201)
 def new_dataset_version(
-    dataset_id: UUID, config: SplitConfig, service: TrainingService = Depends(get_service),
+    dataset_id: UUID,
+    config: SplitConfig,
+    service: TrainingService = Depends(get_service),
 ) -> DatasetResponse:
     return DatasetResponse.of(service.new_version(dataset_id, config))
 
@@ -252,8 +299,10 @@ def dataset_feedback(
 
 @router.get("/datasets/{dataset_id}/images")
 def dataset_images(
-    dataset_id: UUID, split: Literal["train", "val", "test"] | None = None,
-    offset: int = Query(default=0, ge=0), limit: int = Query(default=24, ge=1, le=100),
+    dataset_id: UUID,
+    split: Literal["train", "val", "test"] | None = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=24, ge=1, le=100),
     service: TrainingService = Depends(get_service),
 ) -> dict[str, Any]:
     return service.dataset_images(dataset_id, split, offset, limit)
@@ -261,25 +310,36 @@ def dataset_images(
 
 @router.get("/datasets/{dataset_id}/images/{image_id}/preview")
 def dataset_preview(
-    dataset_id: UUID, image_id: int, service: TrainingService = Depends(get_service),
+    dataset_id: UUID,
+    image_id: int,
+    service: TrainingService = Depends(get_service),
 ) -> Response:
-    return Response(service.dataset_preview(dataset_id, image_id), media_type="image/jpeg",
-                    headers={"Cache-Control": "private, max-age=86400"})
+    return Response(
+        service.dataset_preview(dataset_id, image_id),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
 
 
 @router.get("/datasets/{dataset_id}/report")
 def dataset_report(
-    dataset_id: UUID, service: TrainingService = Depends(get_service),
+    dataset_id: UUID,
+    service: TrainingService = Depends(get_service),
 ) -> dict[str, Any]:
     return service.dataset_report(dataset_id)
 
 
 @router.get("/datasets/{dataset_id}/archive", response_class=FileResponse)
 def dataset_archive(
-    dataset_id: UUID, source: bool = False, service: TrainingService = Depends(get_service),
+    dataset_id: UUID,
+    source: bool = False,
+    service: TrainingService = Depends(get_service),
 ):
-    return FileResponse(service.dataset_archive(dataset_id, source=source),
-                        media_type="application/zip", filename=f"dataset-{dataset_id}.zip")
+    return FileResponse(
+        service.dataset_archive(dataset_id, source=source),
+        media_type="application/zip",
+        filename=f"dataset-{dataset_id}.zip",
+    )
 
 
 @router.get("/datasets/{dataset_id}", response_model=DatasetResponse)
@@ -312,6 +372,7 @@ def create_run(
         node_id=payload.node_id,
         gpu_device_ids=tuple(payload.gpu_device_ids),
         source=payload.source,
+        architecture=payload.architecture,
         operation=payload.operation,
     )
     return run_response(run)
@@ -354,14 +415,25 @@ def publish_model(
     container: ApplicationContainer = Depends(get_container),
 ) -> AlgorithmResponse:
     publisher = ModelPublisher(
-        container.training, container.training_storage, container.algorithms,
-        container.model_store, get_settings().yolo_inference_image,
-        project_id_from(request), request.state.session.username,
+        container.training,
+        container.training_storage,
+        container.algorithms,
+        container.model_store,
+        get_settings().yolo_inference_image,
+        project_id_from(request),
+        request.state.session.username,
+        faster_inference_image=get_settings().faster_inference_image,
     )
-    return AlgorithmResponse.from_entity(publisher.publish(
-        run_id, checkpoint=payload.checkpoint, key=payload.key, name=payload.name,
-        version=payload.version, description=payload.description,
-    ))
+    return AlgorithmResponse.from_entity(
+        publisher.publish(
+            run_id,
+            checkpoint=payload.checkpoint,
+            key=payload.key,
+            name=payload.name,
+            version=payload.version,
+            description=payload.description,
+        )
+    )
 
 
 @router.get("/runs/{run_id}/logs", response_model=list[str])
@@ -371,6 +443,79 @@ def run_logs(
     service: TrainingService = Depends(get_service),
 ) -> list[str]:
     return service.logs(run_id, min(max(tail, 1), 2000))
+
+
+@router.get("/runs/{run_id}/report")
+def training_report(run_id: UUID, service: TrainingService = Depends(get_service)):
+    from .reports import chart_groups, snapshot
+
+    report = snapshot(service, service.get_run(run_id))
+    return {**report, "charts": list(chart_groups(report))}
+
+
+@router.get("/runs/{run_id}/download/{kind}")
+def download_report(
+    run_id: UUID,
+    kind: Literal[
+        "report.pdf",
+        "report.json",
+        "metrics.csv",
+        "metrics.json",
+        "per-class.csv",
+        "per-class.json",
+        "logs.txt",
+        "figures.zip",
+    ],
+    service: TrainingService = Depends(get_service),
+):
+    from .reports import csv_bytes, figures_zip, json_bytes, pdf_report, snapshot
+
+    run = service.get_run(run_id)
+    report = snapshot(service, run)
+    classes = (report["evaluation"] or {}).get("per_class", [])
+    if kind == "report.pdf":
+        content, media = pdf_report(service, run, report), "application/pdf"
+    elif kind == "figures.zip":
+        content, media = figures_zip(service, run, report), "application/zip"
+    elif kind == "logs.txt":
+        content, media = "\n".join(service.logs(run_id, 2000)).encode("utf-8"), "text/plain"
+    elif kind.endswith(".csv"):
+        content = csv_bytes(classes if kind.startswith("per-class") else report["metrics"])
+        media = "text/csv"
+    else:
+        content = json_bytes(
+            report
+            if kind == "report.json"
+            else {
+                "run_id": str(run_id),
+                "snapshot_at": report["snapshot_at"],
+                "notes": report["notes"],
+                "data": classes if kind.startswith("per-class") else report["metrics"],
+            }
+        )
+        media = "application/json"
+    return Response(
+        content,
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{run_id}-{kind}"',
+        },
+    )
+
+
+@router.get("/runs/{run_id}/charts/{name}")
+def download_chart(run_id: UUID, name: str, service: TrainingService = Depends(get_service)):
+    from .reports import chart_png, snapshot
+
+    run = service.get_run(run_id)
+    return Response(chart_png(snapshot(service, run), name), media_type="image/png")
+
+
+@router.get("/runs/{run_id}/figure")
+def download_figure(run_id: UUID, name: str, service: TrainingService = Depends(get_service)):
+    from .reports import figure_png
+
+    return Response(figure_png(service, service.get_run(run_id), name), media_type="image/png")
 
 
 @router.get("/runs/{run_id}/archive", response_class=FileResponse)
@@ -384,9 +529,7 @@ def download_archive(run_id: UUID, service: TrainingService = Depends(get_servic
 
 
 @router.get("/runs/{run_id}/artifacts/{name:path}", response_class=FileResponse)
-def download_artifact(
-    run_id: UUID, name: str, service: TrainingService = Depends(get_service)
-):
+def download_artifact(run_id: UUID, name: str, service: TrainingService = Depends(get_service)):
     path = service.artifact(run_id, name)
     media_type = {".png": "image/png", ".jpg": "image/jpeg", ".csv": "text/csv"}.get(
         path.suffix, "application/octet-stream"

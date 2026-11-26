@@ -36,6 +36,7 @@ from ..modules.evaluations.repository import (
 )
 from ..modules.instances.application.service import RuntimeInstanceService
 from ..modules.media.postgres_service import PostgresMediaSourceService
+from ..modules.inference.service import InferenceService
 from ..modules.media.runs import MediaRunService
 from ..modules.media.service import InMemoryMediaSourceService
 from ..modules.media.storage import LocalVideoStorage
@@ -59,6 +60,7 @@ from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
 from ..modules.tasks.infrastructure.memory_repository import InMemoryTaskRepository
 from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
 from ..modules.tasks.infrastructure.postgres_repository import PostgresTaskRepository
+from ..modules.training.reviews import ReviewStore
 from ..modules.training.datasets import TrainingDatasetStorage
 from ..modules.training.orchestrator import LeaderLock, TrainingOrchestrator
 from ..modules.training.repository import (
@@ -91,12 +93,14 @@ class ApplicationContainer:
     rate_limiter: SlidingWindowRateLimiter
     media_sources: InMemoryMediaSourceService | PostgresMediaSourceService
     media_worker: MediaWorkerGateway
+    inference: InferenceService
     media_runs: MediaRunService
     video_storage: LocalVideoStorage
     workflows: InMemoryWorkflowService
     operations: OperationsService
     projects: InMemoryProjectService | PostgresProjectService
     training: InMemoryTrainingRepository | PostgresTrainingRepository
+    reviews: ReviewStore
     training_storage: TrainingDatasetStorage
     training_orchestrator: TrainingOrchestrator
     model_store: ModelStore
@@ -223,6 +227,7 @@ def build_container() -> ApplicationContainer:
         media_sources=media_sources,
         media_worker=media_worker,
         media_runs=MediaRunService(media_sources, media_worker, database),
+        inference=InferenceService(database, settings.storage_root, settings.media_worker_url),
         video_storage=LocalVideoStorage(
             settings.storage_root,
             settings.max_video_upload_bytes,
@@ -232,8 +237,9 @@ def build_container() -> ApplicationContainer:
         projects=projects,
         training=training,
         training_storage=training_storage,
+        reviews=ReviewStore(database),
         training_orchestrator=TrainingOrchestrator(
-            training, training_storage, manager, settings.training_image
+            training, training_storage, manager, settings.training_image, settings.faster_training_image
         ),
         model_store=model_store,
         deployments=deployments,

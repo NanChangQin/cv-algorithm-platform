@@ -3,29 +3,19 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 import { advancedApi, type MediaRun, type MediaSource, type RuntimeNode, type ScalingPolicy, type Workflow, type WorkflowRun } from '@/api/advanced'
 import { systemApi, type GpuInfo } from '@/api/system'
-import ParameterForm from '@/components/algorithms/ParameterForm.vue'
 import AssetPicker from '@/components/assets/AssetPicker.vue'
-import UploadDropzone from '@/components/assets/UploadDropzone.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
 import { toast } from '@/composables/useToast'
 import type { ImageAsset } from '@/types/asset'
 import { errorMessage } from '@/utils/errors'
-import { defaultParameters, parameterIssue, type ParameterValues } from '@/utils/parameters'
 import { formatDateTime, nodeLabel, runStatusLabel } from '@/utils/presentation'
 import { taskStatusLabel } from '@/utils/status'
 
 type Tab = 'media' | 'workflow' | 'nodes' | 'scaling' | 'deploy'
 const tabs: Array<{ id: Tab; label: string }> = [
-  { id: 'media', label: '媒体推理' }, { id: 'workflow', label: '工作流' }, { id: 'nodes', label: '运行节点' },
+  { id: 'media', label: '旧版媒体记录' }, { id: 'workflow', label: '工作流' }, { id: 'nodes', label: '运行节点' },
   { id: 'scaling', label: '扩缩容与灰度' }, { id: 'deploy', label: '部署与指标' },
 ]
-const sourceTypeLabel: Record<MediaSource['source_type'], string> = { rtsp: 'RTSP 视频流', camera: '摄像头', video: '视频文件' }
-const sourceTypeHint: Record<MediaSource['source_type'], string> = {
-  rtsp: '例如 rtsp://192.168.1.20:554/stream1，需要 Media Worker 能访问该地址',
-  camera: '格式为 camera:0，对应服务器上的 /dev/video0',
-  video: '视频文件建议直接用上方的“上传视频”，手工填写需位于 file:///data/ 目录',
-}
-
 const { algorithms, availableAlgorithms } = useAlgorithms()
 const activeTab = ref<Tab>('media')
 const busy = ref(false)
@@ -38,18 +28,7 @@ const gpus = ref<GpuInfo[]>([])
 const policies = ref<ScalingPolicy[]>([])
 const metrics = ref<Record<string, unknown>>({})
 const error = ref('')
-const videoUploading = ref(false)
 
-// 媒体推理
-const sourceName = ref('')
-const sourceType = ref<MediaSource['source_type']>('rtsp')
-const sourceUri = ref('')
-const mediaSourceId = ref('')
-const mediaAlgorithmId = ref('')
-const mediaParameters = ref<ParameterValues>({})
-const mediaEditorIssue = ref('')
-const mediaInterval = ref(1)
-const mediaMaxFrames = ref(100)
 // 工作流
 const workflowName = ref('')
 const workflowMode = ref<'sequential' | 'parallel'>('sequential')
@@ -72,7 +51,6 @@ const exportBackend = ref<'docker' | 'bentoml' | 'kserve'>('docker')
 const exportFiles = ref<Record<string, string>>({})
 const exportFile = ref('')
 
-const mediaAlgorithm = computed(() => availableAlgorithms.value.find((item) => item.id === mediaAlgorithmId.value))
 const algorithmFamilies = computed(() => [...new Set(algorithms.value.map((item) => item.key))])
 const trafficVersions = computed(() => algorithms.value.filter((item) => item.key === trafficFamily.value && ['available', 'disabled'].includes(item.status)))
 const trafficTotal = computed(() => trafficVersions.value.reduce((sum, item) => sum + Number(trafficWeights.value[item.id] ?? item.traffic_weight), 0))
@@ -81,10 +59,6 @@ const nodeUrlValid = computed(() => /^https?:\/\/.+/.test(node.value.manager_url
 const tasksByStatus = computed(() => Object.entries((metrics.value.tasks_by_status ?? {}) as Record<string, number>))
 const hasActiveRuns = computed(() => mediaRuns.value.some((run) => ['queued', 'extracting', 'running'].includes(run.status)) || workflowRuns.value.some((run) => ['queued', 'running'].includes(run.status)))
 
-watch(mediaAlgorithm, (algorithm) => {
-  mediaParameters.value = defaultParameters(algorithm?.parameters)
-  mediaEditorIssue.value = ''
-})
 watch(exportFiles, (files) => { exportFile.value = Object.keys(files)[0] ?? '' })
 
 function algorithmName(id: string) {
@@ -124,28 +98,6 @@ async function act(action: () => Promise<unknown>, success: string, fallback: st
   } finally { busy.value = false }
 }
 
-async function addSource() {
-  const ok = await act(() => advancedApi.createMediaSource({ name: sourceName.value.trim(), source_type: sourceType.value, uri: sourceUri.value.trim() }), `已注册媒体源 ${sourceName.value}`, '注册媒体源失败')
-  if (ok) { sourceName.value = ''; sourceUri.value = '' }
-}
-async function uploadVideo(files: File[]) {
-  const file = files[0]
-  if (!file) return
-  videoUploading.value = true
-  try { await act(() => advancedApi.uploadVideo(file), `已上传 ${file.name}`, '上传视频失败') } finally { videoUploading.value = false }
-}
-function removeSource(source: MediaSource) {
-  if (!window.confirm(`删除媒体源“${source.name}”？已产生的抽帧任务不受影响。`)) return
-  void act(() => advancedApi.deleteMediaSource(source.id), '已删除媒体源', '删除媒体源失败')
-}
-function startMediaRun() {
-  const issue = mediaEditorIssue.value || parameterIssue(mediaAlgorithm.value?.parameters, mediaParameters.value)
-  if (issue) { toast.error(issue); return }
-  void act(() => advancedApi.startMediaRun(mediaSourceId.value, {
-    algorithm_version_id: mediaAlgorithmId.value, parameters: mediaParameters.value,
-    interval_seconds: mediaInterval.value, max_frames: mediaMaxFrames.value,
-  }), '媒体推理已开始，运行记录会自动刷新', '发起媒体推理失败')
-}
 function toggleStep(id: string) {
   workflowSteps.value = workflowSteps.value.includes(id) ? workflowSteps.value.filter((item) => item !== id) : [...workflowSteps.value, id]
 }
@@ -204,7 +156,7 @@ onUnmounted(() => window.clearInterval(polling))
 
 <template>
   <header class="page-heading page-heading-actions">
-    <div><h1>高级编排</h1><p>视频与摄像头推理、多算法工作流、远程 GPU 节点、扩缩容和部署导出。</p></div>
+    <div><h1>高级编排</h1><p>多算法工作流、远程 GPU 节点、扩缩容和部署导出。媒体推理请前往推理中心。</p></div>
     <button class="secondary-button" @click="refresh">刷新</button>
   </header>
   <p v-if="error" class="alert" role="alert">{{ error }}</p>
@@ -213,33 +165,7 @@ onUnmounted(() => window.clearInterval(polling))
   </nav>
 
   <div v-show="activeTab === 'media'" class="advanced-grid" role="tabpanel">
-    <section class="section-block">
-      <header class="section-heading"><div><h2>媒体源</h2><span class="count-badge">{{ media.length }}</span></div></header>
-      <UploadDropzone accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,.mkv" :multiple="false" :disabled="videoUploading" compact :title="videoUploading ? '正在上传视频…' : '上传视频文件'" hint="MP4、WebM、MOV、AVI、MKV，上传后自动登记为媒体源" @files="uploadVideo" />
-      <form class="stacked-form" @submit.prevent="addSource">
-        <label>名称<input v-model="sourceName" required maxlength="128" placeholder="例如：一号门摄像头" /></label>
-        <label>类型<select v-model="sourceType"><option v-for="(label, value) in sourceTypeLabel" :key="value" :value="value">{{ label }}</option></select></label>
-        <label>地址<input v-model="sourceUri" required maxlength="2048" :placeholder="sourceType === 'camera' ? 'camera:0' : sourceType === 'rtsp' ? 'rtsp://' : 'file:///data/videos/…'" /><small>{{ sourceTypeHint[sourceType] }}</small></label>
-        <button class="primary-button" :disabled="busy || !sourceName.trim() || !sourceUri.trim()">注册媒体源</button>
-      </form>
-      <ul class="plain-list">
-        <li v-for="item in media" :key="item.id"><span><strong>{{ item.name }}</strong><small class="mono">{{ sourceTypeLabel[item.source_type] }} · {{ item.uri }}</small></span><button class="secondary-button danger-button compact" :disabled="busy" @click="removeSource(item)">删除</button></li>
-        <li v-if="!media.length" class="muted-copy">还没有媒体源。</li>
-      </ul>
-    </section>
-    <section class="section-block">
-      <header class="section-heading"><div><h2>发起媒体推理</h2></div></header>
-      <form class="stacked-form" @submit.prevent="startMediaRun">
-        <label>媒体源<select v-model="mediaSourceId" required><option value="" disabled>选择媒体源</option><option v-for="item in media" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
-        <label>算法<select v-model="mediaAlgorithmId" required><option value="" disabled>选择算法</option><option v-for="item in availableAlgorithms" :key="item.id" :value="item.id">{{ item.name }} · v{{ item.version }}</option></select></label>
-        <div class="form-row">
-          <label>抽帧间隔（秒）<input v-model.number="mediaInterval" type="number" min="0.1" max="60" step="0.1" /></label>
-          <label>最多处理帧数<input v-model.number="mediaMaxFrames" type="number" min="1" max="10000" /></label>
-        </div>
-        <details v-if="mediaAlgorithm && Object.keys(mediaAlgorithm.parameters).length" class="inline-details"><summary>算法参数</summary><ParameterForm v-model="mediaParameters" :parameters="mediaAlgorithm.parameters" @validity="mediaEditorIssue = $event" /></details>
-        <button class="primary-button" :disabled="busy || !mediaSourceId || !mediaAlgorithmId">开始媒体推理</button>
-      </form>
-    </section>
+    <section class="section-block wide"><h2>媒体推理已迁移到推理中心</h2><p>视频、浏览器摄像头、服务器摄像头与 RTSP 在推理中心统一配置；下方保留旧版运行记录。</p><RouterLink class="primary-button" to="/">进入推理中心</RouterLink><RouterLink class="secondary-button" to="/inference/tasks">推理任务</RouterLink></section>
     <section class="section-block wide">
       <header class="section-heading"><div><h2>媒体推理记录</h2><span class="count-badge">{{ mediaRuns.length }}</span></div></header>
       <div v-if="!mediaRuns.length" class="empty-state">还没有媒体推理记录。</div>

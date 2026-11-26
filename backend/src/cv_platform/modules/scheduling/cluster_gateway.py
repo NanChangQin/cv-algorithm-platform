@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass, replace
 from threading import RLock
 
@@ -185,9 +186,13 @@ class ClusterAlgorithmManagerGateway:
             "gpu-" + "-".join(scheduled_request.gpu_device_ids)
             if scheduled_request.gpu_device_ids else scheduled_request.device
         )
-        scheduled_request = replace(
-            scheduled_request, container_name=f"{request.container_name}-{suffix}"
-        )
+        container_name = f"{request.container_name}-{suffix}"
+        # Docker accepts longer names, but their DNS labels must fit in 63 bytes.
+        # Hash the entire name to preserve deployment and GPU isolation when shortened.
+        if len(container_name) > 63:
+            digest = hashlib.sha256(container_name.encode()).hexdigest()[:16]
+            container_name = f"{container_name[:46]}-{digest}"
+        scheduled_request = replace(scheduled_request, container_name=container_name)
         self.sync_model_files(node.id, request)
         instance = gateway.ensure_running(scheduled_request)
         with self._lock:

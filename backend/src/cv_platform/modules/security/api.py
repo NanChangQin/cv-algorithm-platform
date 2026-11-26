@@ -14,7 +14,8 @@ router = APIRouter(tags=["security"])
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=128)
-    password: str = Field(min_length=12, max_length=256)
+    # Login checks the stored credential; creation policy belongs to create-user.
+    password: str = Field(min_length=1, max_length=256)
 
 
 class SessionResponse(BaseModel):
