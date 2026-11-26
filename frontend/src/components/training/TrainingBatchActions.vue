@@ -51,12 +51,20 @@ async function preview() {
   } catch (reason) { if (sequence === previewSequence) modalError.value = errorMessage(reason, '检查失败，请重试') }
   finally { if (sequence === previewSequence) checking.value = false }
 }
+function newRequestId(): string {
+  // getRandomValues is available on LAN HTTP as well as HTTPS.
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80
+  const hex = Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-')
+}
 async function submit() {
   if (submitting.value || checking.value || (action.value === 'delete' && !eligible.value)) return
   submitting.value = true; modalError.value = ''
-  pending.value ??= {request_id:crypto.randomUUID(),run_ids:[...targets.value],action:action.value,content:content.value}
-  localStorage.setItem(storageKey, pending.value.request_id)
   try {
+    pending.value ??= {request_id:newRequestId(),run_ids:[...targets.value],action:action.value,content:content.value}
+    localStorage.setItem(storageKey, pending.value.request_id)
     job.value = await trainingBatchesApi.create(pending.value)
     close(); pollError.value = ''; await poll()
   } catch (reason) { modalError.value = errorMessage(reason, '提交失败，请重试；重试不会重复执行') }

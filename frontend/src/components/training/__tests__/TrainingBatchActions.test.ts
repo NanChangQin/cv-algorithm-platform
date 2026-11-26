@@ -12,6 +12,42 @@ beforeEach(()=>{
   api.create.mockResolvedValue(result); api.get.mockResolvedValue(result)
 })
 describe('batch confirmation and feedback',()=>{
+  it('submits a UUID on LAN HTTP without randomUUID',async()=>{
+    const getRandomValues = crypto.getRandomValues.bind(crypto)
+    vi.stubGlobal('crypto', {getRandomValues})
+    const wrapper = mount(TrainingBatchActions)
+    try {
+      await wrapper.vm.open(['a'], 'delete')
+      await wrapper.get('dialog .danger-button').trigger('click')
+      await flushPromises()
+      expect(api.create).toHaveBeenCalledOnce()
+      expect(api.create.mock.calls[0]![0].request_id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      )
+    } finally {
+      wrapper.unmount()
+      vi.unstubAllGlobals()
+    }
+  })
+  it('unlocks the dialog if preparing the submission fails',async()=>{
+    const wrapper = mount(TrainingBatchActions)
+    const write = vi.spyOn(Storage.prototype, 'setItem')
+    try {
+      await wrapper.vm.open(['a'], 'delete')
+      write.mockImplementationOnce(() => { throw new Error('存储不可用') })
+      await wrapper.get('dialog .danger-button').trigger('click')
+      await flushPromises()
+      expect(api.create).not.toHaveBeenCalled()
+      expect(wrapper.get('dialog [role="alert"]').text()).toContain('存储不可用')
+      expect(wrapper.get('dialog .secondary-button').attributes('disabled')).toBeUndefined()
+      await wrapper.get('dialog .danger-button').trigger('click')
+      await flushPromises()
+      expect(api.create).toHaveBeenCalledOnce()
+    } finally {
+      write.mockRestore()
+      wrapper.unmount()
+    }
+  })
   it('does not delete until confirmed and retries only failed items',async()=>{
     const wrapper=mount(TrainingBatchActions)
     await wrapper.vm.open(['a','b'],'delete');await flushPromises()
