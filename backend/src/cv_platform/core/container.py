@@ -34,9 +34,9 @@ from ..modules.evaluations.repository import (
     InMemoryEvaluationRepository,
     PostgresEvaluationRepository,
 )
+from ..modules.inference.service import InferenceService
 from ..modules.instances.application.service import RuntimeInstanceService
 from ..modules.media.postgres_service import PostgresMediaSourceService
-from ..modules.inference.service import InferenceService
 from ..modules.media.runs import MediaRunService
 from ..modules.media.service import InMemoryMediaSourceService
 from ..modules.media.storage import LocalVideoStorage
@@ -60,13 +60,13 @@ from ..modules.tasks.infrastructure.local_queue import LocalTaskQueue
 from ..modules.tasks.infrastructure.memory_repository import InMemoryTaskRepository
 from ..modules.tasks.infrastructure.persistent_queue import PostgresTaskQueue
 from ..modules.tasks.infrastructure.postgres_repository import PostgresTaskRepository
-from ..modules.training.reviews import ReviewStore
 from ..modules.training.datasets import TrainingDatasetStorage
 from ..modules.training.orchestrator import LeaderLock, TrainingOrchestrator
 from ..modules.training.repository import (
     InMemoryTrainingRepository,
     PostgresTrainingRepository,
 )
+from ..modules.training.reviews import ReviewStore
 from ..modules.workflows.service import InMemoryWorkflowService
 from .config import get_settings
 from .database import Database
@@ -233,13 +233,16 @@ def build_container() -> ApplicationContainer:
             settings.max_video_upload_bytes,
         ),
         workflows=InMemoryWorkflowService(algorithms, database),
-        operations=OperationsService(algorithms, tasks, instances, database, deployments=deployments),
+        operations=OperationsService(
+            algorithms, tasks, instances, database, deployments=deployments
+        ),
         projects=projects,
         training=training,
         training_storage=training_storage,
         reviews=ReviewStore(database),
         training_orchestrator=TrainingOrchestrator(
-            training, training_storage, manager, settings.training_image, settings.faster_training_image
+            training, training_storage, manager,
+            settings.training_image, settings.faster_training_image,
         ),
         model_store=model_store,
         deployments=deployments,

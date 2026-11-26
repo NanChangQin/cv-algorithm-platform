@@ -9,7 +9,7 @@ from cv_platform.core.errors import ApplicationError
 from cv_platform.dependencies import get_container
 
 
-def run_evaluation(client, dataset):
+def run_evaluation(client, dataset, assets=None):
     algorithm = detector_id(client)
     response = client.post(
         "/api/v1/evaluations/runs",
@@ -18,7 +18,11 @@ def run_evaluation(client, dataset):
     assert response.status_code == 201, response.text
     run = response.json()
     stored = get_container().evaluations.get_run(UUID(run["id"]))
-    return run, algorithm, list(stored.task_ids.values())
+    tasks = (
+        [stored.task_ids[f"{algorithm}:{asset['id']}"] for asset in assets]
+        if assets is not None else list(stored.task_ids.values())
+    )
+    return run, algorithm, tasks
 
 
 def test_error_filter_and_matching_are_consistent(client):
@@ -28,7 +32,7 @@ def test_error_filter_and_matching_are_consistent(client):
         assets,
         coco(("a.png", [("person", [0, 0, 20, 20])]), ("b.png", [("cat", [10, 10, 30, 30])])),
     )
-    run, algorithm, tasks = run_evaluation(client, dataset)
+    run, algorithm, tasks = run_evaluation(client, dataset, assets)
     complete(
         tasks[0],
         [

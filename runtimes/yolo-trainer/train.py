@@ -206,11 +206,11 @@ def resume_trainer(checkpoint: dict, arguments: dict, source: dict):
 
 def validate_architecture(model, config: dict) -> None:
     """Validate uploaded weights inside the isolated runtime, without unpickling in API."""
-    from ultralytics.nn.tasks import yaml_model_load
-
     expected = (config.get("training_input") or {}).get("expected_model")
     if not expected:
         return
+    from ultralytics.nn.tasks import yaml_model_load
+
     declared = yaml_model_load(expected.replace(".pt", ".yaml"))
     actual = model.model.yaml
     if model.task != "detect" or any(

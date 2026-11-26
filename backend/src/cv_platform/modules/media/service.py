@@ -65,6 +65,7 @@ class InMemoryMediaSourceService:
         elif source_type is MediaSourceType.CAMERA:
             if parsed.scheme != "camera" or not parsed.path.isdigit():
                 raise ApplicationError("MEDIA_SOURCE_INVALID", "摄像头 URI 应为 camera:N")
-        elif source_type is MediaSourceType.VIDEO:
-            if parsed.scheme != "file" or not parsed.path.startswith("/data/"):
-                raise ApplicationError("MEDIA_SOURCE_INVALID", "视频必须位于受控 /data 目录")
+        elif source_type is MediaSourceType.VIDEO and (
+            parsed.scheme != "file" or not parsed.path.startswith("/data/")
+        ):
+            raise ApplicationError("MEDIA_SOURCE_INVALID", "视频必须位于受控 /data 目录")
