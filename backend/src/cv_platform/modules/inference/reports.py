@@ -272,15 +272,25 @@ def pdf_bytes(report, root):
     state = report["session"]
     summary = report["summary"]
     paragraph("模型推理报告", "Title")
+    report_timezone = timezone(timedelta(hours=8))
+    snapshot = datetime.fromisoformat(report["snapshot_at"]).astimezone(report_timezone)
+    kinds = {"images": "图片批次", "browser": "浏览器摄像头"}
+    source = (state.get("source") or {}).get("name") or kinds.get(state["kind"], state["kind"])
+    scope = report["scope"]
+    mode = "全部结果" if scope["mode"] == "all" else "筛选结果"
+    start = scope["start_seconds_inclusive"]
+    end = scope["end_seconds_exclusive"]
     for text in [
         state["name"],
         f"会话：{state['id']}",
         f"状态：{STATUS.get(state['status'], state['status'])}",
-        f"统计截止：{datetime.fromisoformat(report['snapshot_at']).astimezone(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S UTC+08:00')}",
+        f"统计截止：{snapshot:%Y-%m-%d %H:%M:%S} UTC+08:00",
         f"模型：{state['model']['name']} · v{state['model']['version']}",
-        f"来源：{(state.get('source') or {}).get('name') or {'images': '图片批次', 'browser': '浏览器摄像头'}.get(state['kind'], state['kind'])}",
-        f"导出范围：{'全部结果' if report['scope']['mode'] == 'all' else '筛选结果'}；类别：{report['scope']['label'] or '全部'}；展示置信度下限：{report['scope']['display_confidence']}",
-        f"时间范围（左闭右开）：{report['scope']['start_seconds_inclusive'] if report['scope']['start_seconds_inclusive'] is not None else '起点'} 至 {report['scope']['end_seconds_exclusive'] if report['scope']['end_seconds_exclusive'] is not None else '统计截止'} 秒",
+        f"来源：{source}",
+        f"导出范围：{mode}；类别：{scope['label'] or '全部'}；"
+        f"展示置信度下限：{scope['display_confidence']}",
+        f"时间范围（左闭右开）：{start if start is not None else '起点'} 至 "
+        f"{end if end is not None else '统计截止'} 秒",
     ]:
         paragraph(text)
     paragraph("处理统计", "Heading2")

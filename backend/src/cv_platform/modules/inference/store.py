@@ -62,7 +62,8 @@ class SessionStore:
                 r["state"]
                 for r in conn.execute(
                     """SELECT state FROM inference_sessions
-                WHERE (%s::uuid IS NULL OR project_id=%s) ORDER BY created_at DESC LIMIT %s OFFSET %s""",
+                WHERE (%s::uuid IS NULL OR project_id=%s)
+                ORDER BY created_at DESC LIMIT %s OFFSET %s""",
                     (project_id, project_id, limit, offset),
                 ).fetchall()
             ]

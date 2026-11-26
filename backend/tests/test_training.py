@@ -220,7 +220,8 @@ def test_training_runs_from_upload_to_downloadable_results(client: TestClient, n
     assert weights.content == b"content of weights/best.pt"
     archive = client.get(f"/api/v1/training/runs/{run['id']}/archive")
     with zipfile.ZipFile(io.BytesIO(archive.content)) as bundle:
-        assert {"results.csv", "weights/best.pt", "report/report.pdf", "report/report.json"} <= set(bundle.namelist())
+        expected = {"results.csv", "weights/best.pt", "report/report.pdf", "report/report.json"}
+        assert expected <= set(bundle.namelist())
     missing = client.get(f"/api/v1/training/runs/{run['id']}/artifacts/..%2F..%2Fsecret")
     assert missing.status_code == 404
 

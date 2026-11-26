@@ -88,7 +88,9 @@ def cluster(monkeypatch):
     )
     started: list[dict] = []
 
-    def start_algorithm(algorithm_id, project_id=None, *, node_id=None, gpu_device_ids=(), **settings):
+    def start_algorithm(
+        algorithm_id, project_id=None, *, node_id=None, gpu_device_ids=(), **settings
+    ):
         started.append({"node_id": node_id, "gpu_device_ids": gpu_device_ids})
         now = datetime.now(UTC)
         instance = RuntimeInstance(
@@ -264,11 +266,13 @@ def test_deployment_requests_are_validated(client, cluster) -> None:
     algorithm_id = detector_id(client)
     # This test exercises GPU-only validation; the built-in Faster R-CNN now also supports CPU.
     from dataclasses import replace
+
     from cv_algorithm_sdk import DeviceType
     repository = get_container().algorithms
     algorithm = repository.get(UUID(algorithm_id))
     runtime = algorithm.manifest.runtime.model_copy(update={"device": DeviceType.GPU})
-    repository.save(replace(algorithm, manifest=algorithm.manifest.model_copy(update={"runtime": runtime})))
+    manifest = algorithm.manifest.model_copy(update={"runtime": runtime})
+    repository.save(replace(algorithm, manifest=manifest))
     deploy(client, algorithm_id, gpus=["0"])
     duplicate = client.post("/api/v1/deployments", json={
         "algorithm_version_id": algorithm_id, "node_id": "dell", "gpu_device_ids": ["0"],

@@ -524,7 +524,7 @@ class InferenceService:
                 (8, 8), result["type"] + " · 详细结果见 JSON / 网页", fill="#facc15", font=font
             )
         image.save(root / "preview.jpg", quality=85)
-        # Save per-frame rendering for timeline and downloadable samples; bounded by configured quotas.
+        # Keep rendered frames for the timeline and sample downloads.
         image.save(root / f"result-{index:08d}.jpg", quality=85)
 
     def cleanup(self):
