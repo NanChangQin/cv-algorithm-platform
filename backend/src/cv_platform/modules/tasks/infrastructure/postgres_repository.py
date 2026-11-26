@@ -159,7 +159,7 @@ class PostgresTaskRepository:
                     parameters = %s, status = %s, container_id = %s,
                     result_type = %s, result = %s, error_code = %s,
                     error_message = %s, cancelled_by_label = %s,
-                    updated_at = %s, started_at = %s, completed_at = %s,
+                    updated_at = %s, created_at = %s, started_at = %s, completed_at = %s,
                     cancelled_at = %s, execution_node_id = %s, execution_gpu_device_ids = %s
                 WHERE id = %s
                 """,
@@ -173,6 +173,7 @@ class PostgresTaskRepository:
                     task.error_message,
                     task.cancelled_by,
                     task.updated_at,
+                    task.created_at,
                     task.started_at,
                     task.completed_at,
                     task.cancelled_at,
@@ -256,4 +257,3 @@ class PostgresTaskRepository:
             if not row or not row["samples"]:
                 return 0.0, 0
             return float(row["average"] or 0.0), int(row["samples"])
-
