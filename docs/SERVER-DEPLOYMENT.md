@@ -66,20 +66,23 @@ docker compose config --quiet
 
 ## 5. 构建与启动
 
-先拉取体积最大的基础镜像，网络中断时可单独重试：
+YOLO 训练和推理镜像都基于 PyTorch 2.10.0、CUDA 12.8，Dockerfile 会安装 Ultralytics 8.4.183。可以先拉取本机缺少的基础镜像：
 
 ```powershell
-docker pull pytorch/pytorch:2.10.0-cuda12.6-cudnn9-runtime
-docker pull ultralytics/ultralytics:8.3.0
+docker pull pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
 docker pull python:3.12-slim
 docker pull node:22-alpine
 docker pull nginx:1.27-alpine
 ```
 
-再构建并启动算法镜像与 PostgreSQL 全栈：
+构建前，按 [Faster R-CNN 权重说明](../runtimes/faster-rcnn-trainer/assets/README.md) 将官方 COCO V1 权重放到 `runtimes/faster-rcnn-trainer/assets/fasterrcnn_resnet50_fpn.pt`。已有同一权重可直接复用，构建时会校验 SHA256 前缀 `258fb6c6`。
+
+按下面的顺序执行，每一步成功后再执行下一步。Faster R-CNN 训练镜像依赖 YOLO 训练镜像，Faster R-CNN 推理镜像又依赖其训练镜像。
 
 ```powershell
-docker compose --profile algorithm-images build faster-rcnn yolo
+docker compose --profile algorithm-images build yolo-trainer yolo
+docker compose --profile algorithm-images build faster-rcnn-trainer
+docker compose --profile algorithm-images build faster-rcnn
 docker compose -f compose.yaml -f compose.database.yaml --profile database up -d --build
 docker compose -f compose.yaml -f compose.database.yaml --profile database ps
 docker compose -f compose.yaml -f compose.database.yaml --profile database logs --tail 200 backend postgres algorithm-manager media-worker
