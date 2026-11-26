@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-from contextlib import suppress
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -512,16 +511,53 @@ class TrainingService:
                 return list(run.logs[-tail:])
         return list(run.logs[-tail:])
 
-    def delete_run(self, run_id: UUID) -> None:
+    def check_delete(self, run_id: UUID) -> None:
         run = self.get_run(run_id)
         if run.status in ACTIVE_STATUSES:
-            raise ApplicationError("TRAINING_ACTIVE", "请先停止训练再删除", 409)
-        with suppress(ApplicationError):
+            raise ApplicationError("TRAINING_ACTIVE", "任务正在运行，请先停止后再删除", 409)
+        # Source weights are normally frozen at creation. Protect legacy/live references
+        # when the independent copy is absent; copied models and datasets are retained.
+        for child in self._repository.list_runs(self._project_id):
+            source = (child.progress or {}).get("source") or {}
+            if source.get("kind") != "run" or str(source.get("reference")) != str(run_id):
+                continue
+            if child.status not in ACTIVE_STATUSES:
+                continue
+            frozen = self._storage.run_directory(child.id) / ".source" / "model.pt"
+            if not frozen.is_file():
+                raise ApplicationError("TRAINING_IN_USE", f"任务“{child.name}”仍引用此权重", 409)
+
+        if self._algorithms is not None and self._model_store is not None:
+            for model in self._algorithms.list():
+                lineage = model.lineage or {}
+                if model.project_id != self._project_id:
+                    continue
+                if lineage.get("training_run_id") != str(run_id):
+                    continue
+                files = self._model_store.files(model)
+                if not files or any(not file.path.is_file() for file in files):
+                    raise ApplicationError(
+                        "TRAINING_IN_USE",
+                        f"已发布模型“{model.manifest.name}”的独立文件不完整，请先修复",
+                        409
+                    )
+
+    def delete_run(self, run_id: UUID) -> None:
+        self.check_delete(run_id)
+        run = self.get_run(run_id)
+        try:
             self._cluster.node_client(run.node_id).request(
                 "DELETE", f"/trainings/{run.id}", timeout=30
             )
+        except ApplicationError as exc:
+            if exc.status_code != 404:
+                raise ApplicationError(
+                    "TRAINING_CLEANUP_FAILED", "执行节点清理失败，记录已保留，请稍后重试", 502
+                ) from exc
+        directory = self._storage.run_directory(run.id)
+        if directory.exists():
+            shutil.rmtree(directory)
         self._repository.delete_run(run.id)
-        self._storage.delete_run(run.id)
 
     def artifact(self, run_id: UUID, name: str) -> Path:
         run = self.get_run(run_id)
