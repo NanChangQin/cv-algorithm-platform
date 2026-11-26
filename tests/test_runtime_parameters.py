@@ -60,6 +60,7 @@ def runner(tmp_path, monkeypatch):
         def train(self, **kwargs):
             module.calls.append(kwargs)
             trainer = SimpleNamespace(
+                best=module.WORKSPACE / "train/weights/best.pt",
                 args=SimpleNamespace(**kwargs),
                 batch_size=6,
                 epoch=0,
@@ -69,6 +70,7 @@ def runner(tmp_path, monkeypatch):
                     "AdamW", (), {"param_groups": [{"lr": 0.002, "initial_lr": 0.003}]}
                 )(),
             )
+            self.trainer = trainer
             for event in (
                 "on_train_start",
                 "on_train_epoch_start",
