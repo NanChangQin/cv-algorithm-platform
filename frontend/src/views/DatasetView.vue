@@ -87,8 +87,8 @@ function color(index: number) { return ['#2563eb', '#dc2626', '#059669', '#9333e
 
 <template>
   <header class="page-heading page-heading-actions">
-    <div><RouterLink to="/training">← 训练中心</RouterLink><h1>{{ dataset?.name ?? '数据集详情' }}<template v-if="dataset"> · v{{ dataset.version }}</template></h1><p>查看固定版本的数据、标注、划分和导入报告。</p></div>
-    <RouterLink v-if="dataset" :to="{ path: '/training', query: { dataset: dataset.id } }" class="primary-button compact-button">用此版本训练</RouterLink>
+    <div><RouterLink to="/training/datasets">← 训练数据集</RouterLink><h1>{{ dataset?.name ?? '数据集详情' }}<template v-if="dataset"> · v{{ dataset.version }}</template></h1><p>查看固定版本的数据、标注、划分和导入报告。</p></div>
+    <RouterLink v-if="dataset" :to="{ path: '/training/new', query: { dataset: dataset.id } }" class="primary-button compact-button">用此版本训练</RouterLink>
   </header>
   <p v-if="error" class="alert" role="alert">{{ error }} <button class="text-button" @click="load">重试</button></p>
   <p v-if="loading" class="muted-copy">正在加载数据集…</p>

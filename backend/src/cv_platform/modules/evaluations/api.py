@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from cv_algorithm_sdk import ResultType
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
 
 from ...core.container import ApplicationContainer
@@ -25,12 +25,21 @@ def get_service(
     project_id = project_id_from(request)
     actor = request.state.session.username
     tasks = TaskService(
-        container.tasks, container.algorithms, container.assets, container.task_queue,
-        project_id, actor,
+        container.tasks,
+        container.algorithms,
+        container.assets,
+        container.task_queue,
+        project_id,
+        actor,
     )
     return EvaluationService(
-        container.evaluations, tasks, container.tasks, container.assets, container.algorithms,
-        project_id, actor,
+        container.evaluations,
+        tasks,
+        container.tasks,
+        container.assets,
+        container.algorithms,
+        project_id,
+        actor,
     )
 
 
@@ -45,8 +54,11 @@ class DatasetResponse(BaseModel):
     @classmethod
     def of(cls, dataset: EvaluationDataset) -> DatasetResponse:
         return cls(
-            id=dataset.id, name=dataset.name, task_type=dataset.task_type,
-            item_count=len(dataset.items), created_by=dataset.created_by,
+            id=dataset.id,
+            name=dataset.name,
+            task_type=dataset.task_type,
+            item_count=len(dataset.items),
+            created_by=dataset.created_by,
             created_at=dataset.created_at,
         )
 
@@ -93,11 +105,15 @@ def run_response(
 ) -> RunResponse:
     dataset = datasets.get(run.dataset_id)
     return RunResponse(
-        id=run.id, dataset_id=run.dataset_id,
+        id=run.id,
+        dataset_id=run.dataset_id,
         dataset_name=dataset.name if dataset else "已删除的评测集",
         task_type=dataset.task_type if dataset else "",
-        algorithm_version_ids=list(run.algorithm_version_ids), task_count=len(run.task_ids),
-        finished=finished, created_by=run.created_by, created_at=run.created_at,
+        algorithm_version_ids=list(run.algorithm_version_ids),
+        task_count=len(run.task_ids),
+        finished=finished,
+        created_by=run.created_by,
+        created_at=run.created_at,
     )
 
 
@@ -113,12 +129,17 @@ def create_dataset(
     payload: CreateDatasetRequest, service: EvaluationService = Depends(get_service)
 ) -> DatasetCreatedResponse:
     dataset, unmatched, unlabeled = service.create_dataset(
-        payload.name, payload.task_type.value, payload.annotations_filename,
-        payload.annotations, payload.asset_ids, payload.asset_names,
+        payload.name,
+        payload.task_type.value,
+        payload.annotations_filename,
+        payload.annotations,
+        payload.asset_ids,
+        payload.asset_names,
     )
     return DatasetCreatedResponse(
         **DatasetResponse.of(dataset).model_dump(),
-        unmatched_files=unmatched[:200], unlabeled_images=unlabeled[:200],
+        unmatched_files=unmatched[:200],
+        unlabeled_images=unlabeled[:200],
     )
 
 
@@ -150,3 +171,102 @@ def get_run(run_id: UUID, service: EvaluationService = Depends(get_service)) -> 
     return RunReportResponse(
         run=run_response(run, datasets, bool(report.get("finished"))), report=report
     )
+
+
+@router.get("/runs/{run_id}/samples")
+def error_samples(
+    run_id: UUID,
+    algorithm_version_id: UUID,
+    error_type: Literal["all", "fp", "fn", "tp"] = "all",
+    label: str = "",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=24, ge=1, le=100),
+    service: EvaluationService = Depends(get_service),
+):
+    return service.samples(run_id, algorithm_version_id, error_type, label, offset, limit)
+
+
+class TrainingDatasetEvaluationRequest(BaseModel):
+    dataset_id: UUID
+    split: Literal["val", "test", "train"] = "val"
+
+
+@router.post("/datasets/from-training", response_model=DatasetResponse, status_code=201)
+def from_training_dataset(
+    payload: TrainingDatasetEvaluationRequest,
+    request: Request,
+    container: ApplicationContainer = Depends(get_container),
+):
+    import zipfile
+    from pathlib import Path
+
+    from PIL import Image
+
+    from ...core.errors import ApplicationError
+    from ..assets.application.service import AssetService
+    from ..training.api import get_service as training_service
+    from .domain import DatasetItem
+
+    project = project_id_from(request)
+    training = training_service(request, container)
+    source = training.get_dataset(payload.dataset_id)
+    entries = [
+        i
+        for i in container.training_storage.index(source.id)["images"]
+        if i["split"] == payload.split
+    ]
+    if not entries or len(entries) > 2000:
+        raise ApplicationError("DATASET_INVALID", "请选择含 1–2000 张图片的数据划分")
+    assets = AssetService(
+        container.assets, container.asset_storage, project, request.state.session.username
+    )
+    items, seen = [], set()
+    with zipfile.ZipFile(training.dataset_archive(source.id)) as archive:
+        for entry in entries:
+            with archive.open(entry["path"]) as stream:
+                image_format = Image.open(stream).format
+                stream.seek(0)
+                suffix = {"PNG": ".png", "JPEG": ".jpg", "BMP": ".bmp", "WEBP": ".webp"}.get(
+                    image_format
+                )
+                if suffix is None:
+                    raise ApplicationError(
+                        "DATASET_INVALID", "该图片格式无法直接评测，请转为 PNG 或 JPEG"
+                    )
+                asset = assets.upload(stream, Path(entry["path"]).stem + suffix, None)
+            if asset.id in seen:
+                raise ApplicationError("DATASET_INVALID", "该划分含重复图片，请先清理重复样本")
+            seen.add(asset.id)
+            w, h = asset.width, asset.height
+            boxes = [
+                {
+                    "label": source.class_names[b["class_id"]],
+                    "bbox": [
+                        (b["cx"] - b["width"] / 2) * w,
+                        (b["cy"] - b["height"] / 2) * h,
+                        (b["cx"] + b["width"] / 2) * w,
+                        (b["cy"] + b["height"] / 2) * h,
+                    ],
+                }
+                for b in entry["boxes"]
+            ]
+            items.append(
+                DatasetItem(
+                    asset.id,
+                    {
+                        "detections": boxes,
+                        "source_dataset_id": str(source.id),
+                        "source_split": payload.split,
+                        "source_sha256": source.sha256,
+                    },
+                )
+            )
+    dataset = EvaluationDataset.create(
+        project,
+        f"{source.name} v{source.version} · {payload.split}",
+        "object_detection",
+        tuple(items),
+        request.state.session.username,
+    )
+    container.evaluations.add_dataset(dataset)
+    return DatasetResponse.of(dataset)

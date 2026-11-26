@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import zipfile
-from contextlib import suppress
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -13,12 +11,18 @@ from uuid import UUID, uuid4
 
 from cv_algorithm_sdk.exports import ExportVerification, verification_parameters
 from cv_algorithm_sdk.runtime_contract import (
-    CONTRACT_ID,
-    normalize_parameters,
     parameter_warnings,
     validate_placement,
 )
-from cv_algorithm_sdk.training_sources import RESUME_OVERRIDES, TRAINING_PROTOCOL, TrainingSource
+from cv_algorithm_sdk.training_contract import (
+    FASTER_MODEL,
+    FASTER_RESUME_OVERRIDES,
+    contract_for,
+    is_faster,
+    normalize_for,
+    protocol_for,
+)
+from cv_algorithm_sdk.training_sources import RESUME_OVERRIDES, TrainingSource
 
 from ...core.errors import ApplicationError
 from ..scheduling.cluster_gateway import ClusterAlgorithmManagerGateway
@@ -177,13 +181,17 @@ class TrainingService:
         ]
         if self._algorithms is not None:
             for item in self._algorithms.list():
-                if item.project_id == self._project_id and (item.lineage or {}).get(
-                    "files", {}
-                ).get("model.pt"):
+                if (
+                    item.project_id == self._project_id
+                    and (item.lineage or {}).get("files", {}).get("model.pt")
+                    or item.project_id == self._project_id
+                    and (item.lineage or {}).get("files", {}).get("model.pth")
+                ):
                     items.append(
                         {
                             "source": {"kind": "algorithm", "reference": str(item.id)},
                             "label": f"{item.manifest.name} v{item.manifest.version}",
+                            "architecture": (item.lineage or {}).get("base_model"),
                         }
                     )
         for run in self.list_runs():
@@ -199,6 +207,7 @@ class TrainingService:
                                 "checkpoint": checkpoint,
                             },
                             "label": f"{run.name} · {checkpoint}.pt",
+                            "architecture": (run.progress or {}).get("architecture") or run.model,
                         }
                     )
         return items
@@ -222,17 +231,22 @@ class TrainingService:
             item = self._algorithms.get(source.reference) if self._algorithms else None
             if item is None or item.project_id != self._project_id:
                 raise ApplicationError("MODEL_NOT_FOUND", "来源模型不存在", 404)
-            recorded = (item.lineage or {}).get("files", {}).get("model.pt")
+            filename = (
+                "model.pth" if is_faster((item.lineage or {}).get("base_model")) else "model.pt"
+            )
+            recorded = (item.lineage or {}).get("files", {}).get(filename)
             if not recorded or self._model_store is None:
-                raise ApplicationError("MODEL_INVALID", "此版本没有可微调的受管 .pt 权重", 409)
-            path = self._model_store.directory(item.id) / "model.pt"
+                raise ApplicationError("MODEL_INVALID", "此版本没有可微调的受管权重", 409)
+            path = self._model_store.directory(item.id) / filename
             label, expected = f"{item.manifest.name} v{item.manifest.version}", recorded["sha256"]
+            snapshot["architecture"] = (item.lineage or {}).get("base_model")
         else:
             parent = self.get_run(source.reference)
             if parent.status in ACTIVE_STATUSES:
                 raise ApplicationError("TRAINING_ACTIVE", "请等待来源训练结束后再使用权重", 409)
             label = f"{parent.name} · {source.checkpoint}.pt"
             model = parent.model
+            snapshot["architecture"] = (parent.progress or {}).get("architecture") or parent.model
             if source.mode == "resume":
                 checkpoint = (parent.progress or {}).get("checkpoint") or {}
                 if not checkpoint.get("resumable"):
@@ -242,7 +256,7 @@ class TrainingService:
                         409,
                     )
                 if (
-                    checkpoint.get("protocol") != TRAINING_PROTOCOL
+                    checkpoint.get("protocol") != protocol_for(snapshot.get("architecture"))
                     or checkpoint.get("dataset_sha256") != dataset.sha256
                 ):
                     raise ApplicationError(
@@ -258,7 +272,13 @@ class TrainingService:
                 changed = {
                     key
                     for key, value in parameters.items()
-                    if key not in RESUME_OVERRIDES and value != parent.parameters.get(key)
+                    if key
+                    not in (
+                        FASTER_RESUME_OVERRIDES
+                        if is_faster(snapshot.get("architecture"))
+                        else RESUME_OVERRIDES
+                    )
+                    and value != parent.parameters.get(key)
                 }
                 if changed:
                     raise ApplicationError(
@@ -289,6 +309,7 @@ class TrainingService:
         node_id: str,
         gpu_device_ids: tuple[str, ...],
         source: TrainingSource | None = None,
+        architecture: str | None = None,
         operation: str = "train",
         verification: ExportVerification | None = None,
     ) -> TrainingRun:
@@ -304,10 +325,28 @@ class TrainingService:
             model,
             parameters,
         )
+        if architecture is not None:
+            if architecture not in {item.key for item in TRAINING_MODELS}:
+                raise ApplicationError("MODEL_INVALID", "不支持的算法或模型规格", 422)
+            known = snapshot.get("architecture") or model
+            known = known if known in {item.key for item in TRAINING_MODELS} else None
+            if known and known != architecture:
+                raise ApplicationError("MODEL_MISMATCH", "所选算法规格与来源权重不一致", 422)
+            snapshot["expected_model"] = architecture
+        elif (snapshot.get("architecture") or model) in {item.key for item in TRAINING_MODELS}:
+            architecture = snapshot.get("architecture") or model
+        if is_faster(architecture):
+            model = FASTER_MODEL
         submitted = parameters.copy()
         try:
-            parameters = normalize_parameters(operation, parameters)
-            validate_placement(parameters, len(gpu_device_ids))
+            parameters = normalize_for(architecture or model, operation, parameters)
+            if is_faster(model):
+                if len(gpu_device_ids) > 1:
+                    raise ValueError("Faster R-CNN 当前支持单 GPU 或 CPU")
+                if parameters["device"] == "cpu" and gpu_device_ids:
+                    raise ValueError("CPU 执行不能同时指定 GPU")
+            else:
+                validate_placement(parameters, len(gpu_device_ids))
         except ValueError as exc:
             raise ApplicationError("INPUT_INVALID", str(exc), 422) from exc
         if any(index >= len(dataset.class_names) for index in parameters.get("classes") or []):
@@ -335,17 +374,18 @@ class TrainingService:
                     422,
                 )
         client = self._cluster.node_client(node_id)
-        gpus = client.gpus() if operation != "export" else []
+        cpu = is_faster(model) and parameters.get("device") == "cpu"
+        gpus = client.gpus() if operation != "export" and not cpu else []
         if operation == "export" and gpu_device_ids:
             raise ApplicationError("INPUT_INVALID", "ONNX 导出和对比验证当前使用 CPU", 422)
-        if not gpus and operation != "export":
+        if not gpus and operation != "export" and not cpu:
             raise ApplicationError(
                 "GPU_UNAVAILABLE", f"服务器「{client.node_name}」没有检测到 GPU，无法训练", 409
             )
         available = {str(gpu["index"]) for gpu in gpus}
         if not set(gpu_device_ids) <= available:
             raise ApplicationError("GPU_UNAVAILABLE", "所选 GPU 不存在，请刷新后重新选择", 409)
-        if not gpu_device_ids and operation != "export":
+        if not gpu_device_ids and operation != "export" and not cpu:
             # 未指定 GPU：选空闲显存最多的一张
             best = max(
                 gpus,
@@ -356,6 +396,7 @@ class TrainingService:
             gpu_device_ids = (str(best["index"]),)
         if (
             operation != "export"
+            and not cpu
             and (source.kind != "builtin" or operation == "val")
             and len(gpu_device_ids) != 1
         ):
@@ -376,13 +417,16 @@ class TrainingService:
             run,
             progress={
                 "configuration": {
-                    "contract_id": CONTRACT_ID,
+                    "contract_id": contract_for(model, operation)["id"],
                     "submitted": submitted,
                     "normalized": parameters,
-                    "warnings": parameter_warnings(parameters) if operation == "train" else [],
+                    "warnings": parameter_warnings(parameters)
+                    if operation == "train" and not is_faster(model)
+                    else [],
                 },
                 "dataset": dataset.snapshot(),
                 "source": snapshot,
+                "architecture": architecture,
                 "operation": operation,
                 **(
                     {"export_verification": verification.model_dump()}
@@ -467,16 +511,53 @@ class TrainingService:
                 return list(run.logs[-tail:])
         return list(run.logs[-tail:])
 
-    def delete_run(self, run_id: UUID) -> None:
+    def check_delete(self, run_id: UUID) -> None:
         run = self.get_run(run_id)
         if run.status in ACTIVE_STATUSES:
-            raise ApplicationError("TRAINING_ACTIVE", "请先停止训练再删除", 409)
-        with suppress(ApplicationError):
+            raise ApplicationError("TRAINING_ACTIVE", "任务正在运行，请先停止后再删除", 409)
+        # Source weights are normally frozen at creation. Protect legacy/live references
+        # when the independent copy is absent; copied models and datasets are retained.
+        for child in self._repository.list_runs(self._project_id):
+            source = (child.progress or {}).get("source") or {}
+            if source.get("kind") != "run" or str(source.get("reference")) != str(run_id):
+                continue
+            if child.status not in ACTIVE_STATUSES:
+                continue
+            frozen = self._storage.run_directory(child.id) / ".source" / "model.pt"
+            if not frozen.is_file():
+                raise ApplicationError("TRAINING_IN_USE", f"任务“{child.name}”仍引用此权重", 409)
+
+        if self._algorithms is not None and self._model_store is not None:
+            for model in self._algorithms.list():
+                lineage = model.lineage or {}
+                if model.project_id != self._project_id:
+                    continue
+                if lineage.get("training_run_id") != str(run_id):
+                    continue
+                files = self._model_store.files(model)
+                if not files or any(not file.path.is_file() for file in files):
+                    raise ApplicationError(
+                        "TRAINING_IN_USE",
+                        f"已发布模型“{model.manifest.name}”的独立文件不完整，请先修复",
+                        409
+                    )
+
+    def delete_run(self, run_id: UUID) -> None:
+        self.check_delete(run_id)
+        run = self.get_run(run_id)
+        try:
             self._cluster.node_client(run.node_id).request(
                 "DELETE", f"/trainings/{run.id}", timeout=30
             )
+        except ApplicationError as exc:
+            if exc.status_code != 404:
+                raise ApplicationError(
+                    "TRAINING_CLEANUP_FAILED", "执行节点清理失败，记录已保留，请稍后重试", 502
+                ) from exc
+        directory = self._storage.run_directory(run.id)
+        if directory.exists():
+            shutil.rmtree(directory)
         self._repository.delete_run(run.id)
-        self._storage.delete_run(run.id)
 
     def artifact(self, run_id: UUID, name: str) -> Path:
         run = self.get_run(run_id)
@@ -489,26 +570,18 @@ class TrainingService:
         return path
 
     def archive(self, run_id: UUID) -> Path:
-        """全部训练产物打成的 ZIP；训练结束后产物不再变化，生成一次后复用。"""
+        """原始产物与报告 ZIP，按记录版本缓存，允许下载未完成任务的快照。"""
         run = self.get_run(run_id)
-        if not run.artifacts:
-            raise ApplicationError("ARTIFACT_NOT_FOUND", "这次训练没有可下载的结果", 404)
-        target = self._storage.run_directory(run.id) / ".results.zip"
+        from .reports import write_bundle
+
+        revision = run.updated_at.strftime("%Y%m%d%H%M%S%f")
+        target = self._storage.run_directory(run.id) / f".report-v2-{revision}.zip"
         if target.is_file():
             return target
+        target.parent.mkdir(parents=True, exist_ok=True)
         staging = target.with_name(f".results-{uuid4().hex}.zip")
         try:
-            with zipfile.ZipFile(staging, "w") as bundle:
-                for name in run.artifacts:
-                    # 权重和图片本身已压缩
-                    compression = (
-                        zipfile.ZIP_STORED
-                        if Path(name).suffix in {".pt", ".png", ".jpg"}
-                        else zipfile.ZIP_DEFLATED
-                    )
-                    bundle.write(
-                        self.artifact(run.id, name), arcname=name, compress_type=compression
-                    )
+            write_bundle(self, run, staging)
             staging.replace(target)
         finally:
             staging.unlink(missing_ok=True)

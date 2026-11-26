@@ -28,7 +28,8 @@ def test_deployments_are_isolated_from_each_other_and_autoscaling():
                                        container_name=spec.container_name + "-da", memory_mb=8192))
 
 
-def test_docker_applies_resources_and_preserves_gpu_environment(tmp_path):
+@pytest.mark.parametrize("restart_policy", ["no", "unless-stopped"])
+def test_docker_applies_resources_and_preserves_gpu_environment(tmp_path, restart_policy):
     captured = {}
 
     def create(**kwargs):
@@ -37,11 +38,13 @@ def test_docker_applies_resources_and_preserves_gpu_environment(tmp_path):
 
     client = SimpleNamespace(containers=SimpleNamespace(create=create), images=SimpleNamespace(
         get=lambda _: SimpleNamespace(labels={"cv.platform.runtime-profile": PROTOCOL})))
-    runtime = DockerContainerRuntime(client, "test", tmp_path, tmp_path, gpu_access_mode="runtime")
+    runtime = DockerContainerRuntime(client, "test", tmp_path, tmp_path,
+                                     gpu_access_mode="runtime", restart_policy=restart_policy)
     spec = replace(build_spec(), memory_mb=2048, cpu_count=2.5, shm_mb=128,
                    runtime_scope="a" * 32, gpu_device_ids=("1",),
                    prediction_timeout_seconds=19, runtime_config={"threads": 3})
     runtime.create(spec)
+    assert captured["restart_policy"] == {"Name": restart_policy}
     assert captured["nano_cpus"] == 2500000000 and captured["mem_limit"] == "2048m"
     assert captured["shm_size"] == "128m"
     assert captured["environment"]["NVIDIA_VISIBLE_DEVICES"] == "1"

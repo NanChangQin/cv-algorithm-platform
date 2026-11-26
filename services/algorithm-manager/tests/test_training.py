@@ -530,3 +530,34 @@ def test_old_training_image_is_rejected_instead_of_dropping_parameters(client, d
     assert response.status_code == 409
     assert response.json()["code"] == "PARAMETER_CONTRACT_MISMATCH"
     assert docker.containers.items == []
+
+
+@pytest.mark.parametrize("model", ["yolo11x.pt", "yolo26l.pt", "yolo26x.pt"])
+def test_model_selection_requires_capable_image_and_reaches_runner(
+    client, service, docker, monkeypatch, model,
+):
+    data = dataset_zip()
+    assert upload(client, data).status_code == 200
+    content = b"weights"
+    digest = hashlib.sha256(content).hexdigest()
+    assert client.put(f"/training/weights/{digest}", content=content).status_code == 200
+    payload = start_payload(training_input={
+        "sha256": digest, "dataset_sha256": hashlib.sha256(data).hexdigest(),
+        "expected_model": model,
+    })
+    response = client.post("/trainings", json=payload)
+    assert response.status_code == 409
+    assert response.json()["code"] == "MODEL_SELECTION_UNSUPPORTED"
+    assert not docker.containers.items
+    original = docker.images.get
+
+    def image(name):
+        result = original(name)
+        result.labels["cv.platform.model-selection"] = "v1"
+        return result
+
+    monkeypatch.setattr(docker.images, "get", image)
+    response = client.post("/trainings", json=payload)
+    assert response.status_code == 200, response.text
+    config = json.loads((service._run_dir(RUN_ID) / "config.json").read_text())
+    assert config["training_input"]["expected_model"] == model

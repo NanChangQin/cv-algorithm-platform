@@ -204,6 +204,57 @@ def resume_trainer(checkpoint: dict, arguments: dict, source: dict):
     return PlatformResumeTrainer
 
 
+def validate_architecture(model, config: dict) -> None:
+    """Validate uploaded weights inside the isolated runtime, without unpickling in API."""
+    from ultralytics.nn.tasks import yaml_model_load
+
+    expected = (config.get("training_input") or {}).get("expected_model")
+    if not expected:
+        return
+    declared = yaml_model_load(expected.replace(".pt", ".yaml"))
+    actual = model.model.yaml
+    if model.task != "detect" or any(
+        actual.get(key) != declared.get(key) for key in ("backbone", "head", "scale")
+    ):
+        raise ValueError(
+            f"权重结构与所选 {expected.removesuffix('.pt')} 不匹配，请选择正确算法和规格"
+        )
+
+
+def evaluation_snapshot(
+    result, config: dict, weights: Path, split: str, checkpoint: str
+):
+    per_class = []
+    for index, class_id in enumerate(result.box.ap_class_index):
+        class_id = int(class_id)
+        per_class.append(
+            {
+                "class_id": class_id,
+                "name": result.names[class_id],
+                "instances": int(result.nt_per_class[class_id]),
+                "precision": float(result.box.p[index]),
+                "recall": float(result.box.r[index]),
+                "f1": float(result.box.f1[index]),
+                "map50": float(result.box.ap50[index]),
+                "map50_95": float(result.box.ap[index]),
+            }
+        )
+    confusion = getattr(result, "confusion_matrix", None)
+    return {
+        "framework_version": FRAMEWORK_VERSION,
+        "split": split,
+        "checkpoint": checkpoint,
+        "dataset_sha256": config.get("dataset_sha256"),
+        "weight_sha256": file_sha256(weights),
+        "metrics": {key: float(value) for key, value in result.results_dict.items()},
+        "per_class": per_class,
+        "speed": {key: float(value) for key, value in result.speed.items()},
+        "confusion_matrix": confusion.matrix.tolist()
+        if confusion is not None
+        else None,
+    }
+
+
 def train(config: dict) -> None:
     config_dir = Path(os.environ.get("YOLO_CONFIG_DIR", WORKSPACE / ".config"))
     config_dir.mkdir(parents=True, exist_ok=True)
@@ -249,6 +300,7 @@ def train(config: dict) -> None:
     resolution = {
         "contract_id": CONTRACT_ID,
         "framework_version": FRAMEWORK_VERSION,
+        "initial_weights": {"file": config["model"], "sha256": file_sha256(weights)},
         "submitted": config["submitted_parameters"]
         if config.get("submitted_parameters") is not None
         else parameters,
@@ -334,6 +386,7 @@ def train(config: dict) -> None:
         )
 
     model = YOLO(str(weights))
+    validate_architecture(model, config)
     if getattr(model, "task", "detect") != "detect":
         raise ValueError("当前训练入口只支持 Ultralytics 目标检测 .pt 权重")
     trainer_options = {}
@@ -391,6 +444,20 @@ def train(config: dict) -> None:
         },
     )
     model.train(**arguments, **trainer_options)
+    # final_eval uses best.pt; retain its class metrics alongside the epoch history.
+    best = Path(model.trainer.best)
+    if best.is_file() and model.trainer.validator.metrics is not None:
+        result = model.trainer.validator.metrics
+        write_json(
+            WORKSPACE / "train" / "evaluation.json",
+            evaluation_snapshot(
+                result,
+                config,
+                best,
+                "val",
+                "best",
+            ),
+        )
 
 
 def evaluate(config: dict) -> None:
@@ -439,6 +506,7 @@ def evaluate(config: dict) -> None:
     output = WORKSPACE / "train"
     output.mkdir(exist_ok=True)
     model = YOLO(str(weights))
+    validate_architecture(model, config)
     if model.task != "detect":
         raise ValueError("独立验证当前只支持目标检测 .pt 模型")
     declared = yaml.safe_load(data.read_text(encoding="utf-8"))["names"]
@@ -512,6 +580,7 @@ def evaluate(config: dict) -> None:
     resolution = {
         "contract_id": CONTRACT_ID,
         "framework_version": FRAMEWORK_VERSION,
+        "initial_weights": {"file": config["model"], "sha256": file_sha256(weights)},
         "submitted": config.get("submitted_parameters", parameters),
         "normalized": arguments,
         "effective": effective,
@@ -536,7 +605,10 @@ def main() -> int:
             exporter = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(exporter)
             exporter.run_export(
-                config, workspace=WORKSPACE, weights=WEIGHTS, input_weight=INPUT_WEIGHT,
+                config,
+                workspace=WORKSPACE,
+                weights=WEIGHTS,
+                input_weight=INPUT_WEIGHT,
                 data=prepare_data(Path(config["dataset"])),
             )
         elif config.get("operation", "train") == "val":

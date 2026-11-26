@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # 训练中心：训练镜像需预先构建到训练服务器（runtimes/yolo-trainer）
     training_image: str = "cv-platform/yolo-trainer:dev"
     # 训练结果发布为推理版本时使用的通用 YOLO 推理镜像（examples/yolo）
+    faster_training_image: str = "cv-platform/faster-rcnn-trainer:dev"
+    faster_inference_image: str = "cv-platform/faster-rcnn:dev"
     yolo_inference_image: str = "cv-platform/yolo:dev"
     onnx_inference_image: str = "cv-platform/yolo-onnx:dev"
     max_dataset_bytes: int = 10 * 1024 * 1024 * 1024

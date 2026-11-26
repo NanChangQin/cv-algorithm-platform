@@ -119,3 +119,23 @@ def test_health_monitor_stops_after_threshold() -> None:
     assert service.monitor_health(2) == []
     assert service.monitor_health(2) == [instance.id]
     assert repository.get(instance.id).status is InstanceStatus.FAILED
+
+
+def test_recreates_removed_failed_container_without_restart() -> None:
+    class MissingRuntime(FakeRuntime):
+        def start(self, instance_id: str) -> None:
+            if instance_id == "container-1":
+                raise FileNotFoundError(instance_id)
+            super().start(instance_id)
+
+    runtime = MissingRuntime()
+    repository = InMemoryInstanceRepository()
+    stale = AlgorithmInstance.created("container-1", build_spec(), "http://stale").transition(
+        InstanceStatus.STARTING
+    ).transition(InstanceStatus.FAILED, "old image failed")
+    repository.save(stale)
+    runtime.created = 1
+    result = InstanceService(repository, runtime).ensure_running(build_spec())
+    assert result.id == "container-2"
+    assert result.status is InstanceStatus.HEALTHY
+    assert repository.get("container-1") is None

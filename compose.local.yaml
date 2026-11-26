@@ -1,0 +1,42 @@
+# Local deployment: explicitly start services after each reboot.
+# Use together with compose.yaml and compose.database.yaml.
+x-local-build: &local-build
+  network: host
+  entitlements:
+    - network.host
+  args:
+    HTTP_PROXY: ${CV_PLATFORM_BUILD_PROXY:-}
+    HTTPS_PROXY: ${CV_PLATFORM_BUILD_PROXY:-}
+    NO_PROXY: localhost,127.0.0.1,::1
+
+services:
+  algorithm-manager:
+    restart: "no"
+    build: *local-build
+    environment:
+      ALGORITHM_MANAGER_CONTAINER_RESTART_POLICY: "no"
+  backend:
+    restart: "no"
+    build: *local-build
+  worker:
+    restart: "no"
+  media-worker:
+    restart: "no"
+    build: *local-build
+  frontend:
+    restart: "no"
+    build: *local-build
+  postgres:
+    restart: "no"
+  database-migrator:
+    restart: "no"
+    build: *local-build
+  yolo:
+    build: *local-build
+  yolo-trainer:
+    build: *local-build
+
+  faster-rcnn:
+    build: *local-build
+  faster-rcnn-trainer:
+    build: *local-build

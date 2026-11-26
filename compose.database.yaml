@@ -59,6 +59,8 @@ services:
     healthcheck:
       disable: true
     environment:
+      CV_PLATFORM_ADMIN_USERNAME: ${CV_PLATFORM_ADMIN_USERNAME:-admin}
+      CV_PLATFORM_ADMIN_PASSWORD: ${CV_PLATFORM_ADMIN_PASSWORD:?set CV_PLATFORM_ADMIN_PASSWORD}
       CV_PLATFORM_PERSISTENCE_BACKEND: postgres
       CV_PLATFORM_QUEUE_BACKEND: postgres
       CV_PLATFORM_POSTGRES_HOST: postgres
@@ -76,6 +78,9 @@ services:
       - ${CV_PLATFORM_DATA_ROOT:-/srv/cv-platform/data}:/storage
       - ${CV_PLATFORM_PACKAGE_ROOT:-/srv/cv-platform/packages}:/packages
     depends_on:
+      # Backend initializes the administrator and default project first.
+      backend:
+        condition: service_healthy
       database-migrator:
         condition: service_completed_successfully
       algorithm-manager:

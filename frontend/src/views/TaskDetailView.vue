@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { assetsApi } from '@/api/assets'
 import { systemApi } from '@/api/system'
 import { tasksApi } from '@/api/tasks'
+import ReviewCollectButton from '@/components/training/ReviewCollectButton.vue'
 import ResultViewer from '@/components/results/ResultViewer.vue'
 import TaskProgress from '@/components/tasks/TaskProgress.vue'
 import { useAlgorithms } from '@/composables/useAlgorithms'
@@ -102,6 +103,7 @@ async function act(action: 'cancel' | 'retry') {
       </p>
     </div>
     <div class="toolbar-actions">
+      <ReviewCollectButton v-if="result?.type === 'object_detection'" :key="taskId" :task-id="taskId" />
       <button v-if="result" type="button" class="secondary-button" @click="downloadJson">下载 JSON</button>
       <RouterLink
         v-if="task?.asset_id && availableAlgorithms.length > 1"

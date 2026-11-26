@@ -9,7 +9,9 @@ from uuid import UUID, uuid4
 
 import yaml
 from cv_algorithm_sdk import AlgorithmManifest
+from cv_algorithm_sdk.faster_rcnn import model_config
 from cv_algorithm_sdk.runtime_contract import prediction_parameters
+from cv_algorithm_sdk.training_contract import is_faster
 
 from ...core.errors import ApplicationError
 from ..algorithms.domain.entities import AlgorithmVersion
@@ -53,12 +55,14 @@ class ModelPublisher:
         inference_image: str,
         project_id: UUID,
         actor: str,
+        faster_inference_image: str = "cv-platform/faster-rcnn:dev",
     ) -> None:
         self._training = training
         self._storage = storage
         self._algorithms = algorithms
         self._models = model_store
         self._image = inference_image
+        self._faster_image = faster_inference_image
         self._project_id = project_id
         self._actor = actor
 
@@ -90,7 +94,10 @@ class ModelPublisher:
             for item in self._algorithms.list()
             if item.project_id == self._project_id and item.manifest.id == key
         ]
-        if any(item.lineage is None for item in family):
+        if any(
+            item.lineage is None or item.lineage.get("source_kind") == "pretrained"
+            for item in family
+        ):
             raise ApplicationError(
                 "MODEL_KEY_TAKEN", "这个模型 ID 已被导入的算法使用，请换一个", 409
             )
@@ -113,15 +120,31 @@ class ModelPublisher:
             )
         except ValueError as exc:
             raise ApplicationError("INPUT_INVALID", "版本号格式应为 1.2.3") from exc
+        faster = is_faster((run.progress or {}).get("architecture") or run.model)
+        config_yaml = None
+        if faster:
+            if not dataset:
+                raise ApplicationError("DATASET_NOT_FOUND", "发布需要原数据集类别映射", 409)
+            config_yaml = yaml.safe_dump(
+                model_config(
+                    list(dataset.class_names), run.parameters["imgsz"], run.parameters["max_size"]
+                ),
+                allow_unicode=True,
+            )
+            manifest = faster_inference_manifest(
+                key, name.strip() or key, version, description[:1000]
+            )
         version_id = uuid4()
         files = self._models.publish(
             version_id,
             weights,
             yaml.safe_dump(manifest.model_dump(mode="json"), allow_unicode=True, sort_keys=False),
+            weight_name="model.pth" if faster else "model.pt",
+            model_config=config_yaml,
         )
         algorithm = AlgorithmVersion.available(
             manifest,
-            self._image,
+            self._faster_image if faster else self._image,
             algorithm_id=version_id,
             project_id=self._project_id,
             created_by=self._actor,
@@ -167,7 +190,7 @@ def lineage(run: TrainingRun, dataset, checkpoint: str, files: dict[str, Any]) -
         "dataset_name": dataset.name if dataset else None,
         "dataset": (run.progress or {}).get("dataset") or (dataset.snapshot() if dataset else None),
         "class_names": list(dataset.class_names) if dataset else [],
-        "base_model": run.model,
+        "base_model": (run.progress or {}).get("architecture") or run.model,
         "initialization": (run.progress or {}).get("source")
         or {"kind": "builtin", "label": run.model},
         "checkpoint": checkpoint,
@@ -182,3 +205,49 @@ def lineage(run: TrainingRun, dataset, checkpoint: str, files: dict[str, Any]) -
         },
         "files": files,
     }
+
+
+def faster_inference_manifest(key, name, version, description):
+    return AlgorithmManifest.model_validate(
+        {
+            "schema_version": "1.1",
+            "id": key,
+            "name": name,
+            "version": version,
+            "description": description,
+            "task_type": "object_detection",
+            "runtime": {"framework": "pytorch", "device": "auto", "min_memory_mb": 4096},
+            "input": {"media_types": ["image/jpeg", "image/png"]},
+            "output": {"type": "object_detection"},
+            "parameters": {
+                "confidence": {
+                    "type": "number",
+                    "default": 0.25,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "title": "置信度阈值",
+                },
+                "nms_threshold": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "title": "分类别 NMS 阈值",
+                },
+                "max_detections": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 300,
+                    "title": "最大检测数量",
+                },
+                "min_box_area": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 1000000,
+                    "title": "最小框面积",
+                },
+            },
+        }
+    )

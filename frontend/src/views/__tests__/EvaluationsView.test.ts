@@ -23,7 +23,7 @@ vi.mock('@/composables/useAlgorithms', () => ({ useAlgorithms: () => {
 import UploadDropzone from '@/components/assets/UploadDropzone.vue'
 import TaskDrawer from '@/components/tasks/TaskDrawer.vue'
 import EvaluationReportView from '../EvaluationReportView.vue'
-import EvaluationsView from '../EvaluationsView.vue'
+import EvaluationsView from '@/components/training/EvaluationComparison.vue'
 
 const stubs = { RouterLink: true }
 const dataset = { id: 'ds-1', name: '街景', task_type: 'object_detection', item_count: 12, created_by: 'admin', created_at: '2026-10-22T00:00:00Z' }

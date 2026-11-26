@@ -14,3 +14,5 @@ storage
 **/*.engine
 **/*.zip
 *.log
+
+!runtimes/faster-rcnn-trainer/assets/*.pt

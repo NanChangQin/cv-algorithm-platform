@@ -2,20 +2,21 @@ import { projectUrl, request, uploadRequest } from './http'
 import type { Algorithm, ParameterContract } from '@/types/algorithm'
 import type { ParameterValues } from '@/utils/parameters'
 
-export interface TrainingModel { key: string; label: string; description: string }
+export interface TrainingModel { key: string; label: string; description: string; algorithm: string; scale: string; task: string }
 export interface TrainingSource {
   kind: 'builtin' | 'upload' | 'algorithm' | 'run'
   reference?: string
   checkpoint?: 'best' | 'last' | 'resume'
   mode?: 'finetune' | 'resume'
 }
-export interface TrainingSourceOption { source: TrainingSource; label: string; sha256?: string; validation?: string }
+export interface TrainingSourceOption { source: TrainingSource; label: string; sha256?: string; validation?: string; architecture?: string }
 export interface TrainingWeight { id: string; name: string; sha256: string; size_bytes: number; validation: string }
 export interface TrainingCheckpoint { resumable: boolean; reason: string | null; epoch: number; epochs: number; sha256: string; file: string }
 export interface EvaluationReport {
   split: string; dataset_sha256: string; weight_sha256: string
   metrics: Record<string, number>; speed: Record<string, number>
   per_class: Array<{ class_id: number; name: string; instances: number; precision: number; recall: number; f1: number; map50: number; map50_95: number }>
+  confusion_matrix_note?: string | null
   confusion_matrix: number[][] | null
 }
 
@@ -75,6 +76,7 @@ export interface TrainingParameters extends ParameterValues {
   cos_lr: boolean
 }
 export interface TrainingProgress {
+  architecture?: string | null
   operation?: 'train' | 'val'
   source?: TrainingSource & { label: string; sha256?: string; checkpoint_state?: TrainingCheckpoint }
   checkpoint?: TrainingCheckpoint
@@ -91,6 +93,7 @@ export interface TrainingProgress {
 }
 export interface BestMetrics { epoch: number; precision: number | null; recall: number | null; map50: number | null; map50_95: number | null }
 export interface TrainingRunSummary {
+  task_type?: string
   id: string
   name: string
   dataset_id: string
@@ -118,8 +121,23 @@ export const defaultParameters: TrainingParameters = {
   epochs: 100, batch: 16, imgsz: 640, lr0: 0.01, optimizer: 'auto', patience: 50, workers: 4, seed: 0, cos_lr: false,
 }
 
+export interface TrainingReport {
+  id: string; name: string; status: TrainingStatus; status_label: string; snapshot_at: string
+  created_at: string; started_at: string | null; finished_at: string | null; created_by: string
+  operation: string; algorithm: string; scale: string | null; architecture: string; task: string
+  training_mode: string; node_id: string; gpu_device_ids: string[]
+  source: Record<string, unknown>; dataset: Record<string, unknown>; parameters: ParameterValues
+  configuration: Record<string, unknown>; best: Record<string, number> | null; last: Record<string, number> | null
+  metrics: Array<Record<string, number>>; evaluation: EvaluationReport | null; artifacts: Record<string, number>
+  figures: string[]; charts: string[]; error: string | null; notes: string[]; logs_note: string
+}
+
 export const trainingApi = {
-  parameterContract: (mode: 'train' | 'val' | 'export' = 'train') => request<ParameterContract>(`/training/parameter-contract?mode=${mode}`),
+  report: (id: string) => request<TrainingReport>(`/training/runs/${id}/report`),
+  downloadUrl: (id: string, kind: string) => projectUrl(`/training/runs/${id}/download/${encodeURIComponent(kind)}`),
+  chartUrl: (id: string, name: string) => projectUrl(`/training/runs/${id}/charts/${encodeURIComponent(name)}`),
+  figureUrl: (id: string, name: string) => projectUrl(`/training/runs/${id}/figure?name=${encodeURIComponent(name)}`),
+  parameterContract: (mode: 'train' | 'val' | 'export' = 'train', model?: string) => request<ParameterContract>(`/training/parameter-contract?mode=${mode}${model ? '&model='+encodeURIComponent(model) : ''}`),
   models: () => request<TrainingModel[]>('/training/models'),
   sources: () => request<TrainingSourceOption[]>('/training/sources'),
   uploadWeight: (file: File, onProgress?: (ratio: number) => void) => {
@@ -154,7 +172,7 @@ export const trainingApi = {
   deleteDataset: (id: string) => request<void>(`/training/datasets/${id}`, { method: 'DELETE' }),
   runs: () => request<TrainingRunSummary[]>('/training/runs'),
   run: (id: string) => request<TrainingRun>(`/training/runs/${id}`),
-  create: (payload: { name: string; dataset_id: string; model: string; node_id: string; gpu_device_ids: string[]; parameters: ParameterValues; source?: TrainingSource; operation?: 'train' | 'val' }) =>
+  create: (payload: { task_type?: 'object_detection'; name: string; dataset_id: string; model: string; node_id: string; gpu_device_ids: string[]; parameters: ParameterValues; architecture?: string; source?: TrainingSource; operation?: 'train' | 'val' }) =>
     request<TrainingRun>('/training/runs', { method: 'POST', body: JSON.stringify(payload) }),
   stop: (id: string) => request<TrainingRun>(`/training/runs/${id}/stop`, { method: 'POST' }),
   evaluation: (id: string) => request<EvaluationReport>(`/training/runs/${id}/evaluation`),

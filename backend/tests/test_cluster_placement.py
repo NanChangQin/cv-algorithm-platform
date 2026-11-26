@@ -71,6 +71,27 @@ def test_missing_gpu_fails_without_fallback(monkeypatch):
     assert all(not node.requests for node in nodes.values())
 
 
+def test_deployment_container_names_are_dns_safe_stable_and_distinct(monkeypatch):
+    manager, _ = cluster(monkeypatch)
+    scope = "a" * 32
+    deployment = request(
+        container_name=f"cv-algorithm-{'b' * 12}-d{scope}",
+        runtime_scope=scope, node_id="local", gpu_device_ids=("0",),
+    )
+    first = manager.ensure_running(deployment)
+    repeated = manager.ensure_running(deployment)
+    other_gpu = manager.ensure_running(replace(deployment, gpu_device_ids=("1",)))
+    other_scope = manager.ensure_running(replace(
+        deployment, runtime_scope="a" * 31 + "b",
+        container_name=deployment.container_name[:-1] + "b",
+    ))
+    assert first.container_name == repeated.container_name
+    assert len({item.container_name for item in (first, other_gpu, other_scope)}) == 3
+    for instance in (first, other_gpu, other_scope):
+        # Exercise the same IDNA limit used by Python's hostname resolution.
+        assert len(instance.container_name.encode("idna")) <= 63
+
+
 def test_disabled_node_fails_without_fallback(monkeypatch):
     manager, nodes = cluster(monkeypatch)
     manager.register_node(RuntimeNode("remote", "Remote", "http://remote", False))

@@ -126,7 +126,7 @@ function exportFile() {
         <p v-if="dirty && !draftError" class="muted-copy">编辑后应用配置，再提交任务。</p>
       </div>
       <div v-else class="parameter-fields">
-        <label v-for="[name, spec] in filtered" :key="name" class="parameter-control">
+        <label v-for="[name, spec] in filtered" :key="name" :class="['parameter-control', `parameter-type-${controlType(spec)}`]">
           <span class="parameter-title">{{ spec.title ?? name }} <code v-if="spec.title && spec.title !== name">{{ name }}</code></span>
           <small v-if="spec.description">{{ spec.description }}</small>
           <div v-if="controlType(spec) === 'number' || controlType(spec) === 'integer'" class="parameter-inputs">
@@ -159,4 +159,21 @@ function exportFile() {
 .parameter-control { min-width: 0; }
 .parameter-error { color: var(--danger, #cf3c48); overflow-wrap: anywhere; }
 .parameter-file { display: block; max-width: 14rem; font-size: .8rem; }
+</style>
+
+<style scoped>
+.parameter-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 14px 22px; align-items: stretch; }
+.parameter-fields .parameter-control { display: grid; grid-template-rows: auto 1fr auto; align-content: start; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.parameter-fields .parameter-control:last-child { border-bottom: 1px solid var(--line); }
+.parameter-control small { min-height: 2.6em; line-height: 1.4; }
+.parameter-control .parameter-inputs { display: flex; flex-wrap: wrap; gap: 8px; }
+.parameter-inputs input[type='range'] { flex: 1 1 100px; min-width: 0; max-width: 160px; }
+.parameter-control input.parameter-number { flex: 0 0 104px; width: 104px; min-width: 0; margin: 0; }
+.parameter-control input:not([type='checkbox']):not([type='range']), .parameter-control select, .parameter-control textarea { min-height: 38px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); background: var(--surface); max-width: 100%; }
+.parameter-control select { width: min(100%, 220px); }
+.parameter-type-json, .parameter-type-string { grid-column: span 2; }
+.parameter-control input[type='checkbox'] { width: 18px; height: 18px; margin: 8px 0; }
+.parameter-toolbar input[type='search'] { max-width: 360px; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); background: var(--surface); }
+.parameter-toolbar select { max-width: 220px; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); background: var(--surface); }
+@media (max-width: 640px) { .parameter-type-json, .parameter-type-string { grid-column: auto; } }
 </style>

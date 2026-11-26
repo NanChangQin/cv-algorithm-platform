@@ -37,8 +37,7 @@ async function login() {
       <div v-if="error" class="alert">{{ error }}</div>
       <label>用户名<input v-model="username" autocomplete="username" /></label>
       <label>密码<input v-model="password" type="password" autocomplete="current-password" /></label>
-      <small v-if="password && password.length < 12" class="muted-copy">密码至少 12 位</small>
-      <button class="primary-button" :disabled="submitting || password.length < 12">
+      <button class="primary-button" :disabled="submitting || !username.trim() || !password">
         {{ submitting ? '正在验证…' : '登录' }}
       </button>
     </form>
